@@ -1,0 +1,5 @@
+{
+  "name": "DEXAPP - Soluções Domésticas",
+  "description": "Plataforma que conecta clientes a prestadores de serviços domésticos em Moçambique.",
+  "requestFramePermissions": ["geolocation"]
+}

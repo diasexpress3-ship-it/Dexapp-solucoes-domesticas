@@ -1,0 +1,89 @@
+{
+  "entities": {
+    "User": {
+      "title": "User",
+      "description": "User profile information",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "nome": { "type": "string" },
+        "email": { "type": "string", "format": "email" },
+        "telefone": { "type": "string" },
+        "role": { "type": "string", "enum": ["cliente", "prestador", "central", "admin"] },
+        "status": { "type": "string", "enum": ["ativo", "pendente", "bloqueado", "suspenso"] },
+        "dataCadastro": { "type": "string", "format": "date-time" },
+        "ultimoAcesso": { "type": "string", "format": "date-time" },
+        "photoURL": { "type": "string" },
+        "prestadorData": {
+          "type": "object",
+          "properties": {
+            "especialidades": { "type": "array", "items": { "type": "string" } },
+            "categoria": { "type": "string" },
+            "biUrl": { "type": "string" },
+            "profileUrl": { "type": "string" },
+            "rating": { "type": "number" },
+            "trabalhos": { "type": "number" },
+            "disponivel": { "type": "boolean" },
+            "agenda": { "type": "array" }
+          }
+        }
+      },
+      "required": ["id", "nome", "telefone", "role", "status"]
+    },
+    "Solicitacao": {
+      "title": "Solicitacao",
+      "description": "Service request",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clienteId": { "type": "string" },
+        "clienteNome": { "type": "string" },
+        "clienteTelefone": { "type": "string" },
+        "prestadorId": { "type": "string" },
+        "prestadorNome": { "type": "string" },
+        "servico": { "type": "string" },
+        "categoria": { "type": "string" },
+        "status": { "type": "string", "enum": ["buscando_prestador", "prestador_atribuido", "em_andamento", "concluido", "cancelado"] },
+        "valorTotal": { "type": "number" },
+        "valor80": { "type": "number" },
+        "valor20": { "type": "number" },
+        "endereco": { "type": "object" },
+        "dataSolicitacao": { "type": "string", "format": "date-time" }
+      },
+      "required": ["clienteId", "servico", "categoria", "status", "valorTotal"]
+    },
+    "Pagamento": {
+      "title": "Pagamento",
+      "description": "Payment transaction",
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "clienteId": { "type": "string" },
+        "valor": { "type": "number" },
+        "metodo": { "type": "string" },
+        "status": { "type": "string", "enum": ["pendente", "confirmado", "falhou"] },
+        "data": { "type": "string", "format": "date-time" },
+        "tipo": { "type": "string", "enum": ["sinal_80", "restante_20", "deposito", "saque", "pagamento_servico"] }
+      },
+      "required": ["clienteId", "valor", "metodo", "status", "data", "tipo"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "User",
+      "description": "User profiles"
+    },
+    "/solicitacoes/{solicitacaoId}": {
+      "schema": "Solicitacao",
+      "description": "Service requests"
+    },
+    "/pagamentos/{pagamentoId}": {
+      "schema": "Pagamento",
+      "description": "Financial transactions"
+    },
+    "/config/{configId}": {
+      "schema": "object",
+      "description": "Platform configuration"
+    }
+  }
+}
