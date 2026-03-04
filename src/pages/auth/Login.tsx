@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Loader2, ArrowRight, User, Wrench, Shield, ShieldCheck } from 'lucide-react';
+import { Mail, Lock, Loader2, ArrowRight, User, Wrench, Shield, ShieldCheck, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { useToast } from '../../contexts/ToastContext';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { doc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 
@@ -13,7 +13,7 @@ export default function Login() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [quickAccessVisible, setQuickAccessVisible] = useState(false);
+  const [showAdmin, setShowAdmin] = useState(false);
   const { login } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
@@ -23,19 +23,6 @@ export default function Login() {
     email: 'startbusiness26@gmail.com',
     password: 'Sahombe13'
   };
-
-  // Verificar se admin já existe no Firebase
-  useEffect(() => {
-    const checkAdminExists = async () => {
-      try {
-        // Esta é apenas uma verificação opcional
-        console.log('Verificando acesso admin...');
-      } catch (error) {
-        console.error('Erro ao verificar admin:', error);
-      }
-    };
-    checkAdminExists();
-  }, []);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -65,7 +52,6 @@ export default function Login() {
     setEmail(creds.email);
     setPassword(creds.password);
     
-    // Pequeno delay para mostrar o preenchimento
     setTimeout(async () => {
       setIsLoading(true);
       try {
@@ -80,7 +66,7 @@ export default function Login() {
     }, 500);
   };
 
-  // Credenciais de teste (apenas para demonstração - não usar em produção)
+  // Credenciais de teste
   const testAccounts = {
     cliente: { email: 'cliente@teste.com', password: '123456' },
     prestador: { email: 'prestador@teste.com', password: '123456' },
@@ -165,106 +151,96 @@ export default function Login() {
             </p>
           </div>
 
-          {/* Botão para mostrar/esconder acesso rápido */}
-          <div className="mt-8 text-center">
-            <button
-              onClick={() => setQuickAccessVisible(!quickAccessVisible)}
-              className="text-xs font-bold text-gray-300 hover:text-[#FF7A00] transition-colors uppercase tracking-widest"
-            >
-              {quickAccessVisible ? '▼ Ocultar Acesso Rápido' : '▶ Mostrar Acesso Rápido'}
-            </button>
-          </div>
-
-          {/* Acesso Rápido por Perfil */}
-          <motion.div
-            initial={false}
-            animate={{ height: quickAccessVisible ? 'auto' : 0, opacity: quickAccessVisible ? 1 : 0 }}
-            transition={{ duration: 0.3 }}
-            className="overflow-hidden"
-          >
-            <div className="mt-6 pt-6 border-t border-gray-100">
-              <p className="text-center text-xs font-black text-gray-300 uppercase tracking-widest mb-4">
-                Acesso Rápido por Perfil
-              </p>
-              <div className="grid grid-cols-4 gap-3">
-                {/* Cliente */}
-                <button
-                  onClick={() => quickLogin('Cliente', testAccounts.cliente)}
-                  className="group relative p-3 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all"
-                  title="Acesso Cliente"
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform">
-                      <User size={20} />
-                    </div>
-                    <span className="text-[10px] font-black text-blue-600 uppercase tracking-wider">Cliente</span>
+          {/* Separador */}
+          <div className="mt-8 pt-6 border-t border-gray-100">
+            <p className="text-center text-xs font-black text-gray-300 uppercase tracking-widest mb-4">
+              Acesso Rápido por Perfil
+            </p>
+            
+            {/* Perfil principais (visíveis) */}
+            <div className="grid grid-cols-3 gap-3 mb-3">
+              {/* Cliente */}
+              <button
+                onClick={() => quickLogin('Cliente', testAccounts.cliente)}
+                className="group relative p-3 bg-blue-50 hover:bg-blue-100 rounded-xl transition-all"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform">
+                    <User size={20} />
                   </div>
-                </button>
+                  <span className="text-[9px] font-black text-blue-600 uppercase tracking-wider">Cliente</span>
+                </div>
+              </button>
 
-                {/* Prestador */}
-                <button
-                  onClick={() => quickLogin('Prestador', testAccounts.prestador)}
-                  className="group relative p-3 bg-orange-50 hover:bg-orange-100 rounded-xl transition-all"
-                  title="Acesso Prestador"
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 bg-[#FF7A00] rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform">
-                      <Wrench size={20} />
-                    </div>
-                    <span className="text-[10px] font-black text-[#FF7A00] uppercase tracking-wider">Prestador</span>
+              {/* Prestador */}
+              <button
+                onClick={() => quickLogin('Prestador', testAccounts.prestador)}
+                className="group relative p-3 bg-orange-50 hover:bg-orange-100 rounded-xl transition-all"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-10 h-10 bg-[#FF7A00] rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform">
+                    <Wrench size={20} />
                   </div>
-                </button>
+                  <span className="text-[9px] font-black text-[#FF7A00] uppercase tracking-wider">Prestador</span>
+                </div>
+              </button>
 
-                {/* Central */}
-                <button
-                  onClick={() => quickLogin('Central', testAccounts.central)}
-                  className="group relative p-3 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all"
-                  title="Acesso Central"
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform">
-                      <Shield size={20} />
-                    </div>
-                    <span className="text-[10px] font-black text-purple-600 uppercase tracking-wider">Central</span>
+              {/* Central */}
+              <button
+                onClick={() => quickLogin('Central', testAccounts.central)}
+                className="group relative p-3 bg-purple-50 hover:bg-purple-100 rounded-xl transition-all"
+              >
+                <div className="flex flex-col items-center gap-1">
+                  <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform">
+                    <Shield size={20} />
                   </div>
-                </button>
+                  <span className="text-[9px] font-black text-purple-600 uppercase tracking-wider">Central</span>
+                </div>
+              </button>
+            </div>
 
-                {/* Admin - Um pouco escondido, com tom mais suave */}
-                <button
-                  onClick={() => quickLogin('Admin', testAccounts.admin)}
-                  className="group relative p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all opacity-70 hover:opacity-100"
-                  title="Acesso Administrador"
-                >
-                  <div className="flex flex-col items-center gap-2">
-                    <div className="w-10 h-10 bg-gray-400 rounded-xl flex items-center justify-center text-white shadow-sm group-hover:scale-110 transition-transform">
-                      <ShieldCheck size={20} />
-                    </div>
-                    <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Admin</span>
-                  </div>
-                </button>
-              </div>
+            {/* Admin - Botão pequeno e discreto */}
+            <div className="flex justify-center">
+              <button
+                onClick={() => setShowAdmin(!showAdmin)}
+                className="flex items-center gap-1 px-3 py-1.5 bg-gray-50 hover:bg-gray-100 rounded-full transition-all opacity-60 hover:opacity-100"
+              >
+                <ShieldCheck size={14} className="text-gray-400" />
+                <span className="text-[10px] font-medium text-gray-400 uppercase tracking-wider">Admin</span>
+                {showAdmin ? <ChevronUp size={12} className="text-gray-400" /> : <ChevronDown size={12} className="text-gray-400" />}
+              </button>
+            </div>
 
-              {/* Admin Credentials Hint */}
-              {quickAccessVisible && (
+            {/* Admin Login - aparece quando clicar no botão admin */}
+            <AnimatePresence>
+              {showAdmin && (
                 <motion.div
-                  initial={{ opacity: 0 }}
-                  animate={{ opacity: 1 }}
-                  transition={{ delay: 0.2 }}
-                  className="mt-4 p-3 bg-gray-50 rounded-xl text-center"
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -10 }}
+                  className="mt-3"
                 >
-                  <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest mb-1">
-                    Acesso Administrador
-                  </p>
-                  <p className="text-xs font-mono text-gray-500">
-                    startbusiness26@gmail.com
-                  </p>
-                  <p className="text-xs font-mono text-gray-500">
-                    ••••••••
-                  </p>
+                  <button
+                    onClick={() => quickLogin('Administrador', testAccounts.admin)}
+                    className="w-full p-3 bg-gray-50 hover:bg-gray-100 rounded-xl transition-all group"
+                  >
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 bg-gray-400 rounded-lg flex items-center justify-center text-white group-hover:scale-110 transition-transform">
+                          <ShieldCheck size={16} />
+                        </div>
+                        <div className="text-left">
+                          <p className="text-xs font-bold text-gray-600">Acesso Administrador</p>
+                          <p className="text-[8px] font-mono text-gray-400">startbusiness26@gmail.com</p>
+                        </div>
+                      </div>
+                      <ArrowRight size={16} className="text-gray-400 group-hover:text-gray-600 transition-colors" />
+                    </div>
+                  </button>
                 </motion.div>
               )}
-            </div>
-          </motion.div>
+            </AnimatePresence>
+          </div>
         </div>
 
         {/* Footer */}
