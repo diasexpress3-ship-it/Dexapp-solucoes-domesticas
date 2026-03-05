@@ -61,26 +61,30 @@ export default function ContactoPage() {
     // Criar link mailto
     const mailtoLink = `mailto:diasexpress3@gmail.com?subject=${assunto}&body=${corpo}`;
 
-    // Abrir o cliente de email padrão
+    // Usar window.location.href para navegação direta
     window.location.href = mailtoLink;
 
     // Feedback para o usuário
     showToast('Abrindo seu cliente de email...', 'info');
     
-    // Simular envio (apenas para feedback visual)
+    // Limpar formulário
     setTimeout(() => {
       setFormData({ nome: '', email: '', telefone: '', assunto: '', mensagem: '' });
       setIsLoading(false);
-      showToast('Obrigado pelo contacto! Responderemos em breve.', 'success');
     }, 2000);
   };
 
-  // Função para lidar com o clique no botão de email (usando window.open)
-  const handleEmailClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    e.preventDefault();
-    const mailtoLink = e.currentTarget.href;
-    window.open(mailtoLink, '_blank');
-    showToast('Abrindo cliente de email...', 'info');
+  // Função para lidar com links externos
+  const handleExternalLink = (url: string, tipo: string) => {
+    showToast(`Abrindo ${tipo}...`, 'info');
+    
+    if (url.startsWith('mailto:')) {
+      // Para mailto, usar window.location.href
+      window.location.href = url;
+    } else {
+      // Para outros links, abrir em nova aba
+      window.open(url, '_blank');
+    }
   };
 
   // Informações de contacto reais
@@ -92,7 +96,7 @@ export default function ContactoPage() {
       description: 'Segunda a Sábado, 08h - 20h',
       action: 'https://wa.me/258871425316',
       actionLabel: 'Chamar no WhatsApp',
-      external: true
+      tipo: 'WhatsApp'
     },
     {
       icon: Mail,
@@ -102,7 +106,7 @@ export default function ContactoPage() {
       action: 'mailto:diasexpress3@gmail.com?subject=Contacto%20via%20DEXAPP&body=Olá,%20gostaria%20de%20saber%20mais%20sobre%20os%20serviços%20da%20DEXAPP.',
       actionLabel: 'Enviar E-mail Agora',
       highlight: true,
-      external: true
+      tipo: 'cliente de email'
     },
     {
       icon: Globe,
@@ -111,7 +115,7 @@ export default function ContactoPage() {
       description: 'Conheça nossos outros serviços',
       action: 'https://dex-diasexpress.vercel.app/#/',
       actionLabel: 'Visitar Site',
-      external: true
+      tipo: 'site'
     },
     {
       icon: MapPin,
@@ -120,18 +124,18 @@ export default function ContactoPage() {
       description: 'Atendimento presencial sob agendamento',
       action: 'https://maps.google.com',
       actionLabel: 'Ver no Mapa',
-      external: true
+      tipo: 'Google Maps'
     }
   ];
 
   // Redes Sociais com links reais
   const socialLinks = [
-    { icon: Facebook, label: 'Facebook', url: 'https://web.facebook.com/people/DEX-Diasexpress/61587829764999/', color: 'hover:bg-blue-600', bg: 'bg-blue-50', text: 'text-blue-600' },
-    { icon: Instagram, label: 'Instagram', url: 'https://www.instagram.com/dex_diasexpress/', color: 'hover:bg-pink-600', bg: 'bg-pink-50', text: 'text-pink-600' },
-    { icon: MessageCircle, label: 'WhatsApp', url: 'https://wa.me/258871425316', color: 'hover:bg-green-600', bg: 'bg-green-50', text: 'text-green-600' },
-    { icon: Twitter, label: 'Twitter', url: '#', color: 'hover:bg-blue-400', bg: 'bg-blue-50', text: 'text-blue-400' },
-    { icon: Linkedin, label: 'LinkedIn', url: 'https://www.linkedin.com/in/vicente-dias', color: 'hover:bg-blue-700', bg: 'bg-blue-50', text: 'text-blue-700' },
-    { icon: Youtube, label: 'YouTube', url: '#', color: 'hover:bg-red-600', bg: 'bg-red-50', text: 'text-red-600' }
+    { icon: Facebook, label: 'Facebook', url: 'https://web.facebook.com/people/DEX-Diasexpress/61587829764999/', bg: 'bg-blue-50', text: 'text-blue-600' },
+    { icon: Instagram, label: 'Instagram', url: 'https://www.instagram.com/dex_diasexpress/', bg: 'bg-pink-50', text: 'text-pink-600' },
+    { icon: MessageCircle, label: 'WhatsApp', url: 'https://wa.me/258871425316', bg: 'bg-green-50', text: 'text-green-600' },
+    { icon: Twitter, label: 'Twitter', url: '#', bg: 'bg-blue-50', text: 'text-blue-400' },
+    { icon: Linkedin, label: 'LinkedIn', url: 'https://www.linkedin.com/in/vicente-dias', bg: 'bg-blue-50', text: 'text-blue-700' },
+    { icon: Youtube, label: 'YouTube', url: '#', bg: 'bg-red-50', text: 'text-red-600' }
   ];
 
   const faqs = [
@@ -206,36 +210,18 @@ export default function ContactoPage() {
                       <p key={i} className="text-sm font-bold text-gray-600 mb-1">{detail}</p>
                     ))}
                     <p className="text-xs text-gray-400 mt-2 mb-4">{info.description}</p>
-                    {info.external ? (
-                      <button
-                        onClick={() => {
-                          window.open(info.action, '_blank');
-                          showToast(`Abrindo ${info.title.toLowerCase()}...`, 'info');
-                        }}
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all w-full justify-center ${
-                          info.highlight 
-                            ? 'bg-accent text-white hover:bg-accent/90 shadow-lg' 
-                            : 'bg-gray-100 text-primary hover:bg-gray-200'
-                        }`}
-                      >
-                        {info.actionLabel}
-                        <ChevronRight size={16} />
-                      </button>
-                    ) : (
-                      <a
-                        href={info.action}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all w-full justify-center ${
-                          info.highlight 
-                            ? 'bg-accent text-white hover:bg-accent/90 shadow-lg' 
-                            : 'bg-gray-100 text-primary hover:bg-gray-200'
-                        }`}
-                      >
-                        {info.actionLabel}
-                        <ChevronRight size={16} />
-                      </a>
-                    )}
+                    
+                    <button
+                      onClick={() => handleExternalLink(info.action, info.tipo)}
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all w-full justify-center ${
+                        info.highlight 
+                          ? 'bg-accent text-white hover:bg-accent/90 shadow-lg' 
+                          : 'bg-gray-100 text-primary hover:bg-gray-200'
+                      }`}
+                    >
+                      {info.actionLabel}
+                      <ChevronRight size={16} />
+                    </button>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -266,25 +252,17 @@ export default function ContactoPage() {
               
               <div className="flex flex-wrap items-center gap-4">
                 {socialLinks.map((social, idx) => (
-                  <motion.a
+                  <button
                     key={idx}
-                    href={social.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    whileHover={{ scale: 1.1 }}
-                    whileTap={{ scale: 0.95 }}
-                    onClick={(e) => {
-                      e.preventDefault();
-                      window.open(social.url, '_blank');
-                    }}
-                    className={`group relative w-14 h-14 rounded-xl bg-gray-50 hover:${social.color} flex items-center justify-center transition-all shadow-md hover:shadow-xl ${social.bg}`}
+                    onClick={() => handleExternalLink(social.url, social.label)}
+                    className={`group relative w-14 h-14 rounded-xl bg-gray-50 hover:bg-gray-200 flex items-center justify-center transition-all shadow-md hover:shadow-xl ${social.bg}`}
                     title={social.label}
                   >
-                    <social.icon className={`w-6 h-6 ${social.text} group-hover:text-white transition-colors`} />
+                    <social.icon className={`w-6 h-6 ${social.text}`} />
                     <span className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-xs font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
                       {social.label}
                     </span>
-                  </motion.a>
+                  </button>
                 ))}
               </div>
             </div>
@@ -405,7 +383,7 @@ export default function ContactoPage() {
                           variant="outline" 
                           size="sm" 
                           className="mt-3 w-full"
-                          onClick={() => window.open('https://maps.google.com', '_blank')}
+                          onClick={() => handleExternalLink('https://maps.google.com', 'Google Maps')}
                         >
                           Abrir no Google Maps
                         </Button>
@@ -480,19 +458,13 @@ export default function ContactoPage() {
       </section>
 
       {/* WhatsApp Floating Button */}
-      <a
-        href="https://wa.me/258871425316"
-        target="_blank"
-        rel="noopener noreferrer"
-        onClick={(e) => {
-          e.preventDefault();
-          window.open('https://wa.me/258871425316', '_blank');
-        }}
+      <button
+        onClick={() => handleExternalLink('https://wa.me/258871425316', 'WhatsApp')}
         className="fixed bottom-6 right-6 z-50 bg-green-500 text-white p-4 rounded-full shadow-2xl hover:bg-green-600 transition-all hover:scale-110 animate-bounce"
         title="Fale connosco no WhatsApp"
       >
         <MessageCircle size={32} />
-      </a>
+      </button>
     </AppLayout>
   );
 }
