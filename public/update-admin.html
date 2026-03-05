@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="pt">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Atualizar Administrador - DEXAPP</title>
+    <style>
+        body {
+            font-family: 'Plus Jakarta Sans', sans-serif;
+            background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+            margin: 0;
+            padding: 20px;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .container {
+            max-width: 600px;
+            width: 100%;
+            background: white;
+            border-radius: 30px;
+            padding: 40px;
+            box-shadow: 0 20px 40px rgba(0,0,0,0.1);
+            border: 1px solid rgba(0,0,0,0.05);
+        }
+        h1 {
+            color: #0A1D56;
+            font-size: 32px;
+            font-weight: 900;
+            margin-bottom: 10px;
+        }
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid #eee;
+        }
+        #status {
+            background: #f8f9fa;
+            border-radius: 20px;
+            padding: 20px;
+            font-family: monospace;
+            font-size: 14px;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            border: 1px solid #e9ecef;
+        }
+        .success { color: #00a86b; font-weight: bold; }
+        .error { color: #dc3545; font-weight: bold; }
+        .info { color: #0A1D56; font-weight: bold; }
+        button {
+            background: #FF7A00;
+            color: white;
+            border: none;
+            padding: 15px 30px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 15px;
+            cursor: pointer;
+            margin-top: 20px;
+            width: 100%;
+            transition: all 0.3s;
+        }
+        button:hover {
+            background: #e66e00;
+            transform: scale(1.02);
+        }
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .warning {
+            background: #fff3cd;
+            border: 1px solid #ffeeba;
+            color: #856404;
+            padding: 15px;
+            border-radius: 15px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🛠️ Atualizar Administrador</h1>
+        <p class="subtitle">Recriar usuário admin no Authentication e Firestore</p>
+
+        <div class="warning">
+            ⚠️ Este script irá:
+            <ul>
+                <li>Apagar o usuário atual (se existir)</li>
+                <li>Criar novo usuário com email <strong>startbusiness26@gmail.com</strong></li>
+                <li>Criar documento no Firestore com o novo UID</li>
+            </ul>
+        </div>
+
+        <button id="btnExecute" onclick="execute()">🚀 Executar Atualização</button>
+        
+        <h3 style="margin: 20px 0 10px">📋 Log de execução:</h3>
+        <div id="status">Aguardando início...</div>
+    </div>
+
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-auth-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.6.0/firebase-firestore-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyA9eKSda522pzADmtipwlnYzzRI15xI8QQ",
+            authDomain: "dex-solucoes-domesticas-2b983.firebaseapp.com",
+            projectId: "dex-solucoes-domesticas-2b983",
+            storageBucket: "dex-solucoes-domesticas-2b983.firebasestorage.app",
+            messagingSenderId: "1037790998572",
+            appId: "1:1037790998572:web:6b755aa840406335ea2f29"
+        };
+
+        // Inicializar Firebase
+        firebase.initializeApp(firebaseConfig);
+        const auth = firebase.auth();
+        const db = firebase.firestore();
+
+        const statusDiv = document.getElementById('status');
+        const btnExecute = document.getElementById('btnExecute');
+
+        function log(message, type = 'info') {
+            const prefix = {
+                'success': '✅',
+                'error': '❌',
+                'info': 'ℹ️'
+            }[type] || 'ℹ️';
+            
+            statusDiv.innerHTML += `<br><span class="${type}">${prefix} ${message}</span>`;
+            statusDiv.scrollTop = statusDiv.scrollHeight;
+        }
+
+        function clearLog() {
+            statusDiv.innerHTML = '';
+        }
+
+        async function execute() {
+            btnExecute.disabled = true;
+            btnExecute.textContent = '⏳ Executando...';
+            clearLog();
+            log('Iniciando processo de atualização do administrador...', 'info');
+
+            try {
+                // 1️⃣ Tentar fazer login para verificar se usuário existe
+                log('Verificando se usuário existe...', 'info');
+                let oldUser = null;
+                
+                try {
+                    const userCredential = await auth.signInWithEmailAndPassword('startbusiness26@gmail.com', 'Sahombe13');
+                    oldUser = userCredential.user;
+                    log(`Usuário encontrado com UID: ${oldUser.uid}`, 'info');
+                    
+                    // 2️⃣ Apagar usuário antigo
+                    log('Apagando usuário antigo...', 'info');
+                    await oldUser.delete();
+                    log('Usuário antigo apagado com sucesso!', 'success');
+                } catch (error) {
+                    if (error.code === 'auth/user-not-found') {
+                        log('Usuário não existe. Prosseguindo com criação...', 'info');
+                    } else {
+                        log(`Erro ao verificar usuário: ${error.message}`, 'error');
+                    }
+                }
+
+                // 3️⃣ Criar novo usuário
+                log('Criando novo usuário no Authentication...', 'info');
+                const userCredential = await auth.createUserWithEmailAndPassword('startbusiness26@gmail.com', 'Sahombe13');
+                const newUser = userCredential.user;
+                
+                log(`✅ Novo usuário criado!`, 'success');
+                log(`📧 Email: ${newUser.email}`, 'success');
+                log(`🔑 Senha: Sahombe13`, 'success');
+                log(`🆔 Novo UID: ${newUser.uid}`, 'success');
+
+                // 4️⃣ Criar documento no Firestore
+                log('Criando documento no Firestore...', 'info');
+                
+                const adminData = {
+                    id: newUser.uid,
+                    nome: 'Administrador',
+                    email: 'startbusiness26@gmail.com',
+                    profile: 'admin',
+                    status: 'ativo',
+                    dataCadastro: new Date().toISOString(),
+                    ultimoAcesso: null,
+                    telefone: ''
+                };
+
+                await db.collection('users').doc(newUser.uid).set(adminData);
+                
+                log('✅ Documento criado no Firestore!', 'success');
+                log('📄 Dados:', 'info');
+                log(JSON.stringify(adminData, null, 2), 'info');
+
+                // 5️⃣ Verificar se está tudo OK
+                log('Verificando documento criado...', 'info');
+                const docCheck = await db.collection('users').doc(newUser.uid).get();
+                
+                if (docCheck.exists) {
+                    log('✅ Documento verificado com sucesso!', 'success');
+                    log('🎉 Processo concluído! Faça login na aplicação com:', 'success');
+                    log('📧 Email: startbusiness26@gmail.com', 'success');
+                    log('🔑 Senha: Sahombe13', 'success');
+                } else {
+                    log('❌ Erro: Documento não encontrado após criação!', 'error');
+                }
+
+            } catch (error) {
+                log(`❌ Erro durante execução: ${error.code} - ${error.message}`, 'error');
+                console.error(error);
+            } finally {
+                btnExecute.disabled = false;
+                btnExecute.textContent = '🚀 Executar Atualização';
+            }
+        }
+    </script>
+</body>
+</html>
