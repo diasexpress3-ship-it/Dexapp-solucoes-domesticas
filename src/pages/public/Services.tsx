@@ -1,25 +1,54 @@
 import React, { useState } from 'react';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { SERVICE_CATEGORIES } from '../../constants/categories';
+import { SERVICE_CATEGORIES, ESPECIALIDADES_POR_CATEGORIA, getSpecialtiesByCategory } from '../../constants/categories';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Search, ArrowRight, Star, ShieldCheck, Clock } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { 
+  Search, 
+  ArrowRight, 
+  Star, 
+  ShieldCheck, 
+  Clock,
+  ChevronDown,
+  ChevronUp,
+  MapPin,
+  Users,
+  Briefcase,
+  Sparkles
+} from 'lucide-react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { useToast } from '../../contexts/ToastContext';
 
 export default function Services() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
+  const [selectedSpecialty, setSelectedSpecialty] = useState<string | null>(null);
   const navigate = useNavigate();
+  const { showToast } = useToast();
 
   const filteredCategories = SERVICE_CATEGORIES.filter(cat => 
-    cat.name.toLowerCase().includes(searchTerm.toLowerCase())
+    cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    getSpecialtiesByCategory(cat.name).some(s => 
+      s.name.toLowerCase().includes(searchTerm.toLowerCase())
+    )
   );
+
+  const handleSolicitar = (categoryName: string, specialtyName?: string) => {
+    showToast(`Redirecionando para solicitação de ${specialtyName || categoryName}`, 'info');
+    navigate('/register-cliente', { 
+      state: { 
+        categoria: categoryName,
+        especialidade: specialtyName 
+      } 
+    });
+  };
 
   return (
     <AppLayout>
       {/* Header Section */}
-      <section className="py-20 bg-primary text-white">
+      <section className="bg-gradient-to-br from-primary to-blue-900 py-20 text-white">
         <div className="container mx-auto px-4 text-center">
           <motion.h1 
             initial={{ opacity: 0, y: 20 }}
@@ -32,7 +61,7 @@ export default function Services() {
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.1 }}
-            className="text-xl opacity-80 max-w-2xl mx-auto mb-10"
+            className="text-xl opacity-90 max-w-2xl mx-auto mb-10"
           >
             Escolha a categoria que melhor atende às suas necessidades e encontre os melhores profissionais de Moçambique.
           </motion.p>
@@ -51,50 +80,141 @@ export default function Services() {
       {/* Categories Grid */}
       <section className="py-20 bg-gray-50">
         <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8">
-            {filteredCategories.map((cat, i) => (
-              <motion.div
-                key={cat.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-              >
-                <Card hoverable className="h-full border-none shadow-sm group">
-                  <CardContent className="p-8 flex flex-col h-full">
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
-                      <cat.icon size={32} />
-                    </div>
-                    <h3 className="text-2xl font-black text-primary mb-4">{cat.name}</h3>
-                    <p className="text-gray-500 mb-8 flex-1">
-                      Encontre profissionais qualificados para {cat.name.toLowerCase()} com garantia de qualidade e segurança DEXAPP.
-                    </p>
-                    <div className="space-y-4 mb-8">
-                      <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase">
-                        <Star size={14} className="text-yellow-500 fill-yellow-500" />
-                        <span>Média 4.8/5.0</span>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+            {filteredCategories.map((cat, i) => {
+              const specialties = getSpecialtiesByCategory(cat.name);
+              const isExpanded = expandedCategory === cat.id;
+              
+              return (
+                <motion.div
+                  key={cat.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: i * 0.05 }}
+                >
+                  <Card className="border-none shadow-sm hover:shadow-lg transition-all overflow-hidden">
+                    <CardContent className="p-0">
+                      {/* Cabeçalho da Categoria */}
+                      <div 
+                        className="p-6 cursor-pointer"
+                        onClick={() => setExpandedCategory(isExpanded ? null : cat.id)}
+                      >
+                        <div className="flex items-start gap-4">
+                          <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white shadow-lg shrink-0`}>
+                            <cat.icon size={32} />
+                          </div>
+                          <div className="flex-1">
+                            <div className="flex items-center justify-between mb-2">
+                              <h3 className="text-2xl font-black text-primary">{cat.name}</h3>
+                              {isExpanded ? (
+                                <ChevronUp className="text-accent" size={24} />
+                              ) : (
+                                <ChevronDown className="text-accent" size={24} />
+                              )}
+                            </div>
+                            
+                            {/* Informações rápidas quando fechado */}
+                            {!isExpanded && (
+                              <div className="flex items-center gap-6 text-sm">
+                                <div className="flex items-center gap-2 text-gray-500">
+                                  <Briefcase size={16} />
+                                  <span>{specialties.length} especialidades</span>
+                                </div>
+                                <div className="flex items-center gap-2 text-gray-500">
+                                  <Star size={16} className="text-yellow-500 fill-yellow-500" />
+                                  <span>4.8/5.0</span>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        </div>
                       </div>
-                      <div className="flex items-center gap-2 text-xs font-bold text-gray-400 uppercase">
-                        <ShieldCheck size={14} className="text-green-500" />
-                        <span>Profissionais Verificados</span>
-                      </div>
-                    </div>
-                    <Button 
-                      className="w-full" 
-                      rightIcon={<ArrowRight size={18} />}
-                      onClick={() => navigate('/auth/register-cliente')}
-                    >
-                      Solicitar Agora
-                    </Button>
-                  </CardContent>
-                </Card>
-              </motion.div>
-            ))}
+
+                      {/* Especialidades (expansível) */}
+                      <AnimatePresence>
+                        {isExpanded && (
+                          <motion.div
+                            initial={{ height: 0, opacity: 0 }}
+                            animate={{ height: 'auto', opacity: 1 }}
+                            exit={{ height: 0, opacity: 0 }}
+                            className="overflow-hidden border-t border-gray-100"
+                          >
+                            <div className="p-6 bg-gray-50/50">
+                              <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                {specialties.map((specialty, idx) => (
+                                  <motion.div
+                                    key={idx}
+                                    initial={{ opacity: 0, x: -10 }}
+                                    animate={{ opacity: 1, x: 0 }}
+                                    transition={{ delay: idx * 0.02 }}
+                                    className="group relative"
+                                  >
+                                    <button
+                                      onClick={() => handleSolicitar(cat.name, specialty.name)}
+                                      className="w-full p-4 bg-white rounded-xl border border-gray-100 hover:border-accent hover:shadow-md transition-all text-left"
+                                    >
+                                      <div className="flex items-center justify-between mb-2">
+                                        <div className="flex items-center gap-2">
+                                          {specialty.icon && <specialty.icon size={16} className="text-accent" />}
+                                          <span className="font-bold text-primary">{specialty.name}</span>
+                                        </div>
+                                        {specialty.popular && (
+                                          <span className="px-2 py-1 bg-accent/10 text-accent text-[10px] font-black uppercase rounded-full">
+                                            Popular
+                                          </span>
+                                        )}
+                                      </div>
+                                      
+                                      <div className="flex items-center justify-between text-xs">
+                                        <span className="text-gray-400">
+                                          {specialty.estimatedTime || '2-3h'}
+                                        </span>
+                                        <span className="font-bold text-accent">
+                                          A partir de {specialty.minPrice || 1000} MTn
+                                        </span>
+                                      </div>
+
+                                      {specialty.description && (
+                                        <p className="text-xs text-gray-400 mt-2 line-clamp-2">
+                                          {specialty.description}
+                                        </p>
+                                      )}
+                                    </button>
+                                  </motion.div>
+                                ))}
+                              </div>
+
+                              {/* Botão para solicitar categoria completa */}
+                              <div className="mt-6 pt-4 border-t border-gray-200">
+                                <Button
+                                  variant="outline"
+                                  className="w-full"
+                                  onClick={() => handleSolicitar(cat.name)}
+                                  rightIcon={<ArrowRight size={16} />}
+                                >
+                                  Solicitar {cat.name} Completa
+                                </Button>
+                              </div>
+                            </div>
+                          </motion.div>
+                        )}
+                      </AnimatePresence>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              );
+            })}
           </div>
 
           {filteredCategories.length === 0 && (
             <div className="text-center py-20">
-              <p className="text-xl text-gray-500">Nenhuma categoria encontrada para "{searchTerm}".</p>
-              <Button variant="ghost" className="mt-4" onClick={() => setSearchTerm('')}>Limpar Pesquisa</Button>
+              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Search size={32} className="text-gray-400" />
+              </div>
+              <p className="text-xl text-gray-500 mb-4">Nenhuma categoria encontrada para "{searchTerm}"</p>
+              <Button variant="outline" onClick={() => setSearchTerm('')}>
+                Limpar Pesquisa
+              </Button>
             </div>
           )}
         </div>
