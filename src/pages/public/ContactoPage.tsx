@@ -65,8 +65,9 @@ export default function ContactoPage() {
       title: 'E-mail Principal',
       details: ['diasexpress3@gmail.com'],
       description: 'Respondemos em até 2h',
-      action: 'mailto:diasexpress3@gmail.com',
-      actionLabel: 'Enviar E-mail'
+      action: 'mailto:diasexpress3@gmail.com?subject=Contacto%20via%20DEXAPP&body=Olá,%20gostaria%20de%20saber%20mais%20sobre%20os%20serviços%20da%20DEXAPP.',
+      actionLabel: 'Enviar E-mail Agora',
+      highlight: true
     },
     {
       icon: Globe,
@@ -74,8 +75,7 @@ export default function ContactoPage() {
       details: ['dex-diasexpress.vercel.app'],
       description: 'Conheça nossos outros serviços',
       action: 'https://dex-diasexpress.vercel.app/#/',
-      actionLabel: 'Visitar Site',
-      highlight: true
+      actionLabel: 'Visitar Site'
     },
     {
       icon: MapPin,
@@ -93,7 +93,7 @@ export default function ContactoPage() {
     { icon: Instagram, label: 'Instagram', url: 'https://www.instagram.com/dex_diasexpress/', color: 'hover:bg-pink-600', bg: 'bg-pink-50', text: 'text-pink-600' },
     { icon: MessageCircle, label: 'WhatsApp', url: 'https://wa.me/258871425316', color: 'hover:bg-green-600', bg: 'bg-green-50', text: 'text-green-600' },
     { icon: Twitter, label: 'Twitter', url: '#', color: 'hover:bg-blue-400', bg: 'bg-blue-50', text: 'text-blue-400' },
-    { icon: Linkedin, label: 'LinkedIn', url: '#', color: 'hover:bg-blue-700', bg: 'bg-blue-50', text: 'text-blue-700' },
+    { icon: Linkedin, label: 'LinkedIn', url: 'https://www.linkedin.com/in/vicente-dias', color: 'hover:bg-blue-700', bg: 'bg-blue-50', text: 'text-blue-700' },
     { icon: Youtube, label: 'YouTube', url: '#', color: 'hover:bg-red-600', bg: 'bg-red-50', text: 'text-red-600' }
   ];
 
@@ -120,7 +120,7 @@ export default function ContactoPage() {
 
   return (
     <AppLayout>
-      {/* Hero Section - Mais atrativo */}
+      {/* Hero Section */}
       <section className="relative bg-gradient-to-br from-primary to-blue-900 py-24 text-white overflow-hidden">
         <div className="absolute inset-0 opacity-10">
           <div className="absolute top-20 left-10 w-32 h-32 bg-white rounded-full blur-3xl animate-pulse" />
@@ -146,7 +146,7 @@ export default function ContactoPage() {
         </div>
       </section>
 
-      {/* Contact Info Cards - Destaque para o site */}
+      {/* Contact Info Cards - Email em destaque */}
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -190,7 +190,7 @@ export default function ContactoPage() {
         </div>
       </section>
 
-      {/* Social Media Banner - Suspenso e Chamativo */}
+      {/* Social Media Banner */}
       <section className="relative -mt-8 mb-16">
         <div className="container mx-auto px-4">
           <motion.div 
@@ -294,7 +294,7 @@ export default function ContactoPage() {
                         required
                       />
                     </div>
-                    <div className="flex items-center gap-4">
+                    <div className="flex items-center justify-between">
                       <Button 
                         type="submit" 
                         size="lg" 
