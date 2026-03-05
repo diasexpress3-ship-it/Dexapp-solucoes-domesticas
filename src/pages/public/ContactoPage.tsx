@@ -16,9 +16,16 @@ import {
   ChevronRight,
   CheckCircle,
   Headphones,
-  HelpCircle
+  HelpCircle,
+  Globe,
+  Sparkles,
+  MessageCircle,
+  Share2,
+  Linkedin,
+  Youtube
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
+import { motion } from 'framer-motion';
 
 export default function ContactoPage() {
   const [formData, setFormData] = useState({
@@ -43,31 +50,51 @@ export default function ContactoPage() {
     }, 1500);
   };
 
+  // Informações de contacto reais
   const contactInfo = [
     {
       icon: Phone,
-      title: 'Telefone',
-      details: ['+258 84 000 0000', '+258 82 000 0000'],
-      description: 'Segunda a Sexta, 08h - 18h'
+      title: 'Telefone / WhatsApp',
+      details: ['+258 87 142 5316'],
+      description: 'Segunda a Sábado, 08h - 20h',
+      action: 'https://wa.me/258871425316',
+      actionLabel: 'Chamar no WhatsApp'
     },
     {
       icon: Mail,
-      title: 'E-mail',
-      details: ['geral@dex.co.mz', 'suporte@dex.co.mz'],
-      description: 'Respondemos em até 24h'
+      title: 'E-mail Principal',
+      details: ['diasexpress3@gmail.com'],
+      description: 'Respondemos em até 2h',
+      action: 'mailto:diasexpress3@gmail.com',
+      actionLabel: 'Enviar E-mail'
+    },
+    {
+      icon: Globe,
+      title: 'Site Oficial',
+      details: ['dex-diasexpress.vercel.app'],
+      description: 'Conheça nossos outros serviços',
+      action: 'https://dex-diasexpress.vercel.app/#/',
+      actionLabel: 'Visitar Site',
+      highlight: true
     },
     {
       icon: MapPin,
       title: 'Escritório',
-      details: ['Av. 24 de Julho, nº 123', 'Maputo, Moçambique'],
-      description: 'Agende uma visita'
-    },
-    {
-      icon: Headphones,
-      title: 'Suporte 24/7',
-      details: ['+258 87 142 5316', 'emergencias@dex.co.mz'],
-      description: 'Atendimento de emergência'
+      details: ['Maputo, Moçambique'],
+      description: 'Atendimento presencial sob agendamento',
+      action: 'https://maps.google.com',
+      actionLabel: 'Ver no Mapa'
     }
+  ];
+
+  // Redes Sociais com links reais
+  const socialLinks = [
+    { icon: Facebook, label: 'Facebook', url: 'https://web.facebook.com/people/DEX-Diasexpress/61587829764999/', color: 'hover:bg-blue-600', bg: 'bg-blue-50', text: 'text-blue-600' },
+    { icon: Instagram, label: 'Instagram', url: 'https://www.instagram.com/dex_diasexpress/', color: 'hover:bg-pink-600', bg: 'bg-pink-50', text: 'text-pink-600' },
+    { icon: MessageCircle, label: 'WhatsApp', url: 'https://wa.me/258871425316', color: 'hover:bg-green-600', bg: 'bg-green-50', text: 'text-green-600' },
+    { icon: Twitter, label: 'Twitter', url: '#', color: 'hover:bg-blue-400', bg: 'bg-blue-50', text: 'text-blue-400' },
+    { icon: Linkedin, label: 'LinkedIn', url: '#', color: 'hover:bg-blue-700', bg: 'bg-blue-50', text: 'text-blue-700' },
+    { icon: Youtube, label: 'YouTube', url: '#', color: 'hover:bg-red-600', bg: 'bg-red-50', text: 'text-red-600' }
   ];
 
   const faqs = [
@@ -93,40 +120,117 @@ export default function ContactoPage() {
 
   return (
     <AppLayout>
-      {/* Hero Section */}
-      <section className="relative bg-gradient-to-br from-primary to-blue-900 py-20 text-white overflow-hidden">
-        <div className="absolute top-0 right-0 w-96 h-96 bg-accent/10 rounded-full blur-3xl translate-x-1/2 -translate-y-1/2" />
+      {/* Hero Section - Mais atrativo */}
+      <section className="relative bg-gradient-to-br from-primary to-blue-900 py-24 text-white overflow-hidden">
+        <div className="absolute inset-0 opacity-10">
+          <div className="absolute top-20 left-10 w-32 h-32 bg-white rounded-full blur-3xl animate-pulse" />
+          <div className="absolute bottom-20 right-10 w-40 h-40 bg-accent rounded-full blur-3xl animate-pulse delay-1000" />
+        </div>
         <div className="container mx-auto px-4 relative z-10">
-          <div className="text-center max-w-3xl mx-auto">
-            <h1 className="text-4xl md:text-5xl font-black mb-6">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="text-center max-w-4xl mx-auto"
+          >
+            <div className="inline-flex items-center gap-2 bg-white/10 backdrop-blur-sm px-6 py-2 rounded-full mb-8">
+              <Sparkles className="w-4 h-4 text-accent" />
+              <span className="text-sm font-bold uppercase tracking-wider">Estamos Aqui para Ajudar</span>
+            </div>
+            <h1 className="text-5xl md:text-6xl font-black mb-6 leading-tight">
               Entre em <span className="text-accent">Contacto</span>
             </h1>
-            <p className="text-xl opacity-90 mb-8">
-              Estamos aqui para ajudar. Escolha o canal de sua preferência ou preencha o formulário abaixo.
+            <p className="text-xl opacity-90 mb-8 max-w-2xl mx-auto">
+              Escolha o canal de sua preferência. Respondemos em até 2 horas durante o horário comercial.
             </p>
-          </div>
+          </motion.div>
         </div>
       </section>
 
-      {/* Contact Info Cards */}
+      {/* Contact Info Cards - Destaque para o site */}
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {contactInfo.map((info, idx) => (
-              <Card key={idx} className="border-none shadow-sm hover:shadow-lg transition-all">
-                <CardContent className="p-6">
-                  <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center text-accent mb-4">
-                    <info.icon size={24} />
-                  </div>
-                  <h3 className="text-lg font-black text-primary mb-2">{info.title}</h3>
-                  {info.details.map((detail, i) => (
-                    <p key={i} className="text-sm font-bold text-gray-600 mb-1">{detail}</p>
-                  ))}
-                  <p className="text-xs text-gray-400 mt-2">{info.description}</p>
-                </CardContent>
-              </Card>
+              <motion.div
+                key={idx}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.1 }}
+              >
+                <Card className={`border-none shadow-lg hover:shadow-xl transition-all group ${info.highlight ? 'ring-2 ring-accent transform hover:scale-105' : ''}`}>
+                  <CardContent className="p-6 text-center">
+                    <div className={`w-16 h-16 rounded-2xl flex items-center justify-center mx-auto mb-4 transition-all group-hover:scale-110 ${
+                      info.highlight ? 'bg-accent text-white' : 'bg-accent/10 text-accent'
+                    }`}>
+                      <info.icon size={28} />
+                    </div>
+                    <h3 className="text-lg font-black text-primary mb-2">{info.title}</h3>
+                    {info.details.map((detail, i) => (
+                      <p key={i} className="text-sm font-bold text-gray-600 mb-1">{detail}</p>
+                    ))}
+                    <p className="text-xs text-gray-400 mt-2 mb-4">{info.description}</p>
+                    <a
+                      href={info.action}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all w-full justify-center ${
+                        info.highlight 
+                          ? 'bg-accent text-white hover:bg-accent/90 shadow-lg' 
+                          : 'bg-gray-100 text-primary hover:bg-gray-200'
+                      }`}
+                    >
+                      {info.actionLabel}
+                      <ChevronRight size={16} />
+                    </a>
+                  </CardContent>
+                </Card>
+              </motion.div>
             ))}
           </div>
+        </div>
+      </section>
+
+      {/* Social Media Banner - Suspenso e Chamativo */}
+      <section className="relative -mt-8 mb-16">
+        <div className="container mx-auto px-4">
+          <motion.div 
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.4 }}
+            className="bg-white rounded-[2rem] shadow-2xl p-8 border border-gray-100"
+          >
+            <div className="flex flex-col lg:flex-row items-center justify-between gap-8">
+              <div className="flex items-center gap-4">
+                <div className="w-16 h-16 bg-gradient-to-br from-accent to-orange-600 rounded-2xl flex items-center justify-center text-white shadow-lg">
+                  <Share2 size={28} />
+                </div>
+                <div>
+                  <h3 className="text-2xl font-black text-primary mb-1">Siga a DEX nas Redes Sociais</h3>
+                  <p className="text-gray-500">Fique por dentro de novidades, promoções e dicas exclusivas</p>
+                </div>
+              </div>
+              
+              <div className="flex flex-wrap items-center gap-4">
+                {socialLinks.map((social, idx) => (
+                  <motion.a
+                    key={idx}
+                    href={social.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    whileHover={{ scale: 1.1 }}
+                    whileTap={{ scale: 0.95 }}
+                    className={`group relative w-14 h-14 rounded-xl bg-gray-50 hover:${social.color} flex items-center justify-center transition-all shadow-md hover:shadow-xl ${social.bg}`}
+                    title={social.label}
+                  >
+                    <social.icon className={`w-6 h-6 ${social.text} group-hover:text-white transition-colors`} />
+                    <span className="absolute -bottom-8 left-1/2 transform -translate-x-1/2 text-xs font-bold text-primary opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                      {social.label}
+                    </span>
+                  </motion.a>
+                ))}
+              </div>
+            </div>
+          </motion.div>
         </div>
       </section>
 
@@ -135,9 +239,18 @@ export default function ContactoPage() {
         <div className="container mx-auto px-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
             {/* Formulário */}
-            <div>
-              <h2 className="text-2xl font-black text-primary mb-8">Envie uma Mensagem</h2>
-              <Card className="border-none shadow-lg">
+            <motion.div
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.2 }}
+            >
+              <h2 className="text-2xl font-black text-primary mb-8 flex items-center gap-3">
+                <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                  <MessageSquare size={20} />
+                </div>
+                Envie uma Mensagem
+              </h2>
+              <Card className="border-none shadow-xl">
                 <CardContent className="p-8">
                   <form onSubmit={handleSubmit} className="space-y-6">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -198,37 +311,68 @@ export default function ContactoPage() {
                   </form>
                 </CardContent>
               </Card>
-            </div>
+            </motion.div>
 
-            {/* Mapa Interativo */}
-            <div>
-              <h2 className="text-2xl font-black text-primary mb-8">Nossa Localização</h2>
-              <Card className="border-none shadow-lg overflow-hidden">
-                <div className="relative h-[400px] bg-gray-100">
-                  {/* Imagem do mapa - em produção, usar Google Maps ou similar */}
+            {/* Localização e Info Adicional */}
+            <motion.div
+              initial={{ opacity: 0, x: 20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <h2 className="text-2xl font-black text-primary mb-8 flex items-center gap-3">
+                <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center text-accent">
+                  <MapPin size={20} />
+                </div>
+                Nossa Localização
+              </h2>
+              
+              <Card className="border-none shadow-xl overflow-hidden mb-6">
+                <div className="relative h-[300px] bg-gray-100">
                   <img 
                     src="https://images.unsplash.com/photo-1526778548025-fa2f459cd5c1?auto=format&fit=crop&q=80&w=800" 
                     alt="Mapa de Maputo"
                     className="w-full h-full object-cover"
                   />
-                  <div className="absolute inset-0 bg-primary/20 flex items-center justify-center">
-                    <div className="bg-white p-6 rounded-2xl shadow-2xl max-w-xs">
-                      <MapPin className="text-accent mb-2" size={32} />
-                      <p className="font-bold text-primary">Av. 24 de Julho, nº 123</p>
-                      <p className="text-sm text-gray-500">Maputo, Moçambique</p>
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="mt-4 w-full"
-                        onClick={() => window.open('https://maps.google.com', '_blank')}
-                      >
-                        Abrir no Google Maps
-                      </Button>
+                  <div className="absolute inset-0 bg-gradient-to-t from-primary/60 to-transparent" />
+                  <div className="absolute bottom-6 left-6 right-6 bg-white p-6 rounded-2xl shadow-2xl">
+                    <div className="flex items-start gap-3">
+                      <MapPin className="text-accent shrink-0" size={24} />
+                      <div>
+                        <p className="font-bold text-primary mb-1">Maputo, Moçambique</p>
+                        <p className="text-sm text-gray-500">Atendimento presencial sob agendamento</p>
+                        <Button 
+                          variant="outline" 
+                          size="sm" 
+                          className="mt-3 w-full"
+                          onClick={() => window.open('https://maps.google.com', '_blank')}
+                        >
+                          Abrir no Google Maps
+                        </Button>
+                      </div>
                     </div>
                   </div>
                 </div>
               </Card>
-            </div>
+
+              {/* Horário de Funcionamento */}
+              <Card className="border-none shadow-xl bg-gradient-to-br from-primary to-blue-900 text-white">
+                <CardContent className="p-6">
+                  <div className="flex items-start gap-4">
+                    <div className="w-12 h-12 bg-white/10 rounded-xl flex items-center justify-center backdrop-blur-sm">
+                      <Clock className="w-6 h-6" />
+                    </div>
+                    <div>
+                      <h4 className="font-black text-lg mb-2">Horário de Funcionamento</h4>
+                      <div className="space-y-1 text-white/80">
+                        <p>Segunda a Sexta: 08:00 - 18:00</p>
+                        <p>Sábado: 09:00 - 13:00</p>
+                        <p className="text-sm text-accent mt-2">Suporte de emergência 24/7 via WhatsApp</p>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
           </div>
         </div>
       </section>
@@ -237,27 +381,36 @@ export default function ContactoPage() {
       <section className="py-16 bg-gray-50">
         <div className="container mx-auto px-4 max-w-3xl">
           <div className="text-center mb-12">
-            <h2 className="text-2xl font-black text-primary mb-4">Perguntas Frequentes</h2>
-            <p className="text-gray-500">Encontre respostas para as dúvidas mais comuns</p>
+            <div className="inline-flex items-center gap-2 bg-accent/10 px-6 py-2 rounded-full mb-4">
+              <HelpCircle className="w-4 h-4 text-accent" />
+              <span className="text-sm font-bold text-accent uppercase tracking-wider">Dúvidas Frequentes</span>
+            </div>
+            <h2 className="text-3xl font-black text-primary mb-4">Perguntas Frequentes</h2>
+            <p className="text-gray-500">Encontre respostas para as dúvidas mais comuns sobre nossos serviços</p>
           </div>
 
           <div className="space-y-4">
             {faqs.map((faq, idx) => (
-              <Card key={idx} className="border-none shadow-sm overflow-hidden">
+              <Card key={idx} className="border-none shadow-md overflow-hidden hover:shadow-lg transition-all">
                 <button
                   onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
                   className="w-full p-6 text-left flex items-center justify-between hover:bg-gray-50 transition-colors"
                 >
                   <span className="font-bold text-primary">{faq.question}</span>
                   <ChevronRight 
-                    className={`text-accent transition-transform ${openFaq === idx ? 'rotate-90' : ''}`} 
+                    className={`text-accent transition-transform duration-300 ${openFaq === idx ? 'rotate-90' : ''}`} 
                     size={20}
                   />
                 </button>
                 {openFaq === idx && (
-                  <div className="px-6 pb-6 text-gray-500 border-t border-gray-100 pt-4">
+                  <motion.div 
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="px-6 pb-6 text-gray-500 border-t border-gray-100 pt-4"
+                  >
                     {faq.answer}
-                  </div>
+                  </motion.div>
                 )}
               </Card>
             ))}
@@ -265,30 +418,16 @@ export default function ContactoPage() {
         </div>
       </section>
 
-      {/* Social Media */}
-      <section className="py-12 bg-white">
-        <div className="container mx-auto px-4 text-center">
-          <h3 className="text-lg font-black text-primary mb-6">Siga-nos nas Redes Sociais</h3>
-          <div className="flex items-center justify-center gap-4">
-            {[
-              { icon: Facebook, label: 'Facebook', url: '#' },
-              { icon: Instagram, label: 'Instagram', url: '#' },
-              { icon: Twitter, label: 'Twitter', url: '#' },
-              { icon: MessageSquare, label: 'WhatsApp', url: 'https://wa.me/258840000000' }
-            ].map((social, idx) => (
-              <a
-                key={idx}
-                href={social.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="w-12 h-12 rounded-2xl bg-gray-50 hover:bg-accent hover:text-white flex items-center justify-center text-primary transition-all shadow-sm hover:shadow-lg"
-              >
-                <social.icon size={20} />
-              </a>
-            ))}
-          </div>
-        </div>
-      </section>
+      {/* WhatsApp Floating Button */}
+      <a
+        href="https://wa.me/258871425316"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="fixed bottom-6 right-6 z-50 bg-green-500 text-white p-4 rounded-full shadow-2xl hover:bg-green-600 transition-all hover:scale-110 animate-bounce"
+        title="Fale connosco no WhatsApp"
+      >
+        <MessageCircle size={32} />
+      </a>
     </AppLayout>
   );
 }
