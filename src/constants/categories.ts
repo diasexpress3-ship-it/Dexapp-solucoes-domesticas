@@ -4,14 +4,32 @@ import {
   Home, Scissors, Droplets, Fan, Lightbulb, Lock,
   Bath, Trash2, Armchair, Sofa, Trees, Bug,
   Calendar, Sun, Moon, Heart, Utensils, Wind,
-  Plug, Tool, Ruler, Drill, DoorClosed, Grid,
-  Fence, Sprout, Compass, Scroll, Palette,
-  Brush, Volume2, Tv, WashingMachine, Refrigerator,
-  Stove, Microwave, Vacuum, Camera, Printer,
-  Coffee, ChefHat, Dog, Cat, Car, Bike,
+  Plug, Tool, Ruler, Drill, Grid,
+  Fence, Sprout, Compass, Palette,
+  Brush, Tv, WashingMachine, Refrigerator,
+  Stove, Microwave, Vacuum, Camera,
+  Coffee, ChefHat, Dog, Cat,
   Phone, Mail, MessageCircle, MapPin, CreditCard,
   Wallet, DollarSign, Award, Star, ThumbsUp,
-  AlertCircle, CheckCircle, XCircle, Info
+  AlertCircle, CheckCircle, XCircle, Info,
+  Volume2, Headphones, Music, Video, Image,
+  Pen, PenTool, Pencil, Eraser, Scissors as ScissorsIcon,
+  Github, Twitter, Facebook, Instagram, Linkedin,
+  Youtube, Globe, Link, Flag, Tag,
+  Gift, Package, Box, Truck, Bike,
+  Car, Bus, Train, Ship, Plane,
+  Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle,
+  Thermometer, Droplet as DropletIcon, Wind as WindIcon,
+  Sunrise, Sunset, Compass as CompassIcon,
+  Navigation, Map, Pin, Locate, LocateFixed,
+  Bell, BellRing, BellOff, AlertTriangle, AlertOctagon,
+  Eye, EyeOff, EyeClosed, EyeIcon,
+  Lock as LockIcon, Unlock, Key, Fingerprint,
+  User, UserPlus, UserMinus, UserCheck, UserX,
+  Users as UsersIcon, UserCog, UserCircle, UserRound,
+  Mail as MailIcon, Inbox, Send, Forward, Reply,
+  Phone as PhoneIcon, PhoneCall, PhoneForwarded, PhoneIncoming, PhoneOutgoing,
+  MessageSquare, MessageCircle, MessageCircleDashed, ChatBubble, ChatBubbleIcon
 } from 'lucide-react';
 
 // Interfaces para tipagem forte
@@ -172,7 +190,7 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
   ],
   
   '🔨 Carpintaria & Marcenaria': [
-    { name: 'Reparação de Portas', icon: DoorClosed, description: 'Ajustes e consertos', estimatedTime: '1-2h', minPrice: 800 },
+    { name: 'Reparação de Portas', icon: Home, description: 'Ajustes e consertos', estimatedTime: '1-2h', minPrice: 800 },
     { name: 'Reparação de Móveis', icon: Armchair, description: 'Conserto de cadeiras e mesas', estimatedTime: '1-2h', minPrice: 600 },
     { name: 'Montagem', icon: Tool, description: 'Montagem de móveis', estimatedTime: '1-3h', minPrice: 500, popular: true },
     { name: 'Armários', icon: Home, description: 'Construção de armários', estimatedTime: '4-8h', minPrice: 3500 },
@@ -203,7 +221,7 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
     { name: 'Interiores', icon: Home, description: 'Pintura de interiores', estimatedTime: 'por m²', minPrice: 400, popular: true },
     { name: 'Exteriores', icon: Building2, description: 'Pintura de fachadas', estimatedTime: 'por m²', minPrice: 600 },
     { name: 'Texturas', icon: Palette, description: 'Efeitos decorativos', estimatedTime: 'por m²', minPrice: 800 },
-    { name: 'Remoção', icon: Scroll, description: 'Remoção de tinta antiga', estimatedTime: 'por m²', minPrice: 300 },
+    { name: 'Remoção', icon: Trash2, description: 'Remoção de tinta antiga', estimatedTime: 'por m²', minPrice: 300 },
     { name: 'Preparação', icon: Tool, description: 'Massas e lixamento', estimatedTime: 'por m²', minPrice: 350 },
     { name: 'Móveis', icon: Armchair, description: 'Pintura de móveis', estimatedTime: '2-4h', minPrice: 1200 }
   ],
@@ -214,7 +232,7 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
     { name: 'Furações', icon: Drill, description: 'Furos para instalações', estimatedTime: '30min', minPrice: 200 },
     { name: 'Fechaduras', icon: Lock, description: 'Troca de fechaduras', estimatedTime: '1h', minPrice: 600 },
     { name: 'Prateleiras', icon: Grid, description: 'Instalação de prateleiras', estimatedTime: '1h', minPrice: 400 },
-    { name: 'Janelas', icon: DoorClosed, description: 'Reparação de janelas', estimatedTime: '1-2h', minPrice: 800 }
+    { name: 'Janelas', icon: Home, description: 'Reparação de janelas', estimatedTime: '1-2h', minPrice: 800 }
   ]
 };
 
