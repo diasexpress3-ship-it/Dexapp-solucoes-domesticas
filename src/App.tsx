@@ -11,7 +11,7 @@ import Landing from './pages/public/Landing';
 import Services from './pages/public/Services';
 import SobrePage from './pages/public/SobrePage';
 import ContactoPage from './pages/public/ContactoPage';
-import UpdateAdmin from './pages/public/UpdateAdmin'; // ← NOVO IMPORT
+import UpdateAdmin from './pages/public/UpdateAdmin';
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -54,6 +54,32 @@ const ProtectedRoute = ({ children, allowedProfiles }: { children: React.ReactNo
   return <>{children}</>;
 };
 
+// Componente de redirecionamento da raiz
+const HomeRedirect = () => {
+  const { user, loading, firebaseUser } = useAuth();
+
+  if (loading) return <LoadingSpinner fullScreen />;
+
+  // Se não estiver logado, vai para Landing
+  if (!firebaseUser || !user) {
+    return <Landing />;
+  }
+
+  // Se estiver logado, redireciona para o dashboard baseado no perfil
+  switch (user.role) {
+    case 'admin':
+      return <Navigate to="/admin/dashboard" replace />;
+    case 'cliente':
+      return <Navigate to="/cliente/dashboard" replace />;
+    case 'prestador':
+      return <Navigate to="/prestador/dashboard" replace />;
+    case 'central':
+      return <Navigate to="/central/dashboard" replace />;
+    default:
+      return <Landing />;
+  }
+};
+
 export default function App() {
   return (
     <ErrorBoundary>
@@ -61,46 +87,104 @@ export default function App() {
         <ToastProvider>
           <BrowserRouter>
             <Routes>
-            {/* Public Routes */}
-            <Route path="/" element={<Landing />} />
-            <Route path="/servicos" element={<Services />} />
-            <Route path="/sobre" element={<SobrePage />} />
-            <Route path="/contacto" element={<ContactoPage />} />
-            <Route path="/update-admin" element={<UpdateAdmin />} /> {/* ← NOVA ROTA */}
-            
-            {/* Auth Routes */}
-            <Route path="/login" element={<Login />} />
-            <Route path="/register-cliente" element={<RegisterCliente />} />
-            <Route path="/register-prestador" element={<RegisterPrestador />} />
+              {/* Rota raiz - REDIRECIONA baseado no login */}
+              <Route path="/" element={<HomeRedirect />} />
 
-            {/* Cliente Routes */}
-            <Route path="/cliente/dashboard" element={<ProtectedRoute allowedProfiles={['cliente']}><ClienteDashboard /></ProtectedRoute>} />
-            <Route path="/cliente/nova-solicitacao" element={<ProtectedRoute allowedProfiles={['cliente']}><NovaSolicitacao /></ProtectedRoute>} />
-            <Route path="/cliente/acompanhamento/:id" element={<ProtectedRoute allowedProfiles={['cliente']}><AcompanhamentoPage /></ProtectedRoute>} />
-            <Route path="/cliente/carteira" element={<ProtectedRoute allowedProfiles={['cliente']}><CarteiraPage /></ProtectedRoute>} />
-            <Route path="/cliente/agenda" element={<ProtectedRoute allowedProfiles={['cliente']}><AgendaPageCliente /></ProtectedRoute>} />
+              {/* Public Routes */}
+              <Route path="/servicos" element={<Services />} />
+              <Route path="/sobre" element={<SobrePage />} />
+              <Route path="/contacto" element={<ContactoPage />} />
+              <Route path="/update-admin" element={<UpdateAdmin />} />
+              
+              {/* Auth Routes */}
+              <Route path="/login" element={<Login />} />
+              <Route path="/register-cliente" element={<RegisterCliente />} />
+              <Route path="/register-prestador" element={<RegisterPrestador />} />
 
-            {/* Prestador Routes */}
-            <Route path="/prestador/dashboard" element={<ProtectedRoute allowedProfiles={['prestador']}><PrestadorDashboard /></ProtectedRoute>} />
-            <Route path="/prestador/agenda" element={<ProtectedRoute allowedProfiles={['prestador']}><AgendaPagePrestador /></ProtectedRoute>} />
+              {/* Cliente Routes */}
+              <Route path="/cliente/dashboard" element={
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
+                  <ClienteDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/cliente/nova-solicitacao" element={
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
+                  <NovaSolicitacao />
+                </ProtectedRoute>
+              } />
+              <Route path="/cliente/acompanhamento/:id" element={
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
+                  <AcompanhamentoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/cliente/carteira" element={
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
+                  <CarteiraPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/cliente/agenda" element={
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
+                  <AgendaPageCliente />
+                </ProtectedRoute>
+              } />
 
-            {/* Central Routes */}
-            <Route path="/central/dashboard" element={<ProtectedRoute allowedProfiles={['central']}><CentralDashboard /></ProtectedRoute>} />
+              {/* Prestador Routes */}
+              <Route path="/prestador/dashboard" element={
+                <ProtectedRoute allowedProfiles={['prestador', 'admin']}>
+                  <PrestadorDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/prestador/agenda" element={
+                <ProtectedRoute allowedProfiles={['prestador', 'admin']}>
+                  <AgendaPagePrestador />
+                </ProtectedRoute>
+              } />
 
-            {/* Admin Routes */}
-            <Route path="/admin/dashboard" element={<ProtectedRoute allowedProfiles={['admin']}><AdminDashboard /></ProtectedRoute>} />
-            <Route path="/admin/usuarios" element={<ProtectedRoute allowedProfiles={['admin']}><Usuarios /></ProtectedRoute>} />
-            <Route path="/admin/prestadores" element={<ProtectedRoute allowedProfiles={['admin']}><Prestadores /></ProtectedRoute>} />
-            <Route path="/admin/pagamentos" element={<ProtectedRoute allowedProfiles={['admin']}><Pagamentos /></ProtectedRoute>} />
-            <Route path="/admin/relatorios" element={<ProtectedRoute allowedProfiles={['admin']}><Relatorios /></ProtectedRoute>} />
-            <Route path="/admin/configuracoes" element={<ProtectedRoute allowedProfiles={['admin']}><Configuracoes /></ProtectedRoute>} />
+              {/* Central Routes */}
+              <Route path="/central/dashboard" element={
+                <ProtectedRoute allowedProfiles={['central', 'admin']}>
+                  <CentralDashboard />
+                </ProtectedRoute>
+              } />
 
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/" />} />
-          </Routes>
-        </BrowserRouter>
-      </ToastProvider>
-    </AuthProvider>
-  </ErrorBoundary>
-);
+              {/* Admin Routes */}
+              <Route path="/admin/dashboard" element={
+                <ProtectedRoute allowedProfiles={['admin']}>
+                  <AdminDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/usuarios" element={
+                <ProtectedRoute allowedProfiles={['admin']}>
+                  <Usuarios />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/prestadores" element={
+                <ProtectedRoute allowedProfiles={['admin']}>
+                  <Prestadores />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/pagamentos" element={
+                <ProtectedRoute allowedProfiles={['admin']}>
+                  <Pagamentos />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/relatorios" element={
+                <ProtectedRoute allowedProfiles={['admin']}>
+                  <Relatorios />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/configuracoes" element={
+                <ProtectedRoute allowedProfiles={['admin']}>
+                  <Configuracoes />
+                </ProtectedRoute>
+              } />
+
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/" />} />
+            </Routes>
+          </BrowserRouter>
+        </ToastProvider>
+      </AuthProvider>
+    </ErrorBoundary>
+  );
 }
