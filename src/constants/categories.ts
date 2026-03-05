@@ -1,35 +1,44 @@
 import { 
-  Sparkles, Users, Zap, Droplet, Hammer, Building2, 
-  Flower2, Paintbrush, Wrench, Baby, Shield, Clock,
-  Home, Scissors, Droplets, Fan, Lightbulb, Lock,
-  Bath, Trash2, Armchair, Sofa, Trees, Bug,
-  Calendar, Sun, Moon, Heart, Utensils, Wind,
-  Plug, Tool, Ruler, Drill, Grid,
-  Fence, Sprout, Compass, Palette,
-  Brush, Tv, WashingMachine, Refrigerator,
-  Stove, Microwave, Vacuum, Camera,
-  Coffee, ChefHat, Dog, Cat,
-  Phone, Mail, MessageCircle, MapPin, CreditCard,
-  Wallet, DollarSign, Award, Star, ThumbsUp,
-  AlertCircle, CheckCircle, XCircle, Info,
-  Volume2, Headphones, Music, Video, Image,
-  Pen, PenTool, Pencil, Eraser, Scissors as ScissorsIcon,
-  Github, Twitter, Facebook, Instagram, Linkedin,
-  Youtube, Globe, Link, Flag, Tag,
-  Gift, Package, Box, Truck, Bike,
-  Car, Bus, Train, Ship, Plane,
-  Cloud, CloudRain, CloudSnow, CloudLightning, CloudDrizzle,
-  Thermometer, Droplet as DropletIcon, Wind as WindIcon,
-  Sunrise, Sunset, Compass as CompassIcon,
-  Navigation, Map, Pin, Locate, LocateFixed,
-  Bell, BellRing, BellOff, AlertTriangle, AlertOctagon,
-  Eye, EyeOff, EyeClosed, EyeIcon,
-  Lock as LockIcon, Unlock, Key, Fingerprint,
-  User, UserPlus, UserMinus, UserCheck, UserX,
-  Users as UsersIcon, UserCog, UserCircle, UserRound,
-  Mail as MailIcon, Inbox, Send, Forward, Reply,
-  Phone as PhoneIcon, PhoneCall, PhoneForwarded, PhoneIncoming, PhoneOutgoing,
-  MessageSquare, MessageCircle, MessageCircleDashed, ChatBubble, ChatBubbleIcon
+  Home, Wrench, Paintbrush, Hammer, 
+  Shield, Sparkles, Droplet, Zap, 
+  Scissors, Flower2, Building2, Brush,
+  Users, Baby, Dog, Wind,
+  Lightbulb, Lock,
+  Trees, 
+  Sofa, Trash2, 
+  Bath, Key,
+  Armchair, Heart, Clock,
+  Moon, Sun, Cloud, 
+  Utensils, 
+  Plug, 
+  Camera, 
+  Truck,
+  Bug, 
+  Calendar,
+  CheckCircle, XCircle,
+  Eye, 
+  CreditCard, 
+  FileText, 
+  Phone, 
+  MapPin, 
+  Bell, 
+  Menu, 
+  ArrowLeft, ArrowRight,
+  Plus, Minus, Check,
+  Search, 
+  LogOut, 
+  Edit, 
+  Star,
+  Globe, 
+  Image, 
+  Upload, Download,
+  AlertTriangle,
+  User,
+  Mail,
+  Settings,
+  RefreshCw,
+  Filter,
+  Trash2 as Trash
 } from 'lucide-react';
 
 // Interfaces para tipagem forte
@@ -155,9 +164,7 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
     { name: 'Limpeza Pós-Obra', icon: Building2, description: 'Remoção de resíduos de construção', estimatedTime: '5-8h', minPrice: 3500 },
     { name: 'Limpeza de Escritórios', icon: Home, description: 'Limpeza profissional para empresas', estimatedTime: '2-4h', minPrice: 2000 },
     { name: 'Limpeza de Tapetes', icon: Sofa, description: 'Higienização de tapetes e carpetes', estimatedTime: '1-2h', minPrice: 800 },
-    { name: 'Organização', icon: Armchair, description: 'Organização de armários e espaços', estimatedTime: '2-3h', minPrice: 1200 },
-    { name: 'Limpeza de Vidros', icon: Droplets, description: 'Limpeza de janelas e vidros', estimatedTime: '1-2h', minPrice: 600 },
-    { name: 'Limpeza de Estofados', icon: Sofa, description: 'Limpeza a vapor de sofás', estimatedTime: '2-3h', minPrice: 1800 }
+    { name: 'Organização', icon: Home, description: 'Organização de armários e espaços', estimatedTime: '2-3h', minPrice: 1200 }
   ],
   
   '👥 Empregadas Domésticas & Babás': [
@@ -166,8 +173,7 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
     { name: 'Babá', icon: Baby, description: 'Cuidados infantis', estimatedTime: 'por hora', minPrice: 500, popular: true },
     { name: 'Cuidador de Idosos', icon: Heart, description: 'Assistência a idosos', estimatedTime: 'por hora', minPrice: 600 },
     { name: 'Cozinheira', icon: Utensils, description: 'Preparo de refeições', estimatedTime: '3-4h', minPrice: 1500 },
-    { name: 'Passador(a)', icon: Wind, description: 'Passar e engomar roupa', estimatedTime: '2-3h', minPrice: 800 },
-    { name: 'Babá Noturna', icon: Moon, description: 'Cuidados noturnos', estimatedTime: '8h', minPrice: 2000 }
+    { name: 'Passador(a)', icon: Wind, description: 'Passar e engomar roupa', estimatedTime: '2-3h', minPrice: 800 }
   ],
   
   '⚡ Manutenção Elétrica': [
@@ -176,17 +182,15 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
     { name: 'Tomadas', icon: Plug, description: 'Troca e instalação de tomadas', estimatedTime: '30min', minPrice: 400 },
     { name: 'Luminárias', icon: Lightbulb, description: 'Instalação de lustres e spots', estimatedTime: '1h', minPrice: 600 },
     { name: 'Segurança', icon: Shield, description: 'Sistemas de alarme e câmeras', estimatedTime: '4-6h', minPrice: 3000 },
-    { name: 'Ar Condicionado', icon: Fan, description: 'Instalação e manutenção', estimatedTime: '2-3h', minPrice: 2500, popular: true },
-    { name: 'Ventiladores', icon: Fan, description: 'Instalação de ventiladores', estimatedTime: '1h', minPrice: 500 }
+    { name: 'Ar Condicionado', icon: Wind, description: 'Instalação e manutenção', estimatedTime: '2-3h', minPrice: 2500, popular: true }
   ],
   
   '💧 Canalização': [
     { name: 'Torneiras', icon: Droplet, description: 'Troca e reparação', estimatedTime: '30min', minPrice: 400, popular: true },
-    { name: 'Desentupimentos', icon: Trash2, description: 'Desentupir canos', estimatedTime: '1-2h', minPrice: 1000 },
+    { name: 'Desentupimentos', icon: Trash, description: 'Desentupir canos', estimatedTime: '1-2h', minPrice: 1000 },
     { name: 'Sanitários', icon: Bath, description: 'Instalação de vasos sanitários', estimatedTime: '2-3h', minPrice: 1500 },
     { name: 'Canalizações', icon: Droplet, description: 'Reparação de tubagens', estimatedTime: '2-4h', minPrice: 1800 },
-    { name: 'Água Quente', icon: Droplet, description: 'Esquentadores e boilers', estimatedTime: '2-3h', minPrice: 2000 },
-    { name: 'Fugas de Água', icon: Droplets, description: 'Detecção e reparação', estimatedTime: '1-2h', minPrice: 1200, popular: true }
+    { name: 'Água Quente', icon: Droplet, description: 'Esquentadores e boilers', estimatedTime: '2-3h', minPrice: 2000 }
   ],
   
   '🔨 Carpintaria & Marcenaria': [
@@ -194,8 +198,7 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
     { name: 'Reparação de Móveis', icon: Armchair, description: 'Conserto de cadeiras e mesas', estimatedTime: '1-2h', minPrice: 600 },
     { name: 'Montagem', icon: Tool, description: 'Montagem de móveis', estimatedTime: '1-3h', minPrice: 500, popular: true },
     { name: 'Armários', icon: Home, description: 'Construção de armários', estimatedTime: '4-8h', minPrice: 3500 },
-    { name: 'Acabamentos', icon: Brush, description: 'Acabamentos em madeira', estimatedTime: '2-4h', minPrice: 1500 },
-    { name: 'Restauração', icon: Armchair, description: 'Restauro de móveis antigos', estimatedTime: '5-10h', minPrice: 4000 }
+    { name: 'Acabamentos', icon: Paintbrush, description: 'Acabamentos em madeira', estimatedTime: '2-4h', minPrice: 1500 }
   ],
   
   '🏗️ Construção & Obras': [
@@ -203,36 +206,32 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
     { name: 'Pintura', icon: Paintbrush, description: 'Pintura de paredes', estimatedTime: 'por m²', minPrice: 500 },
     { name: 'Telhados', icon: Home, description: 'Reparação de telhados', estimatedTime: '4-8h', minPrice: 3000 },
     { name: 'Acabamentos', icon: Brush, description: 'Reboco e texturas', estimatedTime: 'por m²', minPrice: 800 },
-    { name: 'Pavimentos', icon: Grid, description: 'Colocação de pisos', estimatedTime: 'por m²', minPrice: 1500, popular: true },
-    { name: 'Muros', icon: Fence, description: 'Construção de muros', estimatedTime: 'por m²', minPrice: 1800 }
+    { name: 'Pavimentos', icon: Home, description: 'Colocação de pisos', estimatedTime: 'por m²', minPrice: 1500, popular: true }
   ],
   
   '🌿 Jardinagem & Exteriores': [
     { name: 'Corte de Relva', icon: Scissors, description: 'Corte e manutenção', estimatedTime: '1-2h', minPrice: 600, popular: true },
     { name: 'Poda', icon: Trees, description: 'Poda de árvores', estimatedTime: '2-4h', minPrice: 1200 },
-    { name: 'Plantio', icon: Sprout, description: 'Plantio de flores', estimatedTime: '1-2h', minPrice: 800 },
+    { name: 'Plantio', icon: Flower2, description: 'Plantio de flores', estimatedTime: '1-2h', minPrice: 800 },
     { name: 'Irrigação', icon: Droplet, description: 'Sistemas de rega', estimatedTime: '3-5h', minPrice: 2000 },
-    { name: 'Limpeza', icon: Trash2, description: 'Limpeza de jardins', estimatedTime: '2-3h', minPrice: 1000 },
-    { name: 'Pragas', icon: Bug, description: 'Controlo de pragas', estimatedTime: '1-2h', minPrice: 1500 },
-    { name: 'Paisagismo', icon: Compass, description: 'Projetos paisagísticos', estimatedTime: 'por projeto', minPrice: 5000 }
+    { name: 'Limpeza', icon: Trash, description: 'Limpeza de jardins', estimatedTime: '2-3h', minPrice: 1000 },
+    { name: 'Pragas', icon: Bug, description: 'Controlo de pragas', estimatedTime: '1-2h', minPrice: 1500 }
   ],
   
   '🎨 Pintura & Acabamentos': [
     { name: 'Interiores', icon: Home, description: 'Pintura de interiores', estimatedTime: 'por m²', minPrice: 400, popular: true },
     { name: 'Exteriores', icon: Building2, description: 'Pintura de fachadas', estimatedTime: 'por m²', minPrice: 600 },
-    { name: 'Texturas', icon: Palette, description: 'Efeitos decorativos', estimatedTime: 'por m²', minPrice: 800 },
-    { name: 'Remoção', icon: Trash2, description: 'Remoção de tinta antiga', estimatedTime: 'por m²', minPrice: 300 },
-    { name: 'Preparação', icon: Tool, description: 'Massas e lixamento', estimatedTime: 'por m²', minPrice: 350 },
-    { name: 'Móveis', icon: Armchair, description: 'Pintura de móveis', estimatedTime: '2-4h', minPrice: 1200 }
+    { name: 'Texturas', icon: Brush, description: 'Efeitos decorativos', estimatedTime: 'por m²', minPrice: 800 },
+    { name: 'Remoção', icon: Trash, description: 'Remoção de tinta antiga', estimatedTime: 'por m²', minPrice: 300 },
+    { name: 'Preparação', icon: Tool, description: 'Massas e lixamento', estimatedTime: 'por m²', minPrice: 350 }
   ],
   
   '🛠️ Reparações Gerais': [
     { name: 'Arranjos', icon: Wrench, description: 'Pequenas reparações', estimatedTime: '1h', minPrice: 400, popular: true },
     { name: 'Montagem', icon: Tool, description: 'Montagem de móveis', estimatedTime: '1-2h', minPrice: 500 },
-    { name: 'Furações', icon: Drill, description: 'Furos para instalações', estimatedTime: '30min', minPrice: 200 },
+    { name: 'Furações', icon: Tool, description: 'Furos para instalações', estimatedTime: '30min', minPrice: 200 },
     { name: 'Fechaduras', icon: Lock, description: 'Troca de fechaduras', estimatedTime: '1h', minPrice: 600 },
-    { name: 'Prateleiras', icon: Grid, description: 'Instalação de prateleiras', estimatedTime: '1h', minPrice: 400 },
-    { name: 'Janelas', icon: Home, description: 'Reparação de janelas', estimatedTime: '1-2h', minPrice: 800 }
+    { name: 'Prateleiras', icon: Home, description: 'Instalação de prateleiras', estimatedTime: '1h', minPrice: 400 }
   ]
 };
 
