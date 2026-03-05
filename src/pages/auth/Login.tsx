@@ -55,7 +55,6 @@ export default function Login() {
     setEmail(creds.email);
     setPassword(creds.password);
     
-    // Pequeno delay para mostrar o preenchimento
     setTimeout(async () => {
       setIsLoading(true);
       try {
@@ -75,7 +74,7 @@ export default function Login() {
     }, 500);
   };
 
-  // Contas de teste - apenas para demonstração
+  // Contas de teste
   const testAccounts = {
     cliente: { email: 'cliente@teste.com', password: '123456' },
     prestador: { email: 'prestador@teste.com', password: '123456' },
@@ -92,7 +91,7 @@ export default function Login() {
       >
         {/* Card Principal */}
         <div className="bg-white rounded-[3rem] shadow-2xl shadow-primary/10 p-8 md:p-10 border border-gray-100">
-          {/* Logo e Título - ALTERADO */}
+          {/* Logo e Título - ALTERADO PARA DEX-app */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#0A1D56] to-[#1a2f70] rounded-3xl mb-6 shadow-lg shadow-primary/20">
               <span className="text-4xl font-black text-white">D</span>
