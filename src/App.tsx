@@ -11,6 +11,7 @@ import Landing from './pages/public/Landing';
 import Services from './pages/public/Services';
 import SobrePage from './pages/public/SobrePage';
 import ContactoPage from './pages/public/ContactoPage';
+import UpdateAdmin from './pages/public/UpdateAdmin'; // ← NOVO IMPORT
 
 // Auth Pages
 import Login from './pages/auth/Login';
@@ -65,6 +66,7 @@ export default function App() {
             <Route path="/servicos" element={<Services />} />
             <Route path="/sobre" element={<SobrePage />} />
             <Route path="/contacto" element={<ContactoPage />} />
+            <Route path="/update-admin" element={<UpdateAdmin />} /> {/* ← NOVA ROTA */}
             
             {/* Auth Routes */}
             <Route path="/login" element={<Login />} />
