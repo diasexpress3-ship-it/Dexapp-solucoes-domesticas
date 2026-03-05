@@ -18,7 +18,7 @@ export default function Login() {
   const navigate = useNavigate();
   const { showToast } = useToast();
 
-  // Admin credentials pré-configuradas
+  // Admin credentials
   const adminCredentials = {
     email: 'startbusiness26@gmail.com',
     password: 'Sahombe13'
@@ -42,6 +42,9 @@ export default function Login() {
       if (error.code === 'auth/user-not-found') message = 'Usuário não encontrado.';
       if (error.code === 'auth/wrong-password') message = 'Senha incorreta.';
       if (error.code === 'auth/too-many-requests') message = 'Muitas tentativas. Tente novamente mais tarde.';
+      if (error.message === 'Sua conta ainda não foi validada. Aguarde aprovação da central.') {
+        message = error.message;
+      }
       showToast(message, 'error');
     } finally {
       setIsLoading(false);
@@ -52,21 +55,27 @@ export default function Login() {
     setEmail(creds.email);
     setPassword(creds.password);
     
+    // Pequeno delay para mostrar o preenchimento
     setTimeout(async () => {
       setIsLoading(true);
       try {
         await login(creds.email, creds.password);
         showToast(`Bem-vindo, ${role}!`, 'success');
         navigate('/');
-      } catch (error) {
-        showToast(`Erro ao entrar como ${role}`, 'error');
+      } catch (error: any) {
+        console.error(`Erro no login ${role}:`, error);
+        if (error.message === 'Sua conta ainda não foi validada. Aguarde aprovação da central.') {
+          showToast(error.message, 'warning');
+        } else {
+          showToast(`Erro ao entrar como ${role}`, 'error');
+        }
       } finally {
         setIsLoading(false);
       }
     }, 500);
   };
 
-  // Credenciais de teste
+  // Contas de teste - apenas para demonstração
   const testAccounts = {
     cliente: { email: 'cliente@teste.com', password: '123456' },
     prestador: { email: 'prestador@teste.com', password: '123456' },
@@ -83,12 +92,13 @@ export default function Login() {
       >
         {/* Card Principal */}
         <div className="bg-white rounded-[3rem] shadow-2xl shadow-primary/10 p-8 md:p-10 border border-gray-100">
-          {/* Logo e Título */}
+          {/* Logo e Título - ALTERADO */}
           <div className="text-center mb-8">
             <div className="inline-flex items-center justify-center w-20 h-20 bg-gradient-to-br from-[#0A1D56] to-[#1a2f70] rounded-3xl mb-6 shadow-lg shadow-primary/20">
               <span className="text-4xl font-black text-white">D</span>
             </div>
-            <h1 className="text-4xl font-black text-[#0A1D56] tracking-tight mb-2">DEXAPP</h1>
+            <h1 className="text-4xl font-black text-[#0A1D56] tracking-tight mb-1">DEX-app</h1>
+            <p className="text-sm font-bold text-[#FF7A00] uppercase tracking-widest mb-2">Soluções Domésticas</p>
             <h2 className="text-xl font-bold text-[#0A1D56] mb-1">Bem-vindo de volta</h2>
             <p className="text-gray-400 font-medium">Aceda à sua conta para continuar</p>
           </div>
@@ -246,7 +256,7 @@ export default function Login() {
         {/* Footer */}
         <div className="mt-8 text-center">
           <p className="text-xs font-bold text-gray-300 uppercase tracking-widest">
-            © 2026 DEXAPP - Soluções Domésticas
+            © 2026 DEX-app - Soluções Domésticas
           </p>
         </div>
       </motion.div>
