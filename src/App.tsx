@@ -59,12 +59,14 @@ const HomeRedirect = () => {
 
   if (loading) return <LoadingSpinner fullScreen />;
 
-  // Se NÃO estiver logado, vai para Landing Page (pode navegar nos menus públicos)
+  // Se NÃO estiver logado, vai para Landing Page
   if (!firebaseUser || !user) {
     return <Landing />;
   }
 
-  // Se estiver logado, redireciona para o dashboard baseado no perfil
+  // Se estiver logado, redireciona IMEDIATAMENTE para o dashboard baseado no perfil
+  console.log('Usuário logado:', user.role, user.nome);
+  
   switch (user.role) {
     case 'admin':
       return <Navigate to="/admin/dashboard" replace />;
@@ -75,6 +77,7 @@ const HomeRedirect = () => {
     case 'central':
       return <Navigate to="/central/dashboard" replace />;
     default:
+      console.warn('Perfil desconhecido:', user.role);
       return <Landing />;
   }
 };
@@ -102,7 +105,7 @@ export default function App() {
               {/* Rota raiz - HomeRedirect decide */}
               <Route path="/" element={<HomeRedirect />} />
 
-              {/* Public Routes - ACESSÍVEIS POR TODOS (logados ou não) */}
+              {/* Public Routes */}
               <Route path="/servicos" element={<Services />} />
               <Route path="/sobre" element={<SobrePage />} />
               <Route path="/contacto" element={<ContactoPage />} />
@@ -125,8 +128,6 @@ export default function App() {
                 </PublicOnlyRoute>
               } />
 
-              {/* Rotas Protegidas por Perfil */}
-              
               {/* Cliente Routes */}
               <Route path="/cliente/dashboard" element={
                 <ProtectedRoute allowedProfiles={['cliente']}>
