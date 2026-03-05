@@ -28,13 +28,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (fUser) => {
+      console.log('Auth state changed:', fUser?.email);
       setFirebaseUser(fUser);
       if (fUser) {
         try {
           const userDoc = await getDoc(doc(db, 'users', fUser.uid));
           if (userDoc.exists()) {
-            setUser(userDoc.data() as User);
+            const userData = userDoc.data() as User;
+            console.log('User data loaded:', userData);
+            setUser(userData);
           } else {
+            console.warn('User document not found for:', fUser.uid);
             setUser(null);
           }
         } catch (error) {
@@ -51,8 +55,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = async (email: string, pass: string) => {
     try {
+      console.log('Login attempt:', email);
       await signInWithEmailAndPassword(auth, email, pass);
+      console.log('Login successful');
     } catch (error: any) {
+      console.error('Login error:', error);
       throw error;
     }
   };
@@ -60,6 +67,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const register = async (userData: Partial<User>, pass: string) => {
     const email = userData.email || `${userData.telefone}@temp.dex.co.mz`;
     try {
+      console.log('Register attempt:', email);
       const userCredential = await createUserWithEmailAndPassword(auth, email, pass);
       const newUser: User = {
         id: userCredential.user.uid,
@@ -78,7 +86,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       });
       
       setUser(newUser);
+      console.log('Register successful');
     } catch (error: any) {
+      console.error('Register error:', error);
       throw error;
     }
   };
@@ -93,7 +103,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   return (
     <AuthContext.Provider value={{ user, firebaseUser, loading, login, register, logout }}>
-      {!loading && children}
+      {children}
     </AuthContext.Provider>
   );
 }
