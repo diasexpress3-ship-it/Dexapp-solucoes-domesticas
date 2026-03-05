@@ -39,15 +39,15 @@ import Pagamentos from './pages/admin/Pagamentos';
 import Relatorios from './pages/admin/Relatorios';
 import Configuracoes from './pages/admin/Configuracoes';
 
-const ProtectedRoute = ({ children, allowedProfiles }: { children: React.ReactNode, allowedProfiles?: string[] }) => {
+const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
   const { user, loading, firebaseUser } = useAuth();
 
   if (loading) return <LoadingSpinner fullScreen />;
   
-  if (!firebaseUser) return <Navigate to="/login" />;
+  if (!firebaseUser) return <Navigate to="/login" replace />;
   
-  if (allowedProfiles && user && !allowedProfiles.includes(user.role)) {
-    return <Navigate to="/" />;
+  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -59,13 +59,15 @@ const HomeRedirect = () => {
 
   if (loading) return <LoadingSpinner fullScreen />;
 
+  console.log('HomeRedirect - user:', user, 'firebaseUser:', firebaseUser);
+
   // Se NÃO estiver logado, vai para Landing Page
   if (!firebaseUser || !user) {
     return <Landing />;
   }
 
   // Se estiver logado, redireciona IMEDIATAMENTE para o dashboard baseado no perfil
-  console.log('Usuário logado:', user.role, user.nome);
+  console.log('Usuário logado, redirecionando para:', user.role);
   
   switch (user.role) {
     case 'admin':
@@ -130,84 +132,84 @@ export default function App() {
 
               {/* Cliente Routes */}
               <Route path="/cliente/dashboard" element={
-                <ProtectedRoute allowedProfiles={['cliente']}>
+                <ProtectedRoute allowedRoles={['cliente']}>
                   <ClienteDashboard />
                 </ProtectedRoute>
               } />
               <Route path="/cliente/nova-solicitacao" element={
-                <ProtectedRoute allowedProfiles={['cliente']}>
+                <ProtectedRoute allowedRoles={['cliente']}>
                   <NovaSolicitacao />
                 </ProtectedRoute>
               } />
               <Route path="/cliente/acompanhamento/:id" element={
-                <ProtectedRoute allowedProfiles={['cliente']}>
+                <ProtectedRoute allowedRoles={['cliente']}>
                   <AcompanhamentoPage />
                 </ProtectedRoute>
               } />
               <Route path="/cliente/carteira" element={
-                <ProtectedRoute allowedProfiles={['cliente']}>
+                <ProtectedRoute allowedRoles={['cliente']}>
                   <CarteiraPage />
                 </ProtectedRoute>
               } />
               <Route path="/cliente/agenda" element={
-                <ProtectedRoute allowedProfiles={['cliente']}>
+                <ProtectedRoute allowedRoles={['cliente']}>
                   <AgendaPageCliente />
                 </ProtectedRoute>
               } />
 
               {/* Prestador Routes */}
               <Route path="/prestador/dashboard" element={
-                <ProtectedRoute allowedProfiles={['prestador']}>
+                <ProtectedRoute allowedRoles={['prestador']}>
                   <PrestadorDashboard />
                 </ProtectedRoute>
               } />
               <Route path="/prestador/agenda" element={
-                <ProtectedRoute allowedProfiles={['prestador']}>
+                <ProtectedRoute allowedRoles={['prestador']}>
                   <AgendaPagePrestador />
                 </ProtectedRoute>
               } />
 
               {/* Central Routes */}
               <Route path="/central/dashboard" element={
-                <ProtectedRoute allowedProfiles={['central']}>
+                <ProtectedRoute allowedRoles={['central']}>
                   <CentralDashboard />
                 </ProtectedRoute>
               } />
 
               {/* Admin Routes */}
               <Route path="/admin/dashboard" element={
-                <ProtectedRoute allowedProfiles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <AdminDashboard />
                 </ProtectedRoute>
               } />
               <Route path="/admin/usuarios" element={
-                <ProtectedRoute allowedProfiles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <Usuarios />
                 </ProtectedRoute>
               } />
               <Route path="/admin/prestadores" element={
-                <ProtectedRoute allowedProfiles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <Prestadores />
                 </ProtectedRoute>
               } />
               <Route path="/admin/pagamentos" element={
-                <ProtectedRoute allowedProfiles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <Pagamentos />
                 </ProtectedRoute>
               } />
               <Route path="/admin/relatorios" element={
-                <ProtectedRoute allowedProfiles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <Relatorios />
                 </ProtectedRoute>
               } />
               <Route path="/admin/configuracoes" element={
-                <ProtectedRoute allowedProfiles={['admin']}>
+                <ProtectedRoute allowedRoles={['admin']}>
                   <Configuracoes />
                 </ProtectedRoute>
               } />
 
               {/* Fallback */}
-              <Route path="*" element={<Navigate to="/" />} />
+              <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
         </ToastProvider>
