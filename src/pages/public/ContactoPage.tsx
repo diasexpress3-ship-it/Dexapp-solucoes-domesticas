@@ -38,16 +38,41 @@ export default function ContactoPage() {
   const [isLoading, setIsLoading] = useState(false);
   const { showToast } = useToast();
 
-  const handleSubmit = async (e: React.FormEvent) => {
+  // Função para enviar email via mailto com os dados do formulário
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setIsLoading(true);
     
-    // Simulação de envio - em produção, integrar com API de email
+    if (!formData.nome || !formData.email || !formData.assunto || !formData.mensagem) {
+      showToast('Preencha todos os campos obrigatórios.', 'error');
+      return;
+    }
+
+    setIsLoading(true);
+
+    // Construir o corpo do email com os dados do formulário
+    const assunto = encodeURIComponent(formData.assunto);
+    const corpo = encodeURIComponent(
+      `Nome: ${formData.nome}\n` +
+      `Email: ${formData.email}\n` +
+      `Telefone: ${formData.telefone || 'Não informado'}\n\n` +
+      `Mensagem:\n${formData.mensagem}`
+    );
+
+    // Criar link mailto
+    const mailtoLink = `mailto:diasexpress3@gmail.com?subject=${assunto}&body=${corpo}`;
+
+    // Abrir o cliente de email padrão
+    window.location.href = mailtoLink;
+
+    // Feedback para o usuário
+    showToast('Abrindo seu cliente de email...', 'info');
+    
+    // Simular envio (apenas para feedback visual)
     setTimeout(() => {
-      showToast('Mensagem enviada com sucesso! Entraremos em contacto em breve.', 'success');
       setFormData({ nome: '', email: '', telefone: '', assunto: '', mensagem: '' });
       setIsLoading(false);
-    }, 1500);
+      showToast('Obrigado pelo contacto! Responderemos em breve.', 'success');
+    }, 2000);
   };
 
   // Informações de contacto reais
@@ -302,13 +327,16 @@ export default function ContactoPage() {
                         isLoading={isLoading}
                         leftIcon={<Send size={18} />}
                       >
-                        Enviar Mensagem
+                        {isLoading ? 'A enviar...' : 'Enviar Mensagem'}
                       </Button>
                       <p className="text-xs text-gray-400">
                         * Campos obrigatórios
                       </p>
                     </div>
                   </form>
+                  <p className="text-xs text-gray-400 mt-4 text-center">
+                    Ao enviar, seu cliente de email padrão será aberto com os dados preenchidos.
+                  </p>
                 </CardContent>
               </Card>
             </motion.div>
