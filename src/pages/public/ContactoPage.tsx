@@ -75,6 +75,14 @@ export default function ContactoPage() {
     }, 2000);
   };
 
+  // Função para lidar com o clique no botão de email (usando window.open)
+  const handleEmailClick = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    e.preventDefault();
+    const mailtoLink = e.currentTarget.href;
+    window.open(mailtoLink, '_blank');
+    showToast('Abrindo cliente de email...', 'info');
+  };
+
   // Informações de contacto reais
   const contactInfo = [
     {
@@ -83,7 +91,8 @@ export default function ContactoPage() {
       details: ['+258 87 142 5316'],
       description: 'Segunda a Sábado, 08h - 20h',
       action: 'https://wa.me/258871425316',
-      actionLabel: 'Chamar no WhatsApp'
+      actionLabel: 'Chamar no WhatsApp',
+      external: true
     },
     {
       icon: Mail,
@@ -92,7 +101,8 @@ export default function ContactoPage() {
       description: 'Respondemos em até 2h',
       action: 'mailto:diasexpress3@gmail.com?subject=Contacto%20via%20DEXAPP&body=Olá,%20gostaria%20de%20saber%20mais%20sobre%20os%20serviços%20da%20DEXAPP.',
       actionLabel: 'Enviar E-mail Agora',
-      highlight: true
+      highlight: true,
+      external: true
     },
     {
       icon: Globe,
@@ -100,7 +110,8 @@ export default function ContactoPage() {
       details: ['dex-diasexpress.vercel.app'],
       description: 'Conheça nossos outros serviços',
       action: 'https://dex-diasexpress.vercel.app/#/',
-      actionLabel: 'Visitar Site'
+      actionLabel: 'Visitar Site',
+      external: true
     },
     {
       icon: MapPin,
@@ -108,7 +119,8 @@ export default function ContactoPage() {
       details: ['Maputo, Moçambique'],
       description: 'Atendimento presencial sob agendamento',
       action: 'https://maps.google.com',
-      actionLabel: 'Ver no Mapa'
+      actionLabel: 'Ver no Mapa',
+      external: true
     }
   ];
 
@@ -194,19 +206,36 @@ export default function ContactoPage() {
                       <p key={i} className="text-sm font-bold text-gray-600 mb-1">{detail}</p>
                     ))}
                     <p className="text-xs text-gray-400 mt-2 mb-4">{info.description}</p>
-                    <a
-                      href={info.action}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all w-full justify-center ${
-                        info.highlight 
-                          ? 'bg-accent text-white hover:bg-accent/90 shadow-lg' 
-                          : 'bg-gray-100 text-primary hover:bg-gray-200'
-                      }`}
-                    >
-                      {info.actionLabel}
-                      <ChevronRight size={16} />
-                    </a>
+                    {info.external ? (
+                      <button
+                        onClick={() => {
+                          window.open(info.action, '_blank');
+                          showToast(`Abrindo ${info.title.toLowerCase()}...`, 'info');
+                        }}
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all w-full justify-center ${
+                          info.highlight 
+                            ? 'bg-accent text-white hover:bg-accent/90 shadow-lg' 
+                            : 'bg-gray-100 text-primary hover:bg-gray-200'
+                        }`}
+                      >
+                        {info.actionLabel}
+                        <ChevronRight size={16} />
+                      </button>
+                    ) : (
+                      <a
+                        href={info.action}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className={`inline-flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all w-full justify-center ${
+                          info.highlight 
+                            ? 'bg-accent text-white hover:bg-accent/90 shadow-lg' 
+                            : 'bg-gray-100 text-primary hover:bg-gray-200'
+                        }`}
+                      >
+                        {info.actionLabel}
+                        <ChevronRight size={16} />
+                      </a>
+                    )}
                   </CardContent>
                 </Card>
               </motion.div>
@@ -244,6 +273,10 @@ export default function ContactoPage() {
                     rel="noopener noreferrer"
                     whileHover={{ scale: 1.1 }}
                     whileTap={{ scale: 0.95 }}
+                    onClick={(e) => {
+                      e.preventDefault();
+                      window.open(social.url, '_blank');
+                    }}
                     className={`group relative w-14 h-14 rounded-xl bg-gray-50 hover:${social.color} flex items-center justify-center transition-all shadow-md hover:shadow-xl ${social.bg}`}
                     title={social.label}
                   >
@@ -451,6 +484,10 @@ export default function ContactoPage() {
         href="https://wa.me/258871425316"
         target="_blank"
         rel="noopener noreferrer"
+        onClick={(e) => {
+          e.preventDefault();
+          window.open('https://wa.me/258871425316', '_blank');
+        }}
         className="fixed bottom-6 right-6 z-50 bg-green-500 text-white p-4 rounded-full shadow-2xl hover:bg-green-600 transition-all hover:scale-110 animate-bounce"
         title="Fale connosco no WhatsApp"
       >
