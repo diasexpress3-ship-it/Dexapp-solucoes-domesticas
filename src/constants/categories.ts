@@ -37,9 +37,7 @@ import {
   Mail,
   Settings,
   RefreshCw,
-  Filter,
-  Trash2 as Trash,
-  Tool
+  Filter
 } from 'lucide-react';
 
 // Interfaces para tipagem forte
@@ -188,7 +186,7 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
   
   '💧 Canalização': [
     { name: 'Torneiras', icon: Droplet, description: 'Troca e reparação', estimatedTime: '30min', minPrice: 400, popular: true },
-    { name: 'Desentupimentos', icon: Trash, description: 'Desentupir canos', estimatedTime: '1-2h', minPrice: 1000 },
+    { name: 'Desentupimentos', icon: Trash2, description: 'Desentupir canos', estimatedTime: '1-2h', minPrice: 1000 },
     { name: 'Sanitários', icon: Bath, description: 'Instalação de vasos sanitários', estimatedTime: '2-3h', minPrice: 1500 },
     { name: 'Canalizações', icon: Droplet, description: 'Reparação de tubagens', estimatedTime: '2-4h', minPrice: 1800 },
     { name: 'Água Quente', icon: Droplet, description: 'Esquentadores e boilers', estimatedTime: '2-3h', minPrice: 2000 }
@@ -197,7 +195,7 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
   '🔨 Carpintaria & Marcenaria': [
     { name: 'Reparação de Portas', icon: Home, description: 'Ajustes e consertos', estimatedTime: '1-2h', minPrice: 800 },
     { name: 'Reparação de Móveis', icon: Armchair, description: 'Conserto de cadeiras e mesas', estimatedTime: '1-2h', minPrice: 600 },
-    { name: 'Montagem', icon: Tool, description: 'Montagem de móveis', estimatedTime: '1-3h', minPrice: 500, popular: true },
+    { name: 'Montagem', icon: Wrench, description: 'Montagem de móveis', estimatedTime: '1-3h', minPrice: 500, popular: true },
     { name: 'Armários', icon: Home, description: 'Construção de armários', estimatedTime: '4-8h', minPrice: 3500 },
     { name: 'Acabamentos', icon: Paintbrush, description: 'Acabamentos em madeira', estimatedTime: '2-4h', minPrice: 1500 }
   ],
@@ -215,7 +213,7 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
     { name: 'Poda', icon: Trees, description: 'Poda de árvores', estimatedTime: '2-4h', minPrice: 1200 },
     { name: 'Plantio', icon: Flower2, description: 'Plantio de flores', estimatedTime: '1-2h', minPrice: 800 },
     { name: 'Irrigação', icon: Droplet, description: 'Sistemas de rega', estimatedTime: '3-5h', minPrice: 2000 },
-    { name: 'Limpeza', icon: Trash, description: 'Limpeza de jardins', estimatedTime: '2-3h', minPrice: 1000 },
+    { name: 'Limpeza', icon: Trash2, description: 'Limpeza de jardins', estimatedTime: '2-3h', minPrice: 1000 },
     { name: 'Pragas', icon: Bug, description: 'Controlo de pragas', estimatedTime: '1-2h', minPrice: 1500 }
   ],
   
@@ -223,14 +221,14 @@ export const ESPECIALIDADES_POR_CATEGORIA: Record<string, Specialty[]> = {
     { name: 'Interiores', icon: Home, description: 'Pintura de interiores', estimatedTime: 'por m²', minPrice: 400, popular: true },
     { name: 'Exteriores', icon: Building2, description: 'Pintura de fachadas', estimatedTime: 'por m²', minPrice: 600 },
     { name: 'Texturas', icon: Brush, description: 'Efeitos decorativos', estimatedTime: 'por m²', minPrice: 800 },
-    { name: 'Remoção', icon: Trash, description: 'Remoção de tinta antiga', estimatedTime: 'por m²', minPrice: 300 },
-    { name: 'Preparação', icon: Tool, description: 'Massas e lixamento', estimatedTime: 'por m²', minPrice: 350 }
+    { name: 'Remoção', icon: Trash2, description: 'Remoção de tinta antiga', estimatedTime: 'por m²', minPrice: 300 },
+    { name: 'Preparação', icon: Wrench, description: 'Massas e lixamento', estimatedTime: 'por m²', minPrice: 350 }
   ],
   
   '🛠️ Reparações Gerais': [
     { name: 'Arranjos', icon: Wrench, description: 'Pequenas reparações', estimatedTime: '1h', minPrice: 400, popular: true },
-    { name: 'Montagem', icon: Tool, description: 'Montagem de móveis', estimatedTime: '1-2h', minPrice: 500 },
-    { name: 'Furações', icon: Tool, description: 'Furos para instalações', estimatedTime: '30min', minPrice: 200 },
+    { name: 'Montagem', icon: Wrench, description: 'Montagem de móveis', estimatedTime: '1-2h', minPrice: 500 },
+    { name: 'Furações', icon: Wrench, description: 'Furos para instalações', estimatedTime: '30min', minPrice: 200 },
     { name: 'Fechaduras', icon: Lock, description: 'Troca de fechaduras', estimatedTime: '1h', minPrice: 600 },
     { name: 'Prateleiras', icon: Home, description: 'Instalação de prateleiras', estimatedTime: '1h', minPrice: 400 }
   ]
