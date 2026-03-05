@@ -1,10 +1,10 @@
 {
-  "projectId": "gen-lang-client-0271612924",
-  "appId": "1:669492186810:web:dd26963c615d80ba603c83",
-  "apiKey": "AIzaSyA9eKSda522pzADmtipwlnYzzRI15xI8QQ",
-  "authDomain": "gen-lang-client-0271612924.firebaseapp.com",
-  "firestoreDatabaseId": "ai-studio-ce28cd8c-a80f-4f89-bc5a-480f6564d24a",
-  "storageBucket": "gen-lang-client-0271612924.firebasestorage.app",
-  "messagingSenderId": "669492186810",
+  "projectId": "diasexpress-4073f",
+  "appId": "1:174659717968:web:19830054cf76af1fd6fa55",
+  "apiKey": "AIzaSyDqN7J0A7ebBpUhSo5EyVwb5ZmZ2HaTezU",
+  "authDomain": "diasexpress-4073f.firebaseapp.com",
+  "firestoreDatabaseId": "(default)",
+  "storageBucket": "diasexpress-4073f.firebasestorage.app",
+  "messagingSenderId": "174659717968",
   "measurementId": ""
 }
