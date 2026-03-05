@@ -38,7 +38,8 @@ import {
   Settings,
   RefreshCw,
   Filter,
-  Trash2 as Trash
+  Trash2 as Trash,
+  Tool
 } from 'lucide-react';
 
 // Interfaces para tipagem forte
