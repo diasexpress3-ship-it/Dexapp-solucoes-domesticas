@@ -38,38 +38,41 @@ import Prestadores from './pages/admin/Prestadores';
 import Pagamentos from './pages/admin/Pagamentos';
 import Relatorios from './pages/admin/Relatorios';
 import Configuracoes from './pages/admin/Configuracoes';
+import NovoAdmin from './pages/admin/NovoAdmin';
+import NovoUsuario from './pages/admin/NovoUsuario';
 
-const ProtectedRoute = ({ children, allowedProfiles }: { children: React.ReactNode, allowedProfiles: string[] }) => {
-  const { user, loading } = useAuth();
+const ProtectedRoute = ({ children, allowedProfiles }: { children: React.ReactNode, allowedProfiles?: string[] }) => {
+  const { user, loading, firebaseUser } = useAuth();
 
   if (loading) return <LoadingSpinner fullScreen />;
   
-  if (!user) return <Navigate to="/login" replace />;
+  if (!firebaseUser) return <Navigate to="/login" />;
   
-  if (!allowedProfiles.includes(user.profile)) {
-    return <Navigate to="/" replace />;
+  if (allowedProfiles && user && !allowedProfiles.includes(user.role)) {
+    return <Navigate to="/" />;
   }
 
   return <>{children}</>;
 };
 
-// Componente de redirecionamento da raiz
+// Componente de redirecionamento da raiz - AGORA ADMIN VAI PARA LANDING
 const HomeRedirect = () => {
-  const { user, loading } = useAuth();
+  const { user, loading, firebaseUser } = useAuth();
 
   if (loading) return <LoadingSpinner fullScreen />;
 
   // Se NÃO estiver logado, vai para Landing Page
-  if (!user) {
+  if (!firebaseUser || !user) {
     return <Landing />;
   }
 
-  // Se estiver logado, redireciona para o dashboard baseado no perfil
-  console.log('Usuário logado, redirecionando para:', user.profile);
-  
-  switch (user.profile) {
-    case 'admin':
-      return <Navigate to="/admin/dashboard" replace />;
+  // SE FOR ADMIN - VAI PARA LANDING PAGE (para poder fazer upload)
+  if (user.role === 'admin') {
+    return <Landing />;
+  }
+
+  // Para outros perfis, vai para seus respectivos dashboards
+  switch (user.role) {
     case 'cliente':
       return <Navigate to="/cliente/dashboard" replace />;
     case 'prestador':
@@ -77,18 +80,17 @@ const HomeRedirect = () => {
     case 'central':
       return <Navigate to="/central/dashboard" replace />;
     default:
-      console.warn('Perfil desconhecido:', user.profile);
       return <Landing />;
   }
 };
 
 // Componente para rotas que só não-logados podem acessar (login, register)
 const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
-  const { user, loading } = useAuth();
+  const { firebaseUser, loading } = useAuth();
 
   if (loading) return <LoadingSpinner fullScreen />;
 
-  if (user) {
+  if (firebaseUser) {
     return <Navigate to="/" replace />;
   }
 
@@ -203,6 +205,16 @@ export default function App() {
               <Route path="/admin/configuracoes" element={
                 <ProtectedRoute allowedProfiles={['admin']}>
                   <Configuracoes />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/usuarios/novo" element={
+                <ProtectedRoute allowedProfiles={['admin']}>
+                  <NovoUsuario />
+                </ProtectedRoute>
+              } />
+              <Route path="/admin/novo-admin" element={
+                <ProtectedRoute allowedProfiles={['admin']}>
+                  <NovoAdmin />
                 </ProtectedRoute>
               } />
 
