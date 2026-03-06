@@ -11,7 +11,7 @@ import {
   Home, Phone, Info, Menu,
   Smartphone
 } from 'lucide-react';
-import { ProfileImageUpload } from '../../components/ui/ProfileImageUpload';
+import { ProfileImageUpload } from '../../components/ui/ProfileImageUpload'; // ← CAMINHO CORRETO
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function Landing() {
@@ -30,7 +30,7 @@ export default function Landing() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentPhraseIndex((prev) => (prev + 1) % phrases.length);
-    }, 3000); // Muda a cada 3 segundos
+    }, 3000);
 
     return () => clearInterval(interval);
   }, []);
