@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { 
   DollarSign, 
@@ -12,7 +13,9 @@ import {
   Eye,
   Download,
   FileText,
-  TrendingUp
+  TrendingUp,
+  Home,
+  ArrowLeft
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -25,6 +28,7 @@ import { ExportButtons } from '../../components/ui/ExportButtons';
 import { useToast } from '../../contexts/ToastContext';
 
 export default function Pagamentos() {
+  const navigate = useNavigate();
   const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('todos');
@@ -56,6 +60,30 @@ export default function Pagamentos() {
       showToast('Status do pagamento atualizado.', 'success');
     } catch (error) {
       showToast('Erro ao atualizar status.', 'error');
+    }
+  };
+
+  const handleConfirmar = async (pagamentoId: string) => {
+    try {
+      await updateDoc(doc(db, 'pagamentos', pagamentoId), { 
+        status: 'confirmado',
+        dataConfirmacao: new Date().toISOString()
+      });
+      showToast('Pagamento confirmado com sucesso!', 'success');
+    } catch (error) {
+      showToast('Erro ao confirmar pagamento.', 'error');
+    }
+  };
+
+  const handleRejeitar = async (pagamentoId: string) => {
+    try {
+      await updateDoc(doc(db, 'pagamentos', pagamentoId), { 
+        status: 'falhou',
+        dataRejeicao: new Date().toISOString()
+      });
+      showToast('Pagamento rejeitado.', 'info');
+    } catch (error) {
+      showToast('Erro ao rejeitar pagamento.', 'error');
     }
   };
 
@@ -92,7 +120,34 @@ export default function Pagamentos() {
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        {/* Breadcrumb Navigation */}
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-8">
+          <button 
+            onClick={() => navigate('/')} 
+            className="flex items-center gap-1 hover:text-accent transition-colors"
+          >
+            <Home className="w-4 h-4" /> Início
+          </button>
+          <span>/</span>
+          <button 
+            onClick={() => navigate('/admin/dashboard')} 
+            className="hover:text-accent transition-colors"
+          >
+            Admin
+          </button>
+          <span>/</span>
+          <span className="text-primary font-bold">Pagamentos</span>
+        </div>
+
+        {/* Header com botão Voltar */}
+        <div className="flex items-center gap-4 mb-8">
+          <button 
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Voltar à página anterior"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
           <div>
             <h1 className="text-3xl font-black text-primary flex items-center gap-3">
               <DollarSign size={32} className="text-accent" />
@@ -100,6 +155,10 @@ export default function Pagamentos() {
             </h1>
             <p className="text-gray-500">Controle de pagamentos, depósitos e saques.</p>
           </div>
+        </div>
+
+        {/* Botões de exportação */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div className="flex flex-wrap gap-2">
             <ExportButtons 
               data={exportData}
@@ -202,19 +261,39 @@ export default function Pagamentos() {
                         <p className="text-[10px] text-accent font-bold uppercase tracking-wider">{p.tipo}</p>
                       </td>
                       <td className="p-4">
-                        <select
-                          value={p.status}
-                          onChange={(e) => handleStatusChange(p.id, e.target.value as Pagamento['status'])}
-                          className={`text-[10px] font-black uppercase px-2 py-1 rounded-full border-none outline-none cursor-pointer ${
-                            p.status === 'confirmado' ? 'bg-green-100 text-green-700' :
-                            p.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
-                            'bg-red-100 text-red-700'
-                          }`}
-                        >
-                          <option value="confirmado">Confirmado</option>
-                          <option value="pendente">Pendente</option>
-                          <option value="falhou">Falhou</option>
-                        </select>
+                        {p.status === 'pendente' ? (
+                          <div className="flex gap-2">
+                            <Button 
+                              size="sm" 
+                              className="bg-green-600 hover:bg-green-700 text-white text-xs"
+                              onClick={() => handleConfirmar(p.id)}
+                            >
+                              Confirmar
+                            </Button>
+                            <Button 
+                              size="sm" 
+                              variant="outline" 
+                              className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
+                              onClick={() => handleRejeitar(p.id)}
+                            >
+                              Rejeitar
+                            </Button>
+                          </div>
+                        ) : (
+                          <select
+                            value={p.status}
+                            onChange={(e) => handleStatusChange(p.id, e.target.value as Pagamento['status'])}
+                            className={`text-[10px] font-black uppercase px-2 py-1 rounded-full border-none outline-none cursor-pointer ${
+                              p.status === 'confirmado' ? 'bg-green-100 text-green-700' :
+                              p.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
+                              'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            <option value="confirmado">Confirmado</option>
+                            <option value="pendente">Pendente</option>
+                            <option value="falhou">Falhou</option>
+                          </select>
+                        )}
                       </td>
                       <td className="p-4 text-right">
                         <div className="flex items-center justify-end gap-2">
@@ -240,6 +319,17 @@ export default function Pagamentos() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Botão Voltar flutuante */}
+        <div className="fixed bottom-6 left-6 z-40">
+          <button
+            onClick={() => navigate('/admin/dashboard')}
+            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+            title="Voltar ao Dashboard"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+        </div>
       </div>
     </AppLayout>
   );
