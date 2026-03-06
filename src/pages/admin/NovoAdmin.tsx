@@ -112,19 +112,19 @@ export const NovoAdmin: React.FC = () => {
       <div className="max-w-2xl mx-auto space-y-6">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-slate-500">
-          <button onClick={() => navigate('/')} className="flex items-center gap-1 hover:text-[#FF7A00]">
+          <button onClick={() => navigate('/')} className="flex items-center gap-1 hover:text-accent">
             <Home className="w-4 h-4" /> Início
           </button>
           <span>/</span>
-          <button onClick={() => navigate('/admin/dashboard')} className="hover:text-[#FF7A00]">
+          <button onClick={() => navigate('/admin/dashboard')} className="hover:text-accent">
             Admin
           </button>
           <span>/</span>
-          <button onClick={() => navigate('/admin/usuarios')} className="hover:text-[#FF7A00]">
+          <button onClick={() => navigate('/admin/usuarios')} className="hover:text-accent">
             Utilizadores
           </button>
           <span>/</span>
-          <span className="text-[#0A1D56] font-bold">Novo Administrador</span>
+          <span className="text-primary font-bold">Novo Administrador</span>
         </div>
 
         {/* Header */}
@@ -137,7 +137,7 @@ export const NovoAdmin: React.FC = () => {
             <ArrowLeft className="w-5 h-5 text-slate-600" />
           </button>
           <div>
-            <h1 className="text-2xl md:text-3xl font-black text-[#0A1D56]">Novo Administrador</h1>
+            <h1 className="text-2xl md:text-3xl font-black text-primary">Novo Administrador</h1>
             <p className="text-sm text-slate-500">Crie uma nova conta de administrador</p>
           </div>
         </div>
@@ -253,6 +253,17 @@ export const NovoAdmin: React.FC = () => {
             </div>
           </form>
         </Card>
+
+        {/* Botão Voltar flutuante */}
+        <div className="fixed bottom-6 left-6 z-40">
+          <button
+            onClick={() => navigate('/admin/dashboard')}
+            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+            title="Voltar ao Dashboard"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+        </div>
       </div>
     </div>
   );
