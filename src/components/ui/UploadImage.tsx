@@ -1,268 +1,132 @@
-import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
-import { Button } from '../../components/ui/Button';
-import { SERVICE_CATEGORIES } from '../../constants/categories';
-import { motion, useInView, AnimatePresence } from 'framer-motion';
-import { useRef } from 'react';
-import { 
-  Shield, Clock, Star, Users, 
-  Search, UserCheck, CreditCard, ThumbsUp,
-  Sparkles, ArrowRight, Heart, 
-  Home, Phone, Info, Menu,
-  Smartphone
-} from 'lucide-react';
-import { UploadImage } from '../../components/ui/UploadImage'; // ← USANDO O ARQUIVO ORIGINAL
+import React, { useState, useRef } from 'react';
+import { Camera, Loader2, Upload, X } from 'lucide-react';
+import { doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 
-export default function Landing() {
+interface UploadImageProps {
+  currentImageUrl?: string;
+  onUpload?: (url: string) => void;
+  label?: string;
+  collectionPath?: string;
+  docId?: string;
+  field?: string;
+  isAdminOnly?: boolean;
+  className?: string;
+}
+
+export const UploadImage: React.FC<UploadImageProps> = ({
+  currentImageUrl,
+  onUpload,
+  label = "Carregar Imagem",
+  collectionPath,
+  docId,
+  field,
+  isAdminOnly = true,
+  className = ""
+}) => {
   const { user } = useAuth();
-  const processRef = useRef(null);
-  const isInView = useInView(processRef, { once: true, amount: 0.3 });
-  
-  // Estado para controlar a frase atual no título
-  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
-  const phrases = [
-    { text: "Soluções Domésticas", color: "text-white" },
-    { text: "ao seu Alcance", color: "text-accent" },
-    { text: "no seu Celular", color: "text-white" }
-  ];
+  const { showToast } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setCurrentPhraseIndex((prev) => (prev + 1) % phrases.length);
-    }, 3000);
+  const isAdmin = user?.profile === 'admin';
 
-    return () => clearInterval(interval);
-  }, []);
+  const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-  const processSteps = [
-    {
-      number: '01',
-      icon: Search,
-      title: 'BUSQUE O SERVIÇO',
-      description: 'Navegue por categorias ou busque pelo serviço específico que precisa em nossa plataforma.',
-      color: 'from-blue-400 to-blue-600'
-    },
-    {
-      number: '02',
-      icon: UserCheck,
-      title: 'ESCOLHA O PRESTADOR',
-      description: 'Veja perfis verificados, avaliações reais e escolha o melhor profissional.',
-      color: 'from-orange-400 to-orange-600'
-    },
-    {
-      number: '03',
-      icon: CreditCard,
-      title: 'AGENDE E PAGUE',
-      description: 'Marque data e horário de sua preferência e pague de forma segura.',
-      color: 'from-green-400 to-green-600'
-    },
-    {
-      number: '04',
-      icon: ThumbsUp,
-      title: 'AVALIE O SERVIÇO',
-      description: 'Após a conclusão, avalie o profissional e compartilhe sua experiência.',
-      color: 'from-purple-400 to-purple-600'
+    if (!file.type.startsWith('image/')) {
+      showToast('Por favor, selecione uma imagem', 'error');
+      return;
     }
-  ];
+
+    if (file.size > 5 * 1024 * 1024) {
+      showToast('Imagem muito grande. Máximo 5MB', 'error');
+      return;
+    }
+
+    setIsUploading(true);
+    const formData = new FormData();
+    formData.append('image', file);
+
+    const apiKey = import.meta.env.VITE_IMGBB_KEY;
+    if (!apiKey) {
+      showToast('Chave da API ImgBB não configurada', 'error');
+      setIsUploading(false);
+      return;
+    }
+
+    try {
+      const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        const url = result.data.url;
+        
+        if (collectionPath && docId && field) {
+          const docRef = doc(db, collectionPath, docId);
+          const docSnap = await getDoc(docRef);
+          
+          if (docSnap.exists()) {
+            await updateDoc(docRef, { [field]: url });
+          } else {
+            await setDoc(docRef, { [field]: url });
+          }
+        }
+
+        if (onUpload) onUpload(url);
+        showToast('Imagem carregada com sucesso!', 'success');
+      } else {
+        throw new Error('Falha no upload');
+      }
+    } catch (error) {
+      console.error("Erro no upload:", error);
+      showToast('Erro ao carregar imagem. Tente novamente.', 'error');
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  if (isAdminOnly && !isAdmin) {
+    return currentImageUrl ? (
+      <img src={currentImageUrl} alt="Preview" className={`w-full h-full object-cover ${className}`} referrerPolicy="no-referrer" />
+    ) : null;
+  }
 
   return (
-    <div className="flex flex-col min-h-screen">
-      {/* Header / Menu */}
-      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg shadow-sm py-4">
-        <div className="container mx-auto px-6 flex items-center justify-between">
-          <Link to="/" className="flex items-center gap-2">
-            <div className="w-8 h-8 bg-gradient-to-br from-accent to-orange-600 rounded-lg flex items-center justify-center text-white font-bold">
-              D
-            </div>
-            <span className="text-xl font-black text-primary">DEX<span className="text-accent">-app</span></span>
-          </Link>
-          
-          <nav className="hidden md:flex items-center gap-8">
-            <Link to="/" className="text-sm font-bold text-accent">Início</Link>
-            <Link to="/servicos" className="text-sm font-bold text-gray-600 hover:text-accent transition-colors">Serviços</Link>
-            <Link to="/sobre" className="text-sm font-bold text-gray-600 hover:text-accent transition-colors">Sobre</Link>
-            <Link to="/contacto" className="text-sm font-bold text-gray-600 hover:text-accent transition-colors">Contacto</Link>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            {/* Usando o componente UploadImage original */}
-            <UploadImage 
-              currentImageUrl={user?.profileImageUrl}
-              onUpload={(url) => console.log('Imagem carregada:', url)}
-              collectionPath="users"
-              docId={user?.id}
-              field="profileImageUrl"
-              isAdminOnly={false}
-              className="w-8 h-8 rounded-full"
-            />
-            
-            {!user && (
-              <>
-                <Link to="/login">
-                  <Button variant="ghost" size="sm">Login</Button>
-                </Link>
-                <Link to="/register-cliente">
-                  <Button size="sm">Começar</Button>
-                </Link>
-              </>
-            )}
-          </div>
+    <div className={`relative group ${className}`}>
+      {currentImageUrl ? (
+        <img src={currentImageUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+      ) : (
+        <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center text-slate-400">
+          <Upload className="w-8 h-8 mb-2" />
+          <span className="text-xs font-bold uppercase">{label}</span>
         </div>
-      </header>
+      )}
 
-      {/* Resto do código igual... */}
-      <section className="relative pt-32 pb-32 overflow-hidden bg-gradient-to-br from-primary to-blue-900 text-white">
-        {/* ... conteúdo do hero ... */}
-      </section>
+      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+        <button
+          onClick={() => fileInputRef.current?.click()}
+          disabled={isUploading}
+          className="bg-white text-primary p-3 rounded-xl shadow-lg hover:scale-110 transition-transform disabled:opacity-50"
+        >
+          {isUploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Camera className="w-6 h-6" />}
+        </button>
+      </div>
 
-      {/* Process Steps */}
-      <section ref={processRef} className="py-24 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-black text-primary mb-4">
-              Como <span className="text-accent">Funciona</span>
-            </h2>
-            <p className="text-gray-500 max-w-2xl mx-auto">
-              Em 4 passos simples você resolve todas as suas necessidades domésticas
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {processSteps.map((step, index) => (
-              <motion.div
-                key={index}
-                initial={{ opacity: 0, y: 30 }}
-                animate={isInView ? { opacity: 1, y: 0 } : {}}
-                transition={{ delay: index * 0.15 }}
-                whileHover={{ y: -10 }}
-                className="relative group"
-              >
-                <div className="absolute -top-6 -right-6 text-8xl font-black text-gray-100 opacity-60 group-hover:opacity-100 transition-opacity z-0">
-                  {step.number}
-                </div>
-                
-                <div className="relative bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all z-10 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                  
-                  <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
-                    <step.icon size={36} />
-                  </div>
-                  
-                  <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors relative z-10">
-                    {step.title}
-                  </h3>
-                  
-                  <p className="text-sm text-gray-500 leading-relaxed relative z-10">
-                    {step.description}
-                  </p>
-                  
-                  <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Categories Section */}
-      <section className="py-24 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl md:text-5xl font-black text-primary mb-4">
-              Nossos <span className="text-accent">Serviços</span>
-            </h2>
-            <p className="text-gray-500 max-w-2xl mx-auto">
-              Explore nossas categorias e encontre o profissional ideal para o seu serviço
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {SERVICE_CATEGORIES.slice(0, 6).map((cat, index) => (
-              <motion.div
-                key={cat.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                whileHover={{ y: -8 }}
-                className="group cursor-pointer"
-              >
-                <Link to={`/servicos?cat=${cat.id}`}>
-                  <div className="bg-white p-8 rounded-3xl shadow-md border border-gray-100 h-full transition-all hover:shadow-2xl hover:border-accent/20 relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
-                      <cat.icon size={32} />
-                    </div>
-                    
-                    <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors relative z-10">
-                      {cat.name}
-                    </h3>
-                    
-                    <p className="text-sm text-gray-500 mb-6 leading-relaxed relative z-10">
-                      Profissionais qualificados prontos para atender suas necessidades.
-                    </p>
-                    
-                    <div className="flex items-center text-accent font-black text-sm uppercase tracking-widest group-hover:gap-3 transition-all relative z-10">
-                      Ver detalhes 
-                      <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
-          </div>
-
-          <div className="text-center mt-12">
-            <Link to="/servicos" className="inline-flex items-center gap-2 text-accent font-bold hover:gap-3 transition-all">
-              Ver todos os serviços
-              <ArrowRight size={16} />
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 bg-white">
-        <div className="container mx-auto px-4">
-          <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            whileInView={{ opacity: 1, scale: 1 }}
-            viewport={{ once: true }}
-            className="bg-gradient-to-br from-primary via-primary to-blue-900 rounded-3xl p-12 md:p-20 text-center text-white relative overflow-hidden"
-          >
-            <div className="absolute top-0 left-0 w-64 h-64 bg-accent/20 rounded-full -ml-32 -mt-32 animate-pulse"></div>
-            <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-400/20 rounded-full -mr-32 -mb-32 animate-pulse delay-1000"></div>
-            
-            <div className="relative z-10">
-              <h2 className="text-4xl md:text-5xl font-black mb-6">Pronto para começar?</h2>
-              <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto">
-                Junte-se a milhares de moçambicanos que já confiam na DEXAPP para cuidar dos seus lares.
-              </p>
-              <div className="flex flex-col md:flex-row items-center justify-center gap-4">
-                <Link to="/register-cliente">
-                  <Button 
-                    size="lg" 
-                    className="bg-accent hover:bg-accent/90 text-white px-10 py-6 text-lg rounded-2xl shadow-xl shadow-accent/30 transform hover:scale-105 transition-all"
-                  >
-                    Criar Conta Grátis
-                  </Button>
-                </Link>
-                <Link to="/register-prestador">
-                  <Button 
-                    variant="outline" 
-                    size="lg" 
-                    className="border-white/20 text-white hover:bg-white/10 px-10 py-6 text-lg rounded-2xl transform hover:scale-105 transition-all"
-                  >
-                    Quero ser Prestador
-                  </Button>
-                </Link>
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleUpload}
+        accept="image/*"
+        className="hidden"
+      />
     </div>
   );
-}
+};
