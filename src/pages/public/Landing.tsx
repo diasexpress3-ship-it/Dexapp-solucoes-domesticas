@@ -2,15 +2,20 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { SERVICE_CATEGORIES } from '../../constants/categories';
-import { motion } from 'framer-motion';
+import { motion, useInView } from 'framer-motion';
+import { useRef } from 'react';
 import { 
   Shield, Clock, Star, Users, 
   Search, UserCheck, CreditCard, ThumbsUp,
-  Sparkles, ArrowRight, Heart, Wrench, Hammer,
-  Droplet, Zap, Scissors, Flower2, Building2, Paintbrush
+  Sparkles, ArrowRight, Heart, 
+  Home, Phone, Info, Menu,
+  Smartphone
 } from 'lucide-react';
 
 export default function Landing() {
+  const processRef = useRef(null);
+  const isInView = useInView(processRef, { once: true, amount: 0.3 });
+
   const processSteps = [
     {
       number: '01',
@@ -44,8 +49,36 @@ export default function Landing() {
 
   return (
     <div className="flex flex-col min-h-screen">
+      {/* Header / Menu */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg shadow-sm py-4">
+        <div className="container mx-auto px-6 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-8 h-8 bg-gradient-to-br from-accent to-orange-600 rounded-lg flex items-center justify-center text-white font-bold">
+              D
+            </div>
+            <span className="text-xl font-black text-primary">DEX<span className="text-accent">-app</span></span>
+          </Link>
+          
+          <nav className="hidden md:flex items-center gap-8">
+            <Link to="/" className="text-sm font-bold text-accent">Início</Link>
+            <Link to="/servicos" className="text-sm font-bold text-gray-600 hover:text-accent transition-colors">Serviços</Link>
+            <Link to="/sobre" className="text-sm font-bold text-gray-600 hover:text-accent transition-colors">Sobre</Link>
+            <Link to="/contacto" className="text-sm font-bold text-gray-600 hover:text-accent transition-colors">Contacto</Link>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            <Link to="/login">
+              <Button variant="ghost" size="sm">Login</Button>
+            </Link>
+            <Link to="/register-cliente">
+              <Button size="sm">Começar</Button>
+            </Link>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Section */}
-      <section className="relative pt-20 pb-32 overflow-hidden bg-gradient-to-br from-primary to-blue-900 text-white">
+      <section className="relative pt-32 pb-32 overflow-hidden bg-gradient-to-br from-primary to-blue-900 text-white">
         <div className="absolute inset-0">
           <div className="absolute top-20 left-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute bottom-20 right-10 w-[30rem] h-[30rem] bg-blue-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
@@ -62,10 +95,45 @@ export default function Landing() {
                 <Sparkles className="inline w-4 h-4 mr-2 text-accent" />
                 A Melhor Plataforma de Serviços em Moçambique
               </span>
+              
+              {/* Título com 3 linhas animadas */}
               <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight">
-                Soluções Domésticas <br />
-                <span className="text-accent">ao seu Alcance</span>
+                {/* Primeira linha */}
+                <div className="relative inline-block mb-2">
+                  <span className="relative z-10">Soluções Domésticas</span>
+                  <motion.span 
+                    initial={{ width: 0 }}
+                    animate={{ width: '100%' }}
+                    transition={{ delay: 0.3, duration: 0.8 }}
+                    className="absolute bottom-2 left-0 h-3 bg-accent/30 -z-10"
+                  />
+                </div>
+                <br />
+                
+                {/* Segunda linha */}
+                <div className="relative inline-block mb-2">
+                  <span className="relative z-10">ao seu Alcance</span>
+                  <motion.span 
+                    initial={{ width: 0 }}
+                    animate={{ width: '100%' }}
+                    transition={{ delay: 0.8, duration: 0.8 }}
+                    className="absolute bottom-2 left-0 h-3 bg-accent/30 -z-10"
+                  />
+                </div>
+                <br />
+                
+                {/* Terceira linha */}
+                <div className="relative inline-block">
+                  <span className="relative z-10">no seu Celular</span>
+                  <motion.span 
+                    initial={{ width: 0 }}
+                    animate={{ width: '100%' }}
+                    transition={{ delay: 1.3, duration: 0.8 }}
+                    className="absolute bottom-2 left-0 h-3 bg-accent/30 -z-10"
+                  />
+                </div>
               </h1>
+              
               <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto font-medium">
                 Encontre os melhores profissionais para cuidar do seu lar em Moçambique. Rápido, seguro e confiável.
               </p>
@@ -111,7 +179,7 @@ export default function Landing() {
       </section>
 
       {/* Process Steps */}
-      <section className="py-24 bg-white">
+      <section ref={processRef} className="py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-black text-primary mb-4">
@@ -124,22 +192,40 @@ export default function Landing() {
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
             {processSteps.map((step, index) => (
-              <div key={index} className="relative group">
-                <div className="absolute -top-4 -right-4 text-7xl font-black text-gray-100 opacity-50 group-hover:opacity-100 transition-opacity">
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 30 }}
+                animate={isInView ? { opacity: 1, y: 0 } : {}}
+                transition={{ delay: index * 0.15 }}
+                whileHover={{ y: -10 }}
+                className="relative group"
+              >
+                {/* Número grande e visível */}
+                <div className="absolute -top-6 -right-6 text-8xl font-black text-gray-100 opacity-60 group-hover:opacity-100 transition-opacity z-0">
                   {step.number}
                 </div>
-                <div className="relative bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all hover:-translate-y-2">
-                  <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform`}>
+                
+                {/* Card */}
+                <div className="relative bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all z-10 overflow-hidden">
+                  {/* Fundo gradiente no hover */}
+                  <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                  
+                  <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
                     <step.icon size={36} />
                   </div>
-                  <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors">
+                  
+                  <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors relative z-10">
                     {step.title}
                   </h3>
-                  <p className="text-sm text-gray-500 leading-relaxed">
+                  
+                  <p className="text-sm text-gray-500 leading-relaxed relative z-10">
                     {step.description}
                   </p>
+                  
+                  {/* Linha decorativa animada */}
+                  <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
                 </div>
-              </div>
+              </motion.div>
             ))}
           </div>
         </div>
@@ -165,23 +251,36 @@ export default function Landing() {
                 whileInView={{ opacity: 1, y: 0 }}
                 viewport={{ once: true }}
                 transition={{ delay: index * 0.1 }}
+                whileHover={{ y: -8 }}
                 className="group cursor-pointer"
               >
-                <div className="bg-white p-8 rounded-3xl shadow-md border border-gray-100 h-full transition-all hover:shadow-2xl hover:border-accent/20 hover:-translate-y-2">
-                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
-                    <cat.icon size={32} />
+                <Link to={`/servicos?cat=${cat.id}`}>
+                  <div className="bg-white p-8 rounded-3xl shadow-md border border-gray-100 h-full transition-all hover:shadow-2xl hover:border-accent/20 relative overflow-hidden">
+                    {/* Fundo gradiente animado */}
+                    <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                    
+                    {/* Ícone animado */}
+                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
+                      <cat.icon size={32} />
+                    </div>
+                    
+                    {/* Título */}
+                    <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors relative z-10">
+                      {cat.name}
+                    </h3>
+                    
+                    {/* Descrição */}
+                    <p className="text-sm text-gray-500 mb-6 leading-relaxed relative z-10">
+                      Profissionais qualificados prontos para atender suas necessidades.
+                    </p>
+                    
+                    {/* Link Detalhes */}
+                    <div className="flex items-center text-accent font-black text-sm uppercase tracking-widest group-hover:gap-3 transition-all relative z-10">
+                      Ver detalhes 
+                      <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                    </div>
                   </div>
-                  <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors">
-                    {cat.name}
-                  </h3>
-                  <p className="text-sm text-gray-500 mb-6 leading-relaxed">
-                    Profissionais qualificados prontos para atender suas necessidades de {cat.name.toLowerCase()}.
-                  </p>
-                  <div className="flex items-center text-accent font-black text-sm uppercase tracking-widest group-hover:gap-3 transition-all">
-                    Ver detalhes 
-                    <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
-                  </div>
-                </div>
+                </Link>
               </motion.div>
             ))}
           </div>
@@ -198,7 +297,12 @@ export default function Landing() {
       {/* CTA Section */}
       <section className="py-20 bg-white">
         <div className="container mx-auto px-4">
-          <div className="bg-gradient-to-br from-primary via-primary to-blue-900 rounded-3xl p-12 md:p-20 text-center text-white relative overflow-hidden">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            viewport={{ once: true }}
+            className="bg-gradient-to-br from-primary via-primary to-blue-900 rounded-3xl p-12 md:p-20 text-center text-white relative overflow-hidden"
+          >
             <div className="absolute top-0 left-0 w-64 h-64 bg-accent/20 rounded-full -ml-32 -mt-32 animate-pulse"></div>
             <div className="absolute bottom-0 right-0 w-64 h-64 bg-blue-400/20 rounded-full -mr-32 -mb-32 animate-pulse delay-1000"></div>
             
@@ -227,7 +331,7 @@ export default function Landing() {
                 </Link>
               </div>
             </div>
-          </div>
+          </motion.div>
         </div>
       </section>
     </div>
