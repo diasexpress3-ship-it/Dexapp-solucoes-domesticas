@@ -11,7 +11,7 @@ import {
 } from 'lucide-react';
 import { UploadImage } from '../../components/ui/UploadImage';
 import { useAuth } from '../../contexts/AuthContext';
-import { doc, getDoc } from 'firebase/firestore';
+import { doc, getDoc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 
 export default function Landing() {
@@ -30,44 +30,48 @@ export default function Landing() {
     "no seu Celular"
   ];
 
-  // Buscar imagem do Firestore quando o usuário estiver logado
+  // Buscar imagem do Firestore em tempo real para QUALQUER usuário (logado ou não)
   useEffect(() => {
-    const fetchProfileImage = async () => {
-      if (user?.id) {
-        setLoadingImage(true);
-        try {
+    // ID fixo para a imagem pública (pode ser um usuário específico ou uma coleção separada)
+    const PUBLIC_IMAGE_USER_ID = 'public_profile_image'; // ID fixo para imagem pública
+    
+    const fetchPublicImage = async () => {
+      setLoadingImage(true);
+      try {
+        // Tenta buscar do documento público primeiro
+        const publicRef = doc(db, 'config', 'landingImage');
+        const publicSnap = await getDoc(publicRef);
+        
+        if (publicSnap.exists() && publicSnap.data().profileImageUrl) {
+          setProfileImageUrl(publicSnap.data().profileImageUrl);
+          console.log('Imagem pública carregada:', publicSnap.data().profileImageUrl);
+        } else if (user?.id) {
+          // Se não houver imagem pública, tenta buscar do usuário logado
           const userRef = doc(db, 'users', user.id);
           const userSnap = await getDoc(userRef);
-          if (userSnap.exists()) {
-            const data = userSnap.data();
-            console.log('Dados do usuário:', data); // Debug
-            if (data.profileImageUrl) {
-              setProfileImageUrl(data.profileImageUrl);
-              console.log('Imagem carregada do Firestore:', data.profileImageUrl);
-            } else {
-              setProfileImageUrl(null);
-            }
+          if (userSnap.exists() && userSnap.data().profileImageUrl) {
+            setProfileImageUrl(userSnap.data().profileImageUrl);
           }
-        } catch (error) {
-          console.error("Erro ao buscar imagem de perfil:", error);
-        } finally {
-          setLoadingImage(false);
         }
-      } else {
-        // Se não estiver logado, limpa a imagem
-        setProfileImageUrl(null);
+      } catch (error) {
+        console.error("Erro ao buscar imagem:", error);
+      } finally {
+        setLoadingImage(false);
       }
     };
 
-    fetchProfileImage();
-  }, [user?.id]);
+    fetchPublicImage();
 
-  // Também buscar quando o usuário fizer login/deslogar
-  useEffect(() => {
-    if (!user) {
-      setProfileImageUrl(null);
-    }
-  }, [user]);
+    // Configurar listener em tempo real para a imagem pública
+    const publicRef = doc(db, 'config', 'landingImage');
+    const unsubscribe = onSnapshot(publicRef, (doc) => {
+      if (doc.exists() && doc.data().profileImageUrl) {
+        setProfileImageUrl(doc.data().profileImageUrl);
+      }
+    });
+
+    return () => unsubscribe();
+  }, [user?.id]); // Executa quando o usuário muda
 
   // Efeito para animação do título
   useEffect(() => {
@@ -101,7 +105,7 @@ export default function Landing() {
   }, []);
 
   const handleImageUpload = (url: string) => {
-    console.log('Imagem carregada com sucesso no callback:', url);
+    console.log('Imagem carregada com sucesso:', url);
     setProfileImageUrl(url);
   };
 
@@ -273,10 +277,10 @@ export default function Landing() {
                     <UploadImage 
                       currentImageUrl={profileImageUrl}
                       onUpload={handleImageUpload}
-                      collectionPath="users"
-                      docId={user?.id}
+                      collectionPath="config"
+                      docId="landingImage"
                       field="profileImageUrl"
-                      isAdminOnly={false}
+                      isAdminOnly={true} // APENAS ADMIN PODE FAZER UPLOAD
                       className="w-full h-full object-cover"
                     />
                   )}
@@ -294,7 +298,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Process Steps */}
+      {/* Process Steps - COM NÚMEROS VISÍVEIS */}
       <section ref={processRef} className="py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -316,25 +320,25 @@ export default function Landing() {
                 whileHover={{ y: -10 }}
                 className="relative group"
               >
-                {/* Número grande e visível */}
-                <div className="absolute -top-6 -right-6 text-8xl font-black text-gray-100 opacity-60 group-hover:opacity-100 transition-opacity z-0">
+                {/* Número grande e VISÍVEL (ajustado) */}
+                <div className="absolute -top-6 -right-6 text-8xl font-black text-gray-200/80 group-hover:text-gray-300 transition-colors z-10">
                   {step.number}
                 </div>
                 
                 {/* Card */}
-                <div className="relative bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all z-10 overflow-hidden">
+                <div className="relative bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all z-20 overflow-hidden">
                   {/* Fundo gradiente no hover */}
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   
-                  <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
+                  <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-30`}>
                     <step.icon size={36} />
                   </div>
                   
-                  <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors relative z-10">
+                  <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors relative z-30">
                     {step.title}
                   </h3>
                   
-                  <p className="text-sm text-gray-500 leading-relaxed relative z-10">
+                  <p className="text-sm text-gray-500 leading-relaxed relative z-30">
                     {step.description}
                   </p>
                   
