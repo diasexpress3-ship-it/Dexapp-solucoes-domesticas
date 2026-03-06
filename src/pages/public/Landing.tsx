@@ -7,7 +7,8 @@ import { useRef } from 'react';
 import { 
   Shield, Clock, Star, Users, 
   Search, UserCheck, CreditCard, ThumbsUp,
-  Sparkles, ArrowRight, Heart, Camera
+  Sparkles, ArrowRight, Heart, Camera,
+  LayoutDashboard, Building2, Award, TrendingUp
 } from 'lucide-react';
 import { UploadImage } from '../../components/ui/UploadImage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,57 +22,76 @@ export default function Landing() {
   
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
   const [displayedPhrases, setDisplayedPhrases] = useState<string[]>([]);
-  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   const [loadingImage, setLoadingImage] = useState(false);
   
-  const phrases = [
-    "Soluções Domésticas",
-    "ao seu Alcance",
-    "no seu Celular"
-  ];
-
-  // Buscar imagem do Firestore em tempo real para QUALQUER usuário (logado ou não)
-  useEffect(() => {
-    // ID fixo para a imagem pública (pode ser um usuário específico ou uma coleção separada)
-    const PUBLIC_IMAGE_USER_ID = 'public_profile_image'; // ID fixo para imagem pública
+  // Imagens da aplicação
+  const [images, setImages] = useState({
+    // Imagem de perfil (círculo)
+    profile: null as string | null,
     
-    const fetchPublicImage = async () => {
+    // Imagem hero (fundo)
+    hero: null as string | null,
+    
+    // Imagens das features
+    feature1: null as string | null,
+    feature2: null as string | null,
+    feature3: null as string | null,
+    feature4: null as string | null,
+    
+    // Imagens das categorias
+    categoryLimpeza: null as string | null,
+    categoryEmpregadas: null as string | null,
+    categoryEletrica: null as string | null,
+    categoryCanalizacao: null as string | null,
+    categoryCarpintaria: null as string | null,
+    categoryConstrucao: null as string | null,
+    categoryJardinagem: null as string | null,
+    categoryPintura: null as string | null,
+    categoryReparacoes: null as string | null,
+    
+    // Logos de parceiros
+    partner1: null as string | null,
+    partner2: null as string | null,
+    partner3: null as string | null,
+    partner4: null as string | null,
+    partner5: null as string | null,
+  });
+
+  // Buscar todas as imagens
+  useEffect(() => {
+    const fetchAllImages = async () => {
       setLoadingImage(true);
       try {
-        // Tenta buscar do documento público primeiro
-        const publicRef = doc(db, 'config', 'landingImage');
-        const publicSnap = await getDoc(publicRef);
+        // Documento principal de imagens
+        const imagesRef = doc(db, 'config', 'landingImages');
+        const imagesSnap = await getDoc(imagesRef);
         
-        if (publicSnap.exists() && publicSnap.data().profileImageUrl) {
-          setProfileImageUrl(publicSnap.data().profileImageUrl);
-          console.log('Imagem pública carregada:', publicSnap.data().profileImageUrl);
-        } else if (user?.id) {
-          // Se não houver imagem pública, tenta buscar do usuário logado
-          const userRef = doc(db, 'users', user.id);
-          const userSnap = await getDoc(userRef);
-          if (userSnap.exists() && userSnap.data().profileImageUrl) {
-            setProfileImageUrl(userSnap.data().profileImageUrl);
-          }
+        if (imagesSnap.exists()) {
+          setImages(prev => ({ ...prev, ...imagesSnap.data() }));
         }
       } catch (error) {
-        console.error("Erro ao buscar imagem:", error);
+        console.error("Erro ao buscar imagens:", error);
       } finally {
         setLoadingImage(false);
       }
     };
 
-    fetchPublicImage();
+    fetchAllImages();
 
-    // Configurar listener em tempo real para a imagem pública
-    const publicRef = doc(db, 'config', 'landingImage');
-    const unsubscribe = onSnapshot(publicRef, (doc) => {
-      if (doc.exists() && doc.data().profileImageUrl) {
-        setProfileImageUrl(doc.data().profileImageUrl);
+    // Listener em tempo real
+    const unsubscribe = onSnapshot(doc(db, 'config', 'landingImages'), (doc) => {
+      if (doc.exists()) {
+        setImages(prev => ({ ...prev, ...doc.data() }));
       }
     });
 
     return () => unsubscribe();
-  }, [user?.id]); // Executa quando o usuário muda
+  }, []);
+
+  // Funções de upload
+  const handleImageUpload = (field: string) => (url: string) => {
+    console.log(`Imagem ${field} atualizada:`, url);
+  };
 
   // Efeito para animação do título
   useEffect(() => {
@@ -104,11 +124,6 @@ export default function Landing() {
     };
   }, []);
 
-  const handleImageUpload = (url: string) => {
-    console.log('Imagem carregada com sucesso:', url);
-    setProfileImageUrl(url);
-  };
-
   const processSteps = [
     {
       number: '01',
@@ -140,6 +155,19 @@ export default function Landing() {
     }
   ];
 
+  // Mapeamento de categorias para campos
+  const categoryFields = {
+    '🧹 Limpeza Doméstica': 'categoryLimpeza',
+    '👥 Empregadas Domésticas & Babás': 'categoryEmpregadas',
+    '⚡ Manutenção Elétrica': 'categoryEletrica',
+    '💧 Canalização': 'categoryCanalizacao',
+    '🔨 Carpintaria & Marcenaria': 'categoryCarpintaria',
+    '🏗️ Construção & Obras': 'categoryConstrucao',
+    '🌿 Jardinagem & Exteriores': 'categoryJardinagem',
+    '🎨 Pintura & Acabamentos': 'categoryPintura',
+    '🛠️ Reparações Gerais': 'categoryReparacoes',
+  };
+
   return (
     <div className="flex flex-col min-h-screen">
       {/* Header / Menu */}
@@ -160,6 +188,41 @@ export default function Landing() {
           </nav>
 
           <div className="flex items-center gap-3">
+            {/* Botão para Admin Dashboard */}
+            {user?.role === 'admin' && (
+              <Link to="/admin/dashboard">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  className="border-accent text-accent hover:bg-accent hover:text-white"
+                  leftIcon={<LayoutDashboard size={16} />}
+                >
+                  Painel Admin
+                </Button>
+              </Link>
+            )}
+            
+            {/* Imagem de perfil - só admin pode alterar */}
+            {user?.role === 'admin' ? (
+              <UploadImage 
+                currentImageUrl={images.profile}
+                onUpload={handleImageUpload('profile')}
+                collectionPath="config"
+                docId="landingImages"
+                field="profile"
+                isAdminOnly={true}
+                className="w-8 h-8 rounded-full"
+              />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white">
+                {images.profile ? (
+                  <img src={images.profile} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                ) : (
+                  <span className="text-xs font-bold">D</span>
+                )}
+              </div>
+            )}
+            
             {!user && (
               <>
                 <Link to="/login">
@@ -179,6 +242,29 @@ export default function Landing() {
         <div className="absolute inset-0">
           <div className="absolute top-20 left-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse"></div>
           <div className="absolute bottom-20 right-10 w-[30rem] h-[30rem] bg-blue-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+          
+          {/* Imagem de fundo hero */}
+          {images.hero && (
+            <div className="absolute inset-0 opacity-20">
+              <img src={images.hero} alt="Hero Background" className="w-full h-full object-cover" />
+            </div>
+          )}
+          
+          {/* Upload da imagem hero - só admin vê */}
+          {user?.role === 'admin' && (
+            <div className="absolute bottom-4 right-4 z-20">
+              <UploadImage 
+                currentImageUrl={images.hero}
+                onUpload={handleImageUpload('hero')}
+                collectionPath="config"
+                docId="landingImages"
+                field="hero"
+                isAdminOnly={true}
+                label="Alterar Fundo"
+                className="w-32 h-20 rounded-lg"
+              />
+            </div>
+          )}
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
@@ -195,7 +281,7 @@ export default function Landing() {
                   A Melhor Plataforma de Serviços em Moçambique
                 </span>
                 
-                {/* Título com animação de acúmulo */}
+                {/* Título com animação */}
                 <div className="space-y-2 mb-6 min-h-[180px] md:min-h-[220px]">
                   <AnimatePresence mode="popLayout">
                     {displayedPhrases.map((phrase, index) => (
@@ -258,7 +344,7 @@ export default function Landing() {
               </motion.div>
             </div>
 
-            {/* Lado direito - Moldura circular para imagem */}
+            {/* Lado direito - Moldura circular para imagem de perfil */}
             <div className="flex justify-center items-center">
               <div className="relative w-64 h-64 md:w-80 md:h-80">
                 {/* Círculo externo decorativo */}
@@ -267,7 +353,7 @@ export default function Landing() {
                 {/* Círculo do meio decorativo */}
                 <div className="absolute inset-4 rounded-full bg-white/10 backdrop-blur-sm border border-white/20"></div>
                 
-                {/* Moldura circular para upload de imagem */}
+                {/* Moldura circular para imagem de perfil */}
                 <div className="absolute inset-8 rounded-full overflow-hidden bg-gradient-to-br from-accent/30 to-orange-600/30 border-4 border-white/30 shadow-2xl">
                   {loadingImage ? (
                     <div className="w-full h-full flex items-center justify-center bg-primary/20">
@@ -275,19 +361,19 @@ export default function Landing() {
                     </div>
                   ) : (
                     <UploadImage 
-                      currentImageUrl={profileImageUrl}
-                      onUpload={handleImageUpload}
+                      currentImageUrl={images.profile}
+                      onUpload={handleImageUpload('profile')}
                       collectionPath="config"
-                      docId="landingImage"
-                      field="profileImageUrl"
-                      isAdminOnly={true} // APENAS ADMIN PODE FAZER UPLOAD
+                      docId="landingImages"
+                      field="profile"
+                      isAdminOnly={true}
                       className="w-full h-full object-cover"
                     />
                   )}
                 </div>
                 
-                {/* Ícone de câmera decorativo (quando não tem imagem) */}
-                {!profileImageUrl && !loadingImage && (
+                {/* Ícone de câmera decorativo */}
+                {!images.profile && !loadingImage && (
                   <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-accent rounded-full flex items-center justify-center text-white shadow-xl border-4 border-white">
                     <Camera className="w-6 h-6" />
                   </div>
@@ -298,7 +384,7 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Process Steps - COM NÚMEROS VISÍVEIS */}
+      {/* Process Steps */}
       <section ref={processRef} className="py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -320,8 +406,8 @@ export default function Landing() {
                 whileHover={{ y: -10 }}
                 className="relative group"
               >
-                {/* Número grande e VISÍVEL (ajustado) */}
-                <div className="absolute -top-6 -right-6 text-8xl font-black text-gray-200/80 group-hover:text-gray-300 transition-colors z-10">
+                {/* Número grande e visível */}
+                <div className="absolute -top-6 -right-6 text-8xl font-black text-gray-100 opacity-60 group-hover:opacity-100 transition-opacity z-10">
                   {step.number}
                 </div>
                 
@@ -351,8 +437,156 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Categories Section */}
+      {/* Features Section */}
       <section className="py-24 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-black text-primary mb-4">
+              Por que escolher a <span className="text-accent">DEXAPP</span>?
+            </h2>
+            <p className="text-gray-500 max-w-2xl mx-auto">
+              Segurança, rapidez e qualidade em cada serviço
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+            {/* Feature 1 */}
+            <div className="relative group">
+              <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all">
+                <div className="relative h-48 mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-accent/10 to-accent/5">
+                  {images.feature1 ? (
+                    <img src={images.feature1} alt="Feature 1" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Shield className="w-16 h-16 text-accent/30" />
+                    </div>
+                  )}
+                  {user?.role === 'admin' && (
+                    <div className="absolute bottom-2 right-2">
+                      <UploadImage 
+                        currentImageUrl={images.feature1}
+                        onUpload={handleImageUpload('feature1')}
+                        collectionPath="config"
+                        docId="landingImages"
+                        field="feature1"
+                        isAdminOnly={true}
+                        label="Alterar"
+                        className="w-10 h-10 rounded-lg"
+                      />
+                    </div>
+                  )}
+                </div>
+                <h3 className="text-xl font-black text-primary mb-2">Segurança Total</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Profissionais verificados e antecedentes criminais checados.
+                </p>
+              </div>
+            </div>
+
+            {/* Feature 2 */}
+            <div className="relative group">
+              <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all">
+                <div className="relative h-48 mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-accent/10 to-accent/5">
+                  {images.feature2 ? (
+                    <img src={images.feature2} alt="Feature 2" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Clock className="w-16 h-16 text-accent/30" />
+                    </div>
+                  )}
+                  {user?.role === 'admin' && (
+                    <div className="absolute bottom-2 right-2">
+                      <UploadImage 
+                        currentImageUrl={images.feature2}
+                        onUpload={handleImageUpload('feature2')}
+                        collectionPath="config"
+                        docId="landingImages"
+                        field="feature2"
+                        isAdminOnly={true}
+                        label="Alterar"
+                        className="w-10 h-10 rounded-lg"
+                      />
+                    </div>
+                  )}
+                </div>
+                <h3 className="text-xl font-black text-primary mb-2">Atendimento Rápido</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Encontre um profissional em minutos.
+                </p>
+              </div>
+            </div>
+
+            {/* Feature 3 */}
+            <div className="relative group">
+              <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all">
+                <div className="relative h-48 mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-accent/10 to-accent/5">
+                  {images.feature3 ? (
+                    <img src={images.feature3} alt="Feature 3" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Star className="w-16 h-16 text-accent/30" />
+                    </div>
+                  )}
+                  {user?.role === 'admin' && (
+                    <div className="absolute bottom-2 right-2">
+                      <UploadImage 
+                        currentImageUrl={images.feature3}
+                        onUpload={handleImageUpload('feature3')}
+                        collectionPath="config"
+                        docId="landingImages"
+                        field="feature3"
+                        isAdminOnly={true}
+                        label="Alterar"
+                        className="w-10 h-10 rounded-lg"
+                      />
+                    </div>
+                  )}
+                </div>
+                <h3 className="text-xl font-black text-primary mb-2">Qualidade Garantida</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Sistema de avaliações reais.
+                </p>
+              </div>
+            </div>
+
+            {/* Feature 4 */}
+            <div className="relative group">
+              <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all">
+                <div className="relative h-48 mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-accent/10 to-accent/5">
+                  {images.feature4 ? (
+                    <img src={images.feature4} alt="Feature 4" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center">
+                      <Users className="w-16 h-16 text-accent/30" />
+                    </div>
+                  )}
+                  {user?.role === 'admin' && (
+                    <div className="absolute bottom-2 right-2">
+                      <UploadImage 
+                        currentImageUrl={images.feature4}
+                        onUpload={handleImageUpload('feature4')}
+                        collectionPath="config"
+                        docId="landingImages"
+                        field="feature4"
+                        isAdminOnly={true}
+                        label="Alterar"
+                        className="w-10 h-10 rounded-lg"
+                      />
+                    </div>
+                  )}
+                </div>
+                <h3 className="text-xl font-black text-primary mb-2">Suporte 24/7</h3>
+                <p className="text-sm text-gray-500 leading-relaxed">
+                  Nossa central está sempre pronta.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* Categories Section */}
+      <section className="py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-black text-primary mb-4">
@@ -364,45 +598,71 @@ export default function Landing() {
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
-            {SERVICE_CATEGORIES.slice(0, 6).map((cat, index) => (
-              <motion.div
-                key={cat.id}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: index * 0.1 }}
-                whileHover={{ y: -8 }}
-                className="group cursor-pointer"
-              >
-                <Link to={`/servicos?cat=${cat.id}`}>
-                  <div className="bg-white p-8 rounded-3xl shadow-md border border-gray-100 h-full transition-all hover:shadow-2xl hover:border-accent/20 relative overflow-hidden">
-                    {/* Fundo gradiente animado */}
-                    <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
-                    
-                    {/* Ícone animado */}
-                    <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
-                      <cat.icon size={32} />
+            {SERVICE_CATEGORIES.slice(0, 6).map((cat, index) => {
+              const fieldName = categoryFields[cat.name] || 'categoryReparacoes';
+              return (
+                <motion.div
+                  key={cat.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1 }}
+                  whileHover={{ y: -8 }}
+                  className="group cursor-pointer relative"
+                >
+                  <Link to={`/servicos?cat=${cat.id}`}>
+                    <div className="bg-white p-8 rounded-3xl shadow-md border border-gray-100 h-full transition-all hover:shadow-2xl hover:border-accent/20 relative overflow-hidden">
+                      {/* Fundo gradiente animado */}
+                      <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
+                      
+                      {/* Imagem da categoria - editável por admin */}
+                      <div className="relative h-32 mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-accent/10 to-accent/5">
+                        {images[fieldName] ? (
+                          <img src={images[fieldName]} alt={cat.name} className="w-full h-full object-cover" />
+                        ) : (
+                          <div className={`w-full h-full bg-gradient-to-br ${cat.color} opacity-20`} />
+                        )}
+                        {user?.role === 'admin' && (
+                          <div className="absolute bottom-2 right-2 z-20">
+                            <UploadImage 
+                              currentImageUrl={images[fieldName]}
+                              onUpload={handleImageUpload(fieldName)}
+                              collectionPath="config"
+                              docId="landingImages"
+                              field={fieldName}
+                              isAdminOnly={true}
+                              label="Alterar"
+                              className="w-8 h-8 rounded-lg"
+                            />
+                          </div>
+                        )}
+                      </div>
+                      
+                      {/* Ícone */}
+                      <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
+                        <cat.icon size={32} />
+                      </div>
+                      
+                      {/* Título */}
+                      <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors relative z-10">
+                        {cat.name}
+                      </h3>
+                      
+                      {/* Descrição */}
+                      <p className="text-sm text-gray-500 mb-6 leading-relaxed relative z-10">
+                        Profissionais qualificados prontos para atender suas necessidades.
+                      </p>
+                      
+                      {/* Link Detalhes */}
+                      <div className="flex items-center text-accent font-black text-sm uppercase tracking-widest group-hover:gap-3 transition-all relative z-10">
+                        Ver detalhes 
+                        <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                      </div>
                     </div>
-                    
-                    {/* Título */}
-                    <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors relative z-10">
-                      {cat.name}
-                    </h3>
-                    
-                    {/* Descrição */}
-                    <p className="text-sm text-gray-500 mb-6 leading-relaxed relative z-10">
-                      Profissionais qualificados prontos para atender suas necessidades.
-                    </p>
-                    
-                    {/* Link Detalhes */}
-                    <div className="flex items-center text-accent font-black text-sm uppercase tracking-widest group-hover:gap-3 transition-all relative z-10">
-                      Ver detalhes 
-                      <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                  </div>
-                </Link>
-              </motion.div>
-            ))}
+                  </Link>
+                </motion.div>
+              );
+            })}
           </div>
 
           <div className="text-center mt-12">
@@ -410,6 +670,52 @@ export default function Landing() {
               Ver todos os serviços
               <ArrowRight size={16} />
             </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* Partners Section */}
+      <section className="py-24 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-black text-primary mb-4">
+              Nossos <span className="text-accent">Parceiros</span>
+            </h2>
+            <p className="text-gray-500 max-w-2xl mx-auto">
+              Empresas que confiam na DEXAPP
+            </p>
+          </div>
+
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
+            {[1, 2, 3, 4, 5].map((num) => (
+              <div key={num} className="relative group">
+                <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-100 hover:shadow-xl transition-all">
+                  <div className="relative h-24 w-full rounded-lg overflow-hidden bg-gray-50">
+                    {images[`partner${num}`] ? (
+                      <img src={images[`partner${num}`]} alt={`Partner ${num}`} className="w-full h-full object-contain p-4" />
+                    ) : (
+                      <div className="w-full h-full flex items-center justify-center">
+                        <Building2 className="w-12 h-12 text-gray-300" />
+                      </div>
+                    )}
+                    {user?.role === 'admin' && (
+                      <div className="absolute bottom-2 right-2">
+                        <UploadImage 
+                          currentImageUrl={images[`partner${num}`]}
+                          onUpload={handleImageUpload(`partner${num}`)}
+                          collectionPath="config"
+                          docId="landingImages"
+                          field={`partner${num}`}
+                          isAdminOnly={true}
+                          label="Alterar"
+                          className="w-8 h-8 rounded-lg"
+                        />
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         </div>
       </section>
