@@ -40,6 +40,7 @@ import {
 } from 'recharts';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { Link } from 'react-router-dom';
 
 export default function AdminDashboard() {
   const navigate = useNavigate();
@@ -57,7 +58,6 @@ export default function AdminDashboard() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Users stats
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
       const users = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
       setStats(prev => ({
@@ -72,7 +72,6 @@ export default function AdminDashboard() {
       }).slice(0, 5));
     });
 
-    // Payments stats
     const unsubPayments = onSnapshot(collection(db, 'pagamentos'), (snap) => {
       const payments = snap.docs.map(d => ({ id: d.id, ...d.data() } as Pagamento));
       setStats(prev => ({
@@ -87,7 +86,6 @@ export default function AdminDashboard() {
       }).slice(0, 5));
     });
 
-    // Services stats
     const unsubServices = onSnapshot(collection(db, 'solicitacoes'), (snap) => {
       const services = snap.docs.map(d => ({ id: d.id, ...d.data() } as Solicitacao));
       setStats(prev => ({
@@ -128,36 +126,35 @@ export default function AdminDashboard() {
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        {/* Breadcrumb Navigation com botão Início */}
+        {/* Breadcrumb Navigation - usando Link do react-router-dom */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-          <button 
-            onClick={() => navigate('/')} 
-            className="flex items-center gap-1 hover:text-accent transition-colors cursor-pointer"
-            title="Ir para Landing Page"
+          <Link 
+            to="/" 
+            className="flex items-center gap-1 hover:text-accent transition-colors"
           >
             <Home className="w-4 h-4" /> Início
-          </button>
+          </Link>
           <span>/</span>
           <span className="text-primary font-bold">Admin Dashboard</span>
         </div>
 
-        {/* Header com saudação e botões */}
+        {/* Header com saudação e botões - usando Link para Início */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
           <div className="flex items-center gap-4">
             <button 
               onClick={() => navigate(-1)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title="Voltar à página anterior"
             >
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
-            <button 
-              onClick={() => navigate('/')}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer"
+            <Link 
+              to="/"
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title="Ir para Landing Page"
             >
               <Home className="w-5 h-5 text-gray-600" />
-            </button>
+            </Link>
             <div>
               <h1 className="text-3xl font-black text-primary">
                 Olá, {user?.nome?.split(' ')[0] || 'Administrador'}!
@@ -170,14 +167,13 @@ export default function AdminDashboard() {
               variant="outline" 
               leftIcon={<Settings className="w-5 h-5" />} 
               onClick={() => navigate('/admin/configuracoes')}
-              className="cursor-pointer"
             >
               Configurações
             </Button>
             <Button 
               leftIcon={<UserPlus className="w-5 h-5" />} 
               onClick={() => navigate('/admin/usuarios/novo')}
-              className="bg-accent hover:bg-accent/90 text-white cursor-pointer"
+              className="bg-accent hover:bg-accent/90 text-white"
             >
               Novo Admin
             </Button>
@@ -256,7 +252,7 @@ export default function AdminDashboard() {
             <Button 
               fullWidth 
               variant="outline" 
-              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent cursor-pointer" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
               leftIcon={<Users className="w-5 h-5 text-accent" />} 
               onClick={() => navigate('/admin/usuarios')}
               rightIcon={<ChevronRight size={16} className="text-gray-400" />}
@@ -267,7 +263,7 @@ export default function AdminDashboard() {
             <Button 
               fullWidth 
               variant="outline" 
-              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent cursor-pointer" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
               leftIcon={<ShieldAlert className="w-5 h-5 text-accent" />} 
               onClick={() => navigate('/admin/prestadores')}
               rightIcon={<ChevronRight size={16} className="text-gray-400" />}
@@ -278,7 +274,7 @@ export default function AdminDashboard() {
             <Button 
               fullWidth 
               variant="outline" 
-              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent cursor-pointer" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
               leftIcon={<Wallet className="w-5 h-5 text-accent" />} 
               onClick={() => navigate('/admin/pagamentos')}
               rightIcon={<ChevronRight size={16} className="text-gray-400" />}
@@ -289,7 +285,7 @@ export default function AdminDashboard() {
             <Button 
               fullWidth 
               variant="outline" 
-              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent cursor-pointer" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
               leftIcon={<FileText className="w-5 h-5 text-accent" />} 
               onClick={() => navigate('/admin/relatorios')}
               rightIcon={<ChevronRight size={16} className="text-gray-400" />}
@@ -323,15 +319,15 @@ export default function AdminDashboard() {
           </CardContent>
         </Card>
 
-        {/* Botão flutuante para Landing Page */}
+        {/* Botão flutuante para Landing Page - usando Link */}
         <div className="fixed bottom-6 left-6 z-40">
-          <button
-            onClick={() => navigate('/')}
-            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors cursor-pointer"
+          <Link
+            to="/"
+            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors inline-flex items-center justify-center"
             title="Ir para Landing Page"
           >
             <Home className="w-6 h-6" />
-          </button>
+          </Link>
         </div>
       </div>
     </AppLayout>
