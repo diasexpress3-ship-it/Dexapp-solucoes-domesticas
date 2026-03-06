@@ -4,7 +4,7 @@ import {
   Users, Wrench, Wallet, ShieldAlert,
   TrendingUp, UserPlus, Settings, FileText,
   Search, Filter, Edit, Ban, CheckCircle, Download, RefreshCw,
-  Home, ArrowLeft, ChevronRight, Calendar
+  Home, ArrowLeft, ChevronRight
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
@@ -154,7 +154,7 @@ export default function AdminDashboard() {
 
   return (
     <div className="container mx-auto px-6 py-12 space-y-12">
-      {/* Breadcrumb Navigation */}
+      {/* Breadcrumb Navigation - CORRIGIDO */}
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
         <button 
           onClick={() => navigate('/')} 
@@ -167,7 +167,7 @@ export default function AdminDashboard() {
         <span className="text-primary font-bold">Admin Dashboard</span>
       </div>
 
-      {/* Header com saudação personalizada */}
+      {/* Header com saudação personalizada - CORRIGIDO */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <button 
@@ -176,6 +176,13 @@ export default function AdminDashboard() {
             title="Voltar à página anterior"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
+          <button 
+            onClick={() => navigate('/')}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Ir para Landing Page"
+          >
+            <Home className="w-5 h-5 text-gray-600" />
           </button>
           <div>
             <h1 className="text-4xl font-black text-primary">
