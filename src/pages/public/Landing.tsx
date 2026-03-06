@@ -7,7 +7,8 @@ import {
   Shield, Clock, Star, Users, 
   Search, UserCheck, CreditCard, ThumbsUp,
   Sparkles, ArrowRight, Heart, Camera,
-  LayoutDashboard, Building2, Award, TrendingUp
+  LayoutDashboard, Building2, Award, TrendingUp,
+  Mail, Phone, MapPin, Facebook, Instagram, Linkedin
 } from 'lucide-react';
 import { UploadImage } from '../../components/ui/UploadImage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -68,7 +69,6 @@ const PROCESS_STEPS = [
   }
 ];
 
-// Mapeamento de categorias para campos de imagem
 const CATEGORY_FIELDS: Record<string, string> = {
   '🧹 Limpeza Doméstica': 'categoryLimpeza',
   '👥 Empregadas Domésticas & Babás': 'categoryEmpregadas',
@@ -84,6 +84,10 @@ const CATEGORY_FIELDS: Record<string, string> = {
 export default function Landing() {
   const { user } = useAuth();
   const navigate = useNavigate();
+  
+  // DEBUG: Verificar no console se o usuário é admin
+  console.log('👤 Usuário atual:', user);
+  console.log('👑 É admin?', user?.role === 'admin');
   
   const [displayedPhrases, setDisplayedPhrases] = useState<string[]>([]);
   const [images, setImages] = useState<Images>({
@@ -166,14 +170,21 @@ export default function Landing() {
   }, []);
 
   const handleImageUpload = useCallback((field: keyof Images) => (url: string) => {
+    console.log(`📸 Upload da imagem ${field}:`, url);
     setImages(prev => ({ ...prev, [field]: url }));
   }, []);
 
+  // Verificação explícita de admin
+  const isAdmin = user?.role === 'admin';
+
   return (
     <div className="flex flex-col min-h-screen bg-white">
-      {/* Header */}
+      {/* ======================================== */}
+      {/* HEADER - COM BOTÃO ADMIN */}
+      {/* ======================================== */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl shadow-lg py-4 border-b border-gray-100">
         <div className="container mx-auto px-6 flex items-center justify-between">
+          {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
             <div className="w-10 h-10 bg-gradient-to-br from-accent to-orange-600 rounded-xl flex items-center justify-center text-white font-black text-xl">
               D
@@ -183,6 +194,7 @@ export default function Landing() {
             </span>
           </Link>
           
+          {/* Navegação */}
           <nav className="hidden md:flex items-center gap-8">
             <Link to="/" className="text-sm font-bold text-accent border-b-2 border-accent">Início</Link>
             <Link to="/servicos" className="text-sm font-bold text-gray-600 hover:text-accent">Serviços</Link>
@@ -190,9 +202,10 @@ export default function Landing() {
             <Link to="/contacto" className="text-sm font-bold text-gray-600 hover:text-accent">Contacto</Link>
           </nav>
 
+          {/* Área do usuário */}
           <div className="flex items-center gap-3">
-            {/* BOTÃO ADMIN - CORRIGIDO */}
-            {user?.role === 'admin' && (
+            {/* BOTÃO ADMIN - COM VERIFICAÇÃO EXPLÍCITA */}
+            {isAdmin && (
               <Button
                 onClick={() => navigate('/admin/dashboard')}
                 variant="outline"
@@ -204,9 +217,9 @@ export default function Landing() {
               </Button>
             )}
             
-            {/* Imagem de perfil - CORRIGIDO: botão de upload sempre visível para admin */}
+            {/* Imagem de perfil - COM VERIFICAÇÃO EXPLÍCITA */}
             <div className="relative w-10 h-10">
-              {user?.role === 'admin' ? (
+              {isAdmin ? (
                 <UploadImage
                   currentImageUrl={images.profile}
                   onUpload={handleImageUpload('profile')}
@@ -227,6 +240,7 @@ export default function Landing() {
               )}
             </div>
             
+            {/* Botões de login/registro */}
             {!user && (
               <>
                 <Link to="/login">
@@ -241,7 +255,9 @@ export default function Landing() {
         </div>
       </header>
 
-      {/* Hero Section */}
+      {/* ======================================== */}
+      {/* HERO SECTION */}
+      {/* ======================================== */}
       <section className="relative pt-32 pb-32 overflow-hidden bg-gradient-to-br from-primary via-primary to-blue-900 text-white">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute top-20 left-10 w-96 h-96 bg-accent/20 rounded-full blur-3xl animate-pulse"></div>
@@ -254,8 +270,8 @@ export default function Landing() {
           </div>
         )}
         
-        {/* Upload hero - CORRIGIDO: botão visível */}
-        {user?.role === 'admin' && (
+        {/* Upload hero - COM VERIFICAÇÃO EXPLÍCITA */}
+        {isAdmin && (
           <div className="absolute bottom-4 right-4 z-20">
             <UploadImage
               currentImageUrl={images.hero}
@@ -315,11 +331,11 @@ export default function Landing() {
               </div>
             </div>
 
-            {/* Imagem de perfil circular - CORRIGIDO */}
+            {/* Imagem de perfil circular */}
             <div className="flex justify-center items-center">
               <div className="relative w-72 h-72 md:w-96 md:h-96">
                 <div className="absolute inset-12 rounded-full overflow-hidden bg-gradient-to-br from-accent to-orange-600 border-4 border-white/30 shadow-2xl">
-                  {user?.role === 'admin' ? (
+                  {isAdmin ? (
                     <UploadImage
                       currentImageUrl={images.profile}
                       onUpload={handleImageUpload('profile')}
@@ -343,7 +359,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Process Steps */}
+      {/* ======================================== */}
+      {/* PROCESS STEPS */}
+      {/* ======================================== */}
       <section className="py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -372,7 +390,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Features Section */}
+      {/* ======================================== */}
+      {/* FEATURES SECTION - COM BOTÕES DE UPLOAD */}
+      {/* ======================================== */}
       <section className="py-24 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -396,8 +416,8 @@ export default function Landing() {
                         </div>
                       )}
                       
-                      {/* BOTÃO DE UPLOAD PARA ADMIN - CORRIGIDO */}
-                      {user?.role === 'admin' && (
+                      {/* BOTÃO DE UPLOAD - COM VERIFICAÇÃO EXPLÍCITA */}
+                      {isAdmin && (
                         <div className="absolute bottom-2 right-2">
                           <UploadImage
                             currentImageUrl={images[field]}
@@ -430,7 +450,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Categories Section - CORRIGIDA (estava sumindo) */}
+      {/* ======================================== */}
+      {/* CATEGORIES SECTION - COM BOTÕES DE UPLOAD */}
+      {/* ======================================== */}
       <section className="py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -462,8 +484,8 @@ export default function Landing() {
                             <div className={`w-full h-full bg-gradient-to-br ${cat.color} opacity-20`} />
                           )}
                           
-                          {/* BOTÃO DE UPLOAD PARA ADMIN */}
-                          {user?.role === 'admin' && (
+                          {/* BOTÃO DE UPLOAD - COM VERIFICAÇÃO EXPLÍCITA */}
+                          {isAdmin && (
                             <div className="absolute bottom-2 right-2">
                               <UploadImage
                                 currentImageUrl={images[fieldName as keyof Images]}
@@ -504,7 +526,9 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* Partners Section */}
+      {/* ======================================== */}
+      {/* PARTNERS SECTION - COM BOTÕES DE UPLOAD */}
+      {/* ======================================== */}
       <section className="py-24 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
@@ -528,8 +552,8 @@ export default function Landing() {
                         </div>
                       )}
                       
-                      {/* BOTÃO DE UPLOAD PARA ADMIN */}
-                      {user?.role === 'admin' && (
+                      {/* BOTÃO DE UPLOAD - COM VERIFICAÇÃO EXPLÍCITA */}
+                      {isAdmin && (
                         <div className="absolute bottom-2 right-2">
                           <UploadImage
                             currentImageUrl={images[field]}
@@ -551,6 +575,68 @@ export default function Landing() {
           </div>
         </div>
       </section>
+
+      {/* ======================================== */}
+      {/* FOOTER - RESTAURADO */}
+      {/* ======================================== */}
+      <footer className="bg-gray-900 text-white pt-16 pb-8">
+        <div className="container mx-auto px-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8 mb-12">
+            {/* Sobre */}
+            <div>
+              <h3 className="text-xl font-black text-accent mb-4">DEX-app</h3>
+              <p className="text-gray-400 text-sm leading-relaxed">
+                A melhor plataforma de serviços domésticos em Moçambique. Conectamos profissionais qualificados a famílias que buscam qualidade e segurança.
+              </p>
+            </div>
+
+            {/* Links Rápidos */}
+            <div>
+              <h4 className="text-lg font-bold text-white mb-4">Links Rápidos</h4>
+              <ul className="space-y-2">
+                <li><Link to="/servicos" className="text-gray-400 hover:text-accent transition-colors text-sm">Nossos Serviços</Link></li>
+                <li><Link to="/sobre" className="text-gray-400 hover:text-accent transition-colors text-sm">Sobre Nós</Link></li>
+                <li><Link to="/contacto" className="text-gray-400 hover:text-accent transition-colors text-sm">Contacto</Link></li>
+                <li><Link to="/termos" className="text-gray-400 hover:text-accent transition-colors text-sm">Termos de Uso</Link></li>
+              </ul>
+            </div>
+
+            {/* Serviços Populares */}
+            <div>
+              <h4 className="text-lg font-bold text-white mb-4">Serviços Populares</h4>
+              <ul className="space-y-2">
+                <li><Link to="/servicos?cat=limpeza" className="text-gray-400 hover:text-accent transition-colors text-sm">Limpeza Doméstica</Link></li>
+                <li><Link to="/servicos?cat=elektrica" className="text-gray-400 hover:text-accent transition-colors text-sm">Manutenção Elétrica</Link></li>
+                <li><Link to="/servicos?cat=canalizacao" className="text-gray-400 hover:text-accent transition-colors text-sm">Canalização</Link></li>
+                <li><Link to="/servicos?cat=jardinagem" className="text-gray-400 hover:text-accent transition-colors text-sm">Jardinagem</Link></li>
+              </ul>
+            </div>
+
+            {/* Newsletter */}
+            <div>
+              <h4 className="text-lg font-bold text-white mb-4">Newsletter</h4>
+              <p className="text-gray-400 text-sm mb-4">Receba dicas e promoções exclusivas.</p>
+              <div className="flex">
+                <input 
+                  type="email" 
+                  placeholder="Seu e-mail" 
+                  className="flex-1 px-4 py-2 rounded-l-lg bg-gray-800 border border-gray-700 text-white text-sm focus:outline-none focus:border-accent"
+                />
+                <button className="bg-accent px-4 py-2 rounded-r-lg text-white font-bold text-sm hover:bg-accent/90 transition-colors">
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Copyright */}
+          <div className="border-t border-gray-800 pt-8 text-center">
+            <p className="text-gray-500 text-sm">
+              © 2026 DEX-app - Soluções Domésticas. Todos os direitos reservados.
+            </p>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
