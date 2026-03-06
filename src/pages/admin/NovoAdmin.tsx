@@ -253,17 +253,6 @@ export const NovoAdmin: React.FC = () => {
             </div>
           </form>
         </Card>
-
-        {/* Botão Voltar flutuante */}
-        <div className="fixed bottom-6 left-6 z-40">
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
-            title="Voltar ao Dashboard"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-        </div>
       </div>
     </div>
   );
