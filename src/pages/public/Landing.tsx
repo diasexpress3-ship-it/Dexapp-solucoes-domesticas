@@ -8,7 +8,8 @@ import {
   Search, UserCheck, CreditCard, ThumbsUp,
   Sparkles, ArrowRight, Heart, Camera,
   LayoutDashboard, Building2, Award, TrendingUp,
-  Mail, Phone, MapPin, Facebook, Instagram, Linkedin
+  Mail, Phone, MapPin, Facebook, Instagram, Linkedin,
+  Home, LogOut
 } from 'lucide-react';
 import { UploadImage } from '../../components/ui/UploadImage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -85,7 +86,7 @@ export default function Landing() {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  // DEBUG - Verificar no console
+  // DEBUG
   console.log('👤 Usuário completo:', user);
   console.log('👑 role:', user?.role);
   console.log('👑 é admin?', user?.role === 'admin');
@@ -175,17 +176,16 @@ export default function Landing() {
     setImages(prev => ({ ...prev, [field]: url }));
   }, []);
 
-  // Verificação explícita de admin
   const isAdmin = user?.role === 'admin';
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
       {/* ======================================== */}
-      {/* HEADER - COM BOTÃO ADMIN (FORÇADO) */}
+      {/* HEADER */}
       {/* ======================================== */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl shadow-lg py-4 border-b border-gray-100">
         <div className="container mx-auto px-6 flex items-center justify-between">
-          {/* Logo - CORRIGIDO para DEX-app */}
+          {/* Logo */}
           <Link to="/" className="flex items-center gap-2 group">
             <div className="w-10 h-10 bg-gradient-to-br from-accent to-orange-600 rounded-xl flex items-center justify-center text-white font-black text-xl">
               D
@@ -195,7 +195,7 @@ export default function Landing() {
             </span>
           </Link>
           
-          {/* Navegação */}
+          {/* Navegação Desktop */}
           <nav className="hidden md:flex items-center gap-8">
             <Link to="/" className="text-sm font-bold text-accent border-b-2 border-accent">Início</Link>
             <Link to="/servicos" className="text-sm font-bold text-gray-600 hover:text-accent">Serviços</Link>
@@ -204,14 +204,11 @@ export default function Landing() {
           </nav>
 
           {/* Área do usuário */}
-          <div className="flex items-center gap-3">
-            {/* BOTÃO ADMIN - FORÇADO COM VERIFICAÇÃO DUPLA */}
+          <div className="flex items-center gap-4">
+            {/* BOTÃO ADMIN - Para admin */}
             {isAdmin && (
               <Button
-                onClick={() => {
-                  console.log('🔘 Clicou no botão admin, navegando para /admin/dashboard');
-                  navigate('/admin/dashboard');
-                }}
+                onClick={() => navigate('/admin/dashboard')}
                 variant="outline"
                 size="sm"
                 className="border-accent text-accent hover:bg-accent hover:text-white flex items-center gap-2"
@@ -221,7 +218,24 @@ export default function Landing() {
               </Button>
             )}
             
-            {/* Imagem de perfil - FORÇADO para admin */}
+            {/* BOTÃO INÍCIO - Volta para Landing */}
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 text-gray-600 hover:text-accent transition-colors"
+              title="Ir para Início"
+            >
+              <Home size={20} />
+              <span className="text-sm font-bold hidden sm:inline">Início</span>
+            </button>
+            
+            {/* Texto "Administrador" - Apenas indicador visual */}
+            {isAdmin && (
+              <span className="text-sm font-bold text-accent bg-accent/10 px-3 py-1.5 rounded-full">
+                Administrador
+              </span>
+            )}
+            
+            {/* Avatar - UploadImage para admin, imagem normal para não-admin */}
             <div className="relative w-10 h-10">
               {isAdmin ? (
                 <UploadImage
@@ -234,7 +248,7 @@ export default function Landing() {
                   className="w-full h-full rounded-full border-2 border-accent object-cover cursor-pointer"
                 />
               ) : (
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white">
+                <div className="w-full h-full rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white shadow-lg">
                   {images.profile ? (
                     <img src={images.profile} alt="Profile" className="w-full h-full rounded-full object-cover" />
                   ) : (
@@ -243,24 +257,16 @@ export default function Landing() {
                 </div>
               )}
             </div>
-            
-            {/* Texto indicador de admin (temporário para debug) */}
-            {isAdmin && (
-              <span className="text-xs font-bold text-accent bg-accent/10 px-2 py-1 rounded-full">
-                Admin
-              </span>
-            )}
-            
-            {/* Botões de login/registro */}
-            {!user && (
-              <>
-                <Link to="/login">
-                  <Button variant="ghost" size="sm">Login</Button>
-                </Link>
-                <Link to="/register-cliente">
-                  <Button size="sm">Começar</Button>
-                </Link>
-              </>
+
+            {/* Botão Sair (apenas se logado) */}
+            {user && (
+              <button
+                onClick={() => {/* implementar logout */}}
+                className="text-gray-400 hover:text-rose-600 transition-colors"
+                title="Sair"
+              >
+                <LogOut size={20} />
+              </button>
             )}
           </div>
         </div>
@@ -281,7 +287,7 @@ export default function Landing() {
           </div>
         )}
         
-        {/* Upload hero - FORÇADO para admin */}
+        {/* Upload hero - para admin */}
         {isAdmin && (
           <div className="absolute bottom-4 right-4 z-20">
             <UploadImage
@@ -342,7 +348,7 @@ export default function Landing() {
               </div>
             </div>
 
-            {/* Imagem de perfil circular - FORÇADO para admin */}
+            {/* Imagem de perfil circular - COM UPLOAD PARA ADMIN */}
             <div className="flex justify-center items-center">
               <div className="relative w-72 h-72 md:w-96 md:h-96">
                 <div className="absolute inset-12 rounded-full overflow-hidden bg-gradient-to-br from-accent to-orange-600 border-4 border-white/30 shadow-2xl">
@@ -402,7 +408,7 @@ export default function Landing() {
       </section>
 
       {/* ======================================== */}
-      {/* FEATURES SECTION - COM BOTÕES DE UPLOAD */}
+      {/* FEATURES SECTION - COM UPLOAD PARA ADMIN */}
       {/* ======================================== */}
       <section className="py-24 bg-gray-50">
         <div className="container mx-auto px-4">
@@ -427,7 +433,7 @@ export default function Landing() {
                         </div>
                       )}
                       
-                      {/* BOTÃO DE UPLOAD - FORÇADO */}
+                      {/* Botão de upload para admin */}
                       {isAdmin && (
                         <div className="absolute bottom-2 right-2">
                           <UploadImage
@@ -462,7 +468,7 @@ export default function Landing() {
       </section>
 
       {/* ======================================== */}
-      {/* CATEGORIES SECTION - COM BOTÕES DE UPLOAD */}
+      {/* CATEGORIES SECTION - COM UPLOAD PARA ADMIN */}
       {/* ======================================== */}
       <section className="py-24 bg-white">
         <div className="container mx-auto px-4">
@@ -495,7 +501,7 @@ export default function Landing() {
                             <div className={`w-full h-full bg-gradient-to-br ${cat.color} opacity-20`} />
                           )}
                           
-                          {/* BOTÃO DE UPLOAD - FORÇADO */}
+                          {/* Botão de upload para admin */}
                           {isAdmin && (
                             <div className="absolute bottom-2 right-2">
                               <UploadImage
@@ -538,7 +544,7 @@ export default function Landing() {
       </section>
 
       {/* ======================================== */}
-      {/* PARTNERS SECTION - COM BOTÕES DE UPLOAD */}
+      {/* PARTNERS SECTION - COM UPLOAD PARA ADMIN */}
       {/* ======================================== */}
       <section className="py-24 bg-gray-50">
         <div className="container mx-auto px-4">
@@ -563,7 +569,7 @@ export default function Landing() {
                         </div>
                       )}
                       
-                      {/* BOTÃO DE UPLOAD - FORÇADO */}
+                      {/* Botão de upload para admin */}
                       {isAdmin && (
                         <div className="absolute bottom-2 right-2">
                           <UploadImage
@@ -588,7 +594,7 @@ export default function Landing() {
       </section>
 
       {/* ======================================== */}
-      {/* FOOTER - COM DEX-app */}
+      {/* FOOTER */}
       {/* ======================================== */}
       <footer className="bg-gray-900 text-white pt-16 pb-8">
         <div className="container mx-auto px-4">
