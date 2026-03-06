@@ -21,7 +21,6 @@ export default defineConfig(({ mode }) => {
       react({
         fastRefresh: true,
         jsxRuntime: 'automatic',
-        exclude: /\.(spec|test)\.(ts|tsx)$/,
       }),
       
       // Tailwind CSS
@@ -70,39 +69,54 @@ export default defineConfig(({ mode }) => {
       hmr: {
         overlay: true,
         clientPort: 3000,
-        timeout: 5000,
       },
     },
 
     // ========================================
-    // BUILD (PRODUÇÃO)
+    // BUILD (PRODUÇÃO) - USANDO ESBUILD (MAIS RÁPIDO)
     // ========================================
     build: {
       outDir: 'dist',
       assetsDir: 'assets',
       sourcemap: isDevelopment,
-      minify: 'terser',
-      target: 'es2020',
       
-      // Configurações do terser
-      terserOptions: {
-        compress: {
-          drop_console: isProduction,
-          drop_debugger: true,
-          pure_funcs: ['console.log', 'console.info', 'console.debug'],
-        },
-        format: {
-          comments: false,
-        },
+      // USAR ESBUILD EM VEZ DE TERSER (não requer instalação adicional)
+      minify: 'esbuild',
+      
+      // Opções do esbuild
+      esbuild: {
+        drop: isProduction ? ['console', 'debugger'] : [],
+        pure: isProduction ? ['console.log', 'console.info', 'console.debug'] : [],
       },
       
-      // Divisão de chunks
+      target: 'es2020',
+      
+      // Divisão de chunks simplificada
       rollupOptions: {
         output: {
-          manualChunks: {
-            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
-            'vendor-firebase': ['firebase/app', 'firebase/firestore'],
-            'vendor-ui': ['framer-motion', 'lucide-react'],
+          manualChunks: (id) => {
+            // React e ReactDOM
+            if (id.includes('node_modules/react/') || 
+                id.includes('node_modules/react-dom/') ||
+                id.includes('node_modules/react-router-dom/')) {
+              return 'vendor-react';
+            }
+            
+            // Firebase
+            if (id.includes('node_modules/firebase/')) {
+              return 'vendor-firebase';
+            }
+            
+            // UI Libraries
+            if (id.includes('node_modules/framer-motion/') ||
+                id.includes('node_modules/lucide-react/')) {
+              return 'vendor-ui';
+            }
+            
+            // Outros node_modules
+            if (id.includes('node_modules/')) {
+              return 'vendor-other';
+            }
           },
         },
       },
@@ -125,7 +139,6 @@ export default defineConfig(({ mode }) => {
         'firebase/app',
         'firebase/firestore',
       ],
-      exclude: ['@tailwindcss/vite'],
     },
 
     // ========================================
