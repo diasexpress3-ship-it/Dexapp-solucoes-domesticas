@@ -4,22 +4,12 @@ import path from 'path';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [
-    react({
-      // Garantir que o React seja corretamente processado
-      jsxRuntime: 'classic', // MUDAR para classic temporariamente
-    }), 
-    tailwindcss()
-  ],
+  plugins: [react(), tailwindcss()],
   
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),
-      // FORÇAR resolução correta do React
-      'react': path.resolve(__dirname, 'node_modules/react'),
-      'react-dom': path.resolve(__dirname, 'node_modules/react-dom'),
     },
-    dedupe: ['react', 'react-dom'], // EVITAR duplicação
   },
   
   server: {
@@ -36,18 +26,17 @@ export default defineConfig({
   
   build: {
     outDir: 'dist',
-    sourcemap: true, // ATIVAR para debug
-    minify: false, // DESATIVAR temporariamente
+    sourcemap: false,
+    minify: false,
     rollupOptions: {
       output: {
-        // SIMPLIFICAR chunks
-        manualChunks: undefined, // REMOVER divisão manual
+        manualChunks: undefined,
+        inlineDynamicImports: true,
       },
     },
   },
   
   optimizeDeps: {
-    include: ['react', 'react-dom'], // FORÇAR otimização
-    force: true,
+    disabled: true,
   },
 });
