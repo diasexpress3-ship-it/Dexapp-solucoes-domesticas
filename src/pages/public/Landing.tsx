@@ -7,15 +7,11 @@ import { useRef } from 'react';
 import { 
   Shield, Clock, Star, Users, 
   Search, UserCheck, CreditCard, ThumbsUp,
-  Sparkles, ArrowRight, Heart, 
-  Home, Phone, Info, Menu,
-  Smartphone
+  Sparkles, ArrowRight, Heart
 } from 'lucide-react';
-import { UploadImage } from '../../components/ui/UploadImage'; // ← IMPORT CORRETO
-import { useAuth } from '../../contexts/AuthContext';
+// IMPORTANTE: Não importar UploadImage aqui se estiver causando erro
 
 export default function Landing() {
-  const { user } = useAuth();
   const processRef = useRef(null);
   const isInView = useInView(processRef, { once: true, amount: 0.3 });
   
@@ -86,31 +82,19 @@ export default function Landing() {
           </nav>
 
           <div className="flex items-center gap-3">
-            {/* Usando o componente UploadImage original */}
-            <UploadImage 
-              currentImageUrl={user?.profileImageUrl}
-              onUpload={(url) => {
-                if (user) {
-                  console.log('Imagem carregada:', url);
-                }
-              }}
-              collectionPath="users"
-              docId={user?.id}
-              field="profileImageUrl"
-              isAdminOnly={false}
-              className="w-8 h-8 rounded-full"
-            />
+            {/* Temporariamente removido o UploadImage até resolver o erro */}
+            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white">
+              <span className="text-xs font-bold">D</span>
+            </div>
             
-            {!user && (
-              <>
-                <Link to="/login">
-                  <Button variant="ghost" size="sm">Login</Button>
-                </Link>
-                <Link to="/register-cliente">
-                  <Button size="sm">Começar</Button>
-                </Link>
-              </>
-            )}
+            <>
+              <Link to="/login">
+                <Button variant="ghost" size="sm">Login</Button>
+              </Link>
+              <Link to="/register-cliente">
+                <Button size="sm">Começar</Button>
+              </Link>
+            </>
           </div>
         </div>
       </header>
