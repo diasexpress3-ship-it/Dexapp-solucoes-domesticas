@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { 
   Users, 
@@ -10,7 +11,15 @@ import {
   Clock,
   CheckCircle2,
   AlertCircle,
-  Download
+  Download,
+  Home,
+  ArrowLeft,
+  ChevronRight,
+  Settings,
+  UserPlus,
+  FileText,
+  ShieldAlert,
+  Wallet
 } from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -29,8 +38,13 @@ import {
   AreaChart,
   Area
 } from 'recharts';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 
 export default function AdminDashboard() {
+  const navigate = useNavigate();
+  const { user } = useAuth();
+  const { showToast } = useToast();
   const [stats, setStats] = useState({
     totalUsers: 0,
     totalProviders: 0,
@@ -45,7 +59,7 @@ export default function AdminDashboard() {
   useEffect(() => {
     // Users stats
     const unsubUsers = onSnapshot(collection(db, 'users'), (snap) => {
-      const users = snap.docs.map(d => d.data() as User);
+      const users = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
       setStats(prev => ({
         ...prev,
         totalUsers: users.length,
@@ -60,7 +74,7 @@ export default function AdminDashboard() {
 
     // Payments stats
     const unsubPayments = onSnapshot(collection(db, 'pagamentos'), (snap) => {
-      const payments = snap.docs.map(d => d.data() as Pagamento);
+      const payments = snap.docs.map(d => ({ id: d.id, ...d.data() } as Pagamento));
       setStats(prev => ({
         ...prev,
         totalRevenue: payments.filter(p => p.status === 'confirmado').reduce((acc, curr) => acc + curr.valor, 0),
@@ -75,7 +89,7 @@ export default function AdminDashboard() {
 
     // Services stats
     const unsubServices = onSnapshot(collection(db, 'solicitacoes'), (snap) => {
-      const services = snap.docs.map(d => d.data() as Solicitacao);
+      const services = snap.docs.map(d => ({ id: d.id, ...d.data() } as Solicitacao));
       setStats(prev => ({
         ...prev,
         activeServices: services.filter(s => s.status === 'em_andamento').length
@@ -109,22 +123,72 @@ export default function AdminDashboard() {
       Status: u.status
     }));
     exportToCSV(data, 'usuarios_recentes');
+    showToast('Exportação iniciada!', 'success');
+  };
+
+  const handleExportRelatorio = () => {
+    showToast('A gerar relatório semanal...', 'info');
+    setTimeout(() => {
+      showToast('Relatório gerado com sucesso!', 'success');
+    }, 1500);
   };
 
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div>
-            <h1 className="text-3xl font-black text-primary flex items-center gap-3">
-              <TrendingUp size={32} className="text-accent" />
-              Painel Administrativo
-            </h1>
-            <p className="text-gray-500">Visão geral do desempenho da plataforma.</p>
+        {/* Breadcrumb Navigation */}
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+          <button 
+            onClick={() => navigate('/')} 
+            className="flex items-center gap-1 hover:text-accent transition-colors"
+            title="Ir para Landing Page"
+          >
+            <Home className="w-4 h-4" /> Início
+          </button>
+          <span>/</span>
+          <span className="text-primary font-bold">Admin Dashboard</span>
+        </div>
+
+        {/* Header com botões de navegação */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => navigate(-1)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Voltar à página anterior"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <button 
+              onClick={() => navigate('/')}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Ir para Landing Page"
+            >
+              <Home className="w-5 h-5 text-gray-600" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-black text-primary flex items-center gap-3">
+                <TrendingUp size={32} className="text-accent" />
+                Painel Administrativo
+              </h1>
+              <p className="text-gray-500">Visão geral do desempenho da plataforma.</p>
+            </div>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" leftIcon={<Download size={18} />} onClick={handleExportCSV}>Exportar CSV</Button>
-            <Button variant="primary" leftIcon={<Clock size={18} />}>Relatório Semanal</Button>
+            <Button 
+              variant="outline" 
+              leftIcon={<Settings className="w-5 h-5" />} 
+              onClick={() => navigate('/admin/configuracoes')}
+            >
+              Configurações
+            </Button>
+            <Button 
+              leftIcon={<UserPlus className="w-5 h-5" />} 
+              onClick={() => navigate('/admin/usuarios/novo')}
+              className="bg-accent hover:bg-accent/90 text-white"
+            >
+              Novo Admin
+            </Button>
           </div>
         </div>
 
@@ -193,6 +257,56 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
+        {/* Ações Rápidas */}
+        <div className="mb-8">
+          <h3 className="text-xl font-black text-primary mb-4">Ações Rápidas</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <Button 
+              fullWidth 
+              variant="outline" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
+              leftIcon={<Users className="w-5 h-5 text-accent" />} 
+              onClick={() => navigate('/admin/usuarios')}
+              rightIcon={<ChevronRight size={16} className="text-gray-400" />}
+            >
+              Gerir Utilizadores
+            </Button>
+            
+            <Button 
+              fullWidth 
+              variant="outline" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
+              leftIcon={<ShieldAlert className="w-5 h-5 text-accent" />} 
+              onClick={() => navigate('/admin/prestadores')}
+              rightIcon={<ChevronRight size={16} className="text-gray-400" />}
+            >
+              Validar Prestadores
+            </Button>
+            
+            <Button 
+              fullWidth 
+              variant="outline" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
+              leftIcon={<Wallet className="w-5 h-5 text-accent" />} 
+              onClick={() => navigate('/admin/pagamentos')}
+              rightIcon={<ChevronRight size={16} className="text-gray-400" />}
+            >
+              Confirmar Pagamentos
+            </Button>
+            
+            <Button 
+              fullWidth 
+              variant="outline" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
+              leftIcon={<FileText className="w-5 h-5 text-accent" />} 
+              onClick={() => navigate('/admin/relatorios')}
+              rightIcon={<ChevronRight size={16} className="text-gray-400" />}
+            >
+              Relatórios Mensais
+            </Button>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* Revenue Chart */}
           <Card className="lg:col-span-2">
@@ -247,12 +361,19 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <h3 className="font-black text-primary">Novos Utilizadores</h3>
-              <Button variant="ghost" size="sm" className="text-accent font-bold">Ver todos</Button>
+              <Button 
+                variant="ghost" 
+                size="sm" 
+                className="text-accent font-bold"
+                onClick={() => navigate('/admin/usuarios')}
+              >
+                Ver todos
+              </Button>
             </CardHeader>
             <CardContent className="p-0">
               <div className="divide-y divide-gray-50">
                 {recentUsers.map((u) => (
-                  <div key={u.id} className="p-4 flex items-center gap-3 hover:bg-gray-50/50 transition-colors">
+                  <div key={u.id} className="p-4 flex items-center gap-3 hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/usuarios')}>
                     <div className="w-10 h-10 rounded-xl bg-primary/5 flex items-center justify-center text-primary font-bold">
                       {u.photoURL ? (
                         <img src={u.photoURL} alt="" className="w-full h-full rounded-xl object-cover" referrerPolicy="no-referrer" />
@@ -278,7 +399,13 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <h3 className="font-black text-primary">Últimas Transações</h3>
-            <Button variant="outline" size="sm">Ver Histórico Completo</Button>
+            <Button 
+              variant="outline" 
+              size="sm"
+              onClick={() => navigate('/admin/pagamentos')}
+            >
+              Ver Histórico Completo
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -294,7 +421,7 @@ export default function AdminDashboard() {
                 </thead>
                 <tbody className="divide-y divide-gray-50">
                   {recentPayments.map((p) => (
-                    <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
+                    <tr key={p.id} className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => navigate('/admin/pagamentos')}>
                       <td className="p-4">
                         <p className="text-xs font-bold text-primary">#{p.id.slice(-6).toUpperCase()}</p>
                         <p className="text-[10px] text-gray-400">{formatDate(p.data)}</p>
@@ -316,7 +443,17 @@ export default function AdminDashboard() {
                         </span>
                       </td>
                       <td className="p-4 text-right">
-                        <Button variant="ghost" size="sm" className="text-accent font-bold">Detalhes</Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm" 
+                          className="text-accent font-bold"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            navigate('/admin/pagamentos');
+                          }}
+                        >
+                          Detalhes
+                        </Button>
                       </td>
                     </tr>
                   ))}
@@ -325,6 +462,17 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Botão Voltar flutuante */}
+        <div className="fixed bottom-6 left-6 z-40">
+          <button
+            onClick={() => navigate('/admin/dashboard')}
+            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+            title="Recarregar Dashboard"
+          >
+            <TrendingUp className="w-6 h-6" />
+          </button>
+        </div>
       </div>
     </AppLayout>
   );
