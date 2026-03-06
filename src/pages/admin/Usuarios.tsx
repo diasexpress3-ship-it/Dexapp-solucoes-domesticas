@@ -25,9 +25,11 @@ import { User } from '../../types';
 import { formatDate, exportToCSV, exportToPDF } from '../../utils/utils';
 import { ExportButtons } from '../../components/ui/ExportButtons';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Usuarios() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [roleFilter, setRoleFilter] = useState('todos');
@@ -85,7 +87,7 @@ export default function Usuarios() {
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
         {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-8">
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
           <button 
             onClick={() => navigate('/')} 
             className="flex items-center gap-1 hover:text-accent transition-colors"
@@ -103,26 +105,24 @@ export default function Usuarios() {
           <span className="text-primary font-bold">Utilizadores</span>
         </div>
 
-        {/* Header com botão Voltar */}
-        <div className="flex items-center gap-4 mb-8">
-          <button 
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Voltar à página anterior"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-black text-primary flex items-center gap-3">
-              <Users size={32} className="text-accent" />
-              Gestão de Utilizadores
-            </h1>
-            <p className="text-gray-500">Administre todos os perfis registados na plataforma.</p>
-          </div>
-        </div>
-
-        {/* Botões de ação */}
+        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => navigate(-1)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Voltar"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-black text-primary flex items-center gap-3">
+                <Users size={32} className="text-accent" />
+                Gestão de Utilizadores
+              </h1>
+              <p className="text-gray-500">Administre todos os perfis registados na plataforma.</p>
+            </div>
+          </div>
           <div className="flex flex-wrap gap-2">
             <ExportButtons 
               data={exportData}
@@ -255,17 +255,6 @@ export default function Usuarios() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Botão Voltar flutuante */}
-        <div className="fixed bottom-6 left-6 z-40">
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
-            title="Voltar ao Dashboard"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-        </div>
       </div>
     </AppLayout>
   );
