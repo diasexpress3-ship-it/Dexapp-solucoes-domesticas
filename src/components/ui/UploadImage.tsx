@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Camera, Loader2, Upload, X } from 'lucide-react';
 import { doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
@@ -29,9 +29,39 @@ export const UploadImage: React.FC<UploadImageProps> = ({
   const { user } = useAuth();
   const { showToast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
+  const [imageUrl, setImageUrl] = useState<string | null>(currentImageUrl || null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isAdmin = user?.profile === 'admin';
+
+  // Atualizar estado quando currentImageUrl mudar (para quando o usuário logar/deslogar)
+  useEffect(() => {
+    setImageUrl(currentImageUrl || null);
+  }, [currentImageUrl]);
+
+  // Buscar imagem do Firestore quando docId estiver disponível
+  useEffect(() => {
+    const fetchImage = async () => {
+      if (collectionPath && docId && field) {
+        try {
+          const docRef = doc(db, collectionPath, docId);
+          const docSnap = await getDoc(docRef);
+          if (docSnap.exists()) {
+            const data = docSnap.data();
+            if (data[field]) {
+              setImageUrl(data[field]);
+            }
+          }
+        } catch (error) {
+          console.error("Erro ao buscar imagem:", error);
+        }
+      }
+    };
+
+    if (docId && collectionPath && field) {
+      fetchImage();
+    }
+  }, [docId, collectionPath, field]);
 
   const handleUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -68,7 +98,9 @@ export const UploadImage: React.FC<UploadImageProps> = ({
 
       if (result.success) {
         const url = result.data.url;
+        setImageUrl(url); // Atualiza localmente
         
+        // Salvar no Firestore
         if (collectionPath && docId && field) {
           const docRef = doc(db, collectionPath, docId);
           const docSnap = await getDoc(docRef);
@@ -76,7 +108,14 @@ export const UploadImage: React.FC<UploadImageProps> = ({
           if (docSnap.exists()) {
             await updateDoc(docRef, { [field]: url });
           } else {
-            await setDoc(docRef, { [field]: url });
+            await setDoc(docRef, { 
+              [field]: url,
+              id: docId,
+              nome: user?.nome || 'Usuário',
+              email: user?.email || '',
+              profile: user?.profile || 'cliente',
+              status: 'ativo'
+            });
           }
         }
 
@@ -93,31 +132,68 @@ export const UploadImage: React.FC<UploadImageProps> = ({
     }
   };
 
+  const handleRemoveImage = async () => {
+    setImageUrl(null);
+    
+    if (collectionPath && docId && field) {
+      try {
+        const docRef = doc(db, collectionPath, docId);
+        await updateDoc(docRef, { [field]: null });
+        showToast('Imagem removida com sucesso', 'info');
+        if (onUpload) onUpload('');
+      } catch (error) {
+        console.error("Erro ao remover imagem:", error);
+        showToast('Erro ao remover imagem', 'error');
+      }
+    }
+  };
+
   if (isAdminOnly && !isAdmin) {
-    return currentImageUrl ? (
-      <img src={currentImageUrl} alt="Preview" className={`w-full h-full object-cover ${className}`} referrerPolicy="no-referrer" />
+    return imageUrl ? (
+      <img src={imageUrl} alt="Preview" className={`w-full h-full object-cover ${className}`} referrerPolicy="no-referrer" />
     ) : null;
   }
 
   return (
     <div className={`relative group ${className}`}>
-      {currentImageUrl ? (
-        <img src={currentImageUrl} alt="Preview" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
+      {imageUrl ? (
+        <img 
+          src={imageUrl} 
+          alt="Preview" 
+          className="w-full h-full object-cover" 
+          referrerPolicy="no-referrer"
+          onError={() => {
+            console.log("Erro ao carregar imagem, removendo referência");
+            setImageUrl(null);
+          }}
+        />
       ) : (
-        <div className="w-full h-full bg-slate-100 flex flex-col items-center justify-center text-slate-400">
-          <Upload className="w-8 h-8 mb-2" />
-          <span className="text-xs font-bold uppercase">{label}</span>
+        <div className="w-full h-full bg-gradient-to-br from-primary/20 to-blue-900/20 flex flex-col items-center justify-center text-white">
+          <Upload className="w-8 h-8 mb-2 opacity-70" />
+          <span className="text-xs font-bold uppercase opacity-70">{label}</span>
         </div>
       )}
 
-      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+      <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
         <button
           onClick={() => fileInputRef.current?.click()}
           disabled={isUploading}
           className="bg-white text-primary p-3 rounded-xl shadow-lg hover:scale-110 transition-transform disabled:opacity-50"
+          title="Carregar nova imagem"
         >
           {isUploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Camera className="w-6 h-6" />}
         </button>
+        
+        {imageUrl && (
+          <button
+            onClick={handleRemoveImage}
+            disabled={isUploading}
+            className="bg-white text-rose-600 p-3 rounded-xl shadow-lg hover:scale-110 transition-transform disabled:opacity-50"
+            title="Remover imagem"
+          >
+            <X className="w-6 h-6" />
+          </button>
+        )}
       </div>
 
       <input
