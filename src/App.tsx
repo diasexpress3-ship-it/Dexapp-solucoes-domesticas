@@ -39,14 +39,14 @@ import Pagamentos from './pages/admin/Pagamentos';
 import Relatorios from './pages/admin/Relatorios';
 import Configuracoes from './pages/admin/Configuracoes';
 
-const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode, allowedRoles?: string[] }) => {
-  const { user, loading, firebaseUser } = useAuth();
+const ProtectedRoute = ({ children, allowedProfiles }: { children: React.ReactNode, allowedProfiles: string[] }) => {
+  const { user, loading } = useAuth();
 
   if (loading) return <LoadingSpinner fullScreen />;
   
-  if (!firebaseUser) return <Navigate to="/login" replace />;
+  if (!user) return <Navigate to="/login" replace />;
   
-  if (allowedRoles && user && !allowedRoles.includes(user.role)) {
+  if (!allowedProfiles.includes(user.profile)) {
     return <Navigate to="/" replace />;
   }
 
@@ -55,21 +55,19 @@ const ProtectedRoute = ({ children, allowedRoles }: { children: React.ReactNode,
 
 // Componente de redirecionamento da raiz
 const HomeRedirect = () => {
-  const { user, loading, firebaseUser } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) return <LoadingSpinner fullScreen />;
 
-  console.log('HomeRedirect - user:', user, 'firebaseUser:', firebaseUser);
-
   // Se NÃO estiver logado, vai para Landing Page
-  if (!firebaseUser || !user) {
+  if (!user) {
     return <Landing />;
   }
 
-  // Se estiver logado, redireciona IMEDIATAMENTE para o dashboard baseado no perfil
-  console.log('Usuário logado, redirecionando para:', user.role);
+  // Se estiver logado, redireciona para o dashboard baseado no perfil
+  console.log('Usuário logado, redirecionando para:', user.profile);
   
-  switch (user.role) {
+  switch (user.profile) {
     case 'admin':
       return <Navigate to="/admin/dashboard" replace />;
     case 'cliente':
@@ -79,18 +77,18 @@ const HomeRedirect = () => {
     case 'central':
       return <Navigate to="/central/dashboard" replace />;
     default:
-      console.warn('Perfil desconhecido:', user.role);
+      console.warn('Perfil desconhecido:', user.profile);
       return <Landing />;
   }
 };
 
 // Componente para rotas que só não-logados podem acessar (login, register)
 const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
-  const { firebaseUser, loading } = useAuth();
+  const { user, loading } = useAuth();
 
   if (loading) return <LoadingSpinner fullScreen />;
 
-  if (firebaseUser) {
+  if (user) {
     return <Navigate to="/" replace />;
   }
 
@@ -132,78 +130,78 @@ export default function App() {
 
               {/* Cliente Routes */}
               <Route path="/cliente/dashboard" element={
-                <ProtectedRoute allowedRoles={['cliente']}>
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
                   <ClienteDashboard />
                 </ProtectedRoute>
               } />
               <Route path="/cliente/nova-solicitacao" element={
-                <ProtectedRoute allowedRoles={['cliente']}>
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
                   <NovaSolicitacao />
                 </ProtectedRoute>
               } />
               <Route path="/cliente/acompanhamento/:id" element={
-                <ProtectedRoute allowedRoles={['cliente']}>
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
                   <AcompanhamentoPage />
                 </ProtectedRoute>
               } />
               <Route path="/cliente/carteira" element={
-                <ProtectedRoute allowedRoles={['cliente']}>
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
                   <CarteiraPage />
                 </ProtectedRoute>
               } />
               <Route path="/cliente/agenda" element={
-                <ProtectedRoute allowedRoles={['cliente']}>
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
                   <AgendaPageCliente />
                 </ProtectedRoute>
               } />
 
               {/* Prestador Routes */}
               <Route path="/prestador/dashboard" element={
-                <ProtectedRoute allowedRoles={['prestador']}>
+                <ProtectedRoute allowedProfiles={['prestador', 'admin']}>
                   <PrestadorDashboard />
                 </ProtectedRoute>
               } />
               <Route path="/prestador/agenda" element={
-                <ProtectedRoute allowedRoles={['prestador']}>
+                <ProtectedRoute allowedProfiles={['prestador', 'admin']}>
                   <AgendaPagePrestador />
                 </ProtectedRoute>
               } />
 
               {/* Central Routes */}
               <Route path="/central/dashboard" element={
-                <ProtectedRoute allowedRoles={['central']}>
+                <ProtectedRoute allowedProfiles={['central', 'admin']}>
                   <CentralDashboard />
                 </ProtectedRoute>
               } />
 
               {/* Admin Routes */}
               <Route path="/admin/dashboard" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedProfiles={['admin']}>
                   <AdminDashboard />
                 </ProtectedRoute>
               } />
               <Route path="/admin/usuarios" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedProfiles={['admin']}>
                   <Usuarios />
                 </ProtectedRoute>
               } />
               <Route path="/admin/prestadores" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedProfiles={['admin']}>
                   <Prestadores />
                 </ProtectedRoute>
               } />
               <Route path="/admin/pagamentos" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedProfiles={['admin']}>
                   <Pagamentos />
                 </ProtectedRoute>
               } />
               <Route path="/admin/relatorios" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedProfiles={['admin']}>
                   <Relatorios />
                 </ProtectedRoute>
               } />
               <Route path="/admin/configuracoes" element={
-                <ProtectedRoute allowedRoles={['admin']}>
+                <ProtectedRoute allowedProfiles={['admin']}>
                   <Configuracoes />
                 </ProtectedRoute>
               } />
