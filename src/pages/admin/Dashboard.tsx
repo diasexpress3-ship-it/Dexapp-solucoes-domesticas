@@ -4,7 +4,7 @@ import {
   Users, Wrench, Wallet, ShieldAlert,
   TrendingUp, UserPlus, Settings, FileText,
   Search, Filter, Edit, Ban, CheckCircle, Download, RefreshCw,
-  Home, ArrowLeft
+  Home, ArrowLeft, ChevronRight, Calendar
 } from 'lucide-react';
 import { collection, getDocs, query, where, orderBy, limit, updateDoc, doc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
@@ -156,7 +156,11 @@ export default function AdminDashboard() {
     <div className="container mx-auto px-6 py-12 space-y-12">
       {/* Breadcrumb Navigation */}
       <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-        <button onClick={() => navigate('/')} className="flex items-center gap-1 hover:text-accent">
+        <button 
+          onClick={() => navigate('/')} 
+          className="flex items-center gap-1 hover:text-accent transition-colors"
+          title="Ir para Landing Page"
+        >
           <Home className="w-4 h-4" /> Início
         </button>
         <span>/</span>
@@ -167,9 +171,9 @@ export default function AdminDashboard() {
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div className="flex items-center gap-4">
           <button 
-            onClick={() => navigate('/')}
+            onClick={() => navigate(-1)}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Voltar ao Início"
+            title="Voltar à página anterior"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
@@ -180,14 +184,27 @@ export default function AdminDashboard() {
             <p className="text-gray-500 font-medium">Bem-vindo ao seu painel de controle.</p>
           </div>
         </div>
-        <div className="flex gap-3">
-          <Button variant="outline" leftIcon={<Settings className="w-5 h-5" />} onClick={() => navigate('/admin/configuracoes')}>
+        <div className="flex gap-3 flex-wrap">
+          <Button 
+            variant="outline" 
+            leftIcon={<Settings className="w-5 h-5" />} 
+            onClick={() => navigate('/admin/configuracoes')}
+            className="hover:bg-gray-50"
+          >
             Configurações
           </Button>
-          <Button leftIcon={<UserPlus className="w-5 h-5" />} onClick={() => navigate('/admin/usuarios/novo')}>
+          <Button 
+            leftIcon={<UserPlus className="w-5 h-5" />} 
+            onClick={() => navigate('/admin/usuarios/novo')}
+            className="bg-accent hover:bg-accent/90 text-white"
+          >
             Novo Admin
           </Button>
-          <Button variant="outline" leftIcon={<RefreshCw className="w-5 h-5" />} onClick={fetchAdminData}>
+          <Button 
+            variant="outline" 
+            leftIcon={<RefreshCw className="w-5 h-5" />} 
+            onClick={fetchAdminData}
+          >
             Atualizar
           </Button>
         </div>
@@ -236,20 +253,51 @@ export default function AdminDashboard() {
           </div>
         </Card>
 
-        {/* Ações Rápidas */}
+        {/* Ações Rápidas - TODAS FUNCIONAIS */}
         <div className="space-y-6">
           <h3 className="text-xl font-black text-primary">Ações Rápidas</h3>
           <div className="grid grid-cols-1 gap-4">
-            <Button fullWidth variant="outline" className="justify-start h-16 px-6" leftIcon={<Users className="w-5 h-5" />} onClick={() => navigate('/admin/usuarios')}>
+            <Button 
+              fullWidth 
+              variant="outline" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
+              leftIcon={<Users className="w-5 h-5 text-accent" />} 
+              onClick={() => navigate('/admin/usuarios')}
+              rightIcon={<ChevronRight size={16} className="text-gray-400" />}
+            >
               Gerir Utilizadores
             </Button>
-            <Button fullWidth variant="outline" className="justify-start h-16 px-6" leftIcon={<ShieldAlert className="w-5 h-5" />} onClick={() => navigate('/admin/prestadores')}>
+            
+            <Button 
+              fullWidth 
+              variant="outline" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
+              leftIcon={<ShieldAlert className="w-5 h-5 text-accent" />} 
+              onClick={() => navigate('/admin/prestadores')}
+              rightIcon={<ChevronRight size={16} className="text-gray-400" />}
+            >
               Validar Prestadores
             </Button>
-            <Button fullWidth variant="outline" className="justify-start h-16 px-6" leftIcon={<Wallet className="w-5 h-5" />} onClick={() => navigate('/admin/pagamentos')}>
+            
+            <Button 
+              fullWidth 
+              variant="outline" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
+              leftIcon={<Wallet className="w-5 h-5 text-accent" />} 
+              onClick={() => navigate('/admin/pagamentos')}
+              rightIcon={<ChevronRight size={16} className="text-gray-400" />}
+            >
               Confirmar Pagamentos
             </Button>
-            <Button fullWidth variant="outline" className="justify-start h-16 px-6" leftIcon={<FileText className="w-5 h-5" />} onClick={() => navigate('/admin/relatorios')}>
+            
+            <Button 
+              fullWidth 
+              variant="outline" 
+              className="justify-start h-16 px-6 hover:bg-gray-50 hover:border-accent" 
+              leftIcon={<FileText className="w-5 h-5 text-accent" />} 
+              onClick={() => navigate('/admin/relatorios')}
+              rightIcon={<ChevronRight size={16} className="text-gray-400" />}
+            >
               Relatórios Mensais
             </Button>
           </div>
