@@ -7,7 +7,7 @@ import { useRef } from 'react';
 import { 
   Shield, Clock, Star, Users, 
   Search, UserCheck, CreditCard, ThumbsUp,
-  Sparkles, ArrowRight, Heart
+  Sparkles, ArrowRight, Heart, Camera
 } from 'lucide-react';
 import { UploadImage } from '../../components/ui/UploadImage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,16 +18,34 @@ export default function Landing() {
   const isInView = useInView(processRef, { once: true, amount: 0.3 });
   
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+  const [displayedPhrases, setDisplayedPhrases] = useState<string[]>([]);
+  
   const phrases = [
-    { text: "Soluções Domésticas", color: "text-white" },
-    { text: "ao seu Alcance", color: "text-accent" },
-    { text: "no seu Celular", color: "text-white" }
+    "Soluções Domésticas",
+    "ao seu Alcance",
+    "no seu Celular"
   ];
 
   useEffect(() => {
+    // Inicia com a primeira frase
+    setDisplayedPhrases([phrases[0]]);
+    
     const interval = setInterval(() => {
-      setCurrentPhraseIndex((prev) => (prev + 1) % phrases.length);
-    }, 3000);
+      setCurrentPhraseIndex((prev) => {
+        const nextIndex = (prev + 1) % phrases.length;
+        
+        // Adiciona a próxima frase mantendo as anteriores
+        setDisplayedPhrases(prevPhrases => {
+          const newPhrases = [...prevPhrases];
+          if (!newPhrases.includes(phrases[nextIndex])) {
+            newPhrases.push(phrases[nextIndex]);
+          }
+          return newPhrases;
+        });
+        
+        return nextIndex;
+      });
+    }, 2000);
 
     return () => clearInterval(interval);
   }, []);
@@ -83,18 +101,6 @@ export default function Landing() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <UploadImage 
-              currentImageUrl={user?.profileImageUrl}
-              onUpload={(url) => {
-                console.log('Imagem carregada:', url);
-              }}
-              collectionPath="users"
-              docId={user?.id}
-              field="profileImageUrl"
-              isAdminOnly={false}
-              className="w-8 h-8 rounded-full"
-            />
-            
             {!user && (
               <>
                 <Link to="/login">
@@ -117,72 +123,111 @@ export default function Landing() {
         </div>
 
         <div className="container mx-auto px-4 relative z-10">
-          <div className="max-w-4xl mx-auto text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.6 }}
-            >
-              <span className="inline-block py-1 px-4 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-xs font-black uppercase tracking-widest mb-6">
-                <Sparkles className="inline w-4 h-4 mr-2 text-accent" />
-                A Melhor Plataforma de Serviços em Moçambique
-              </span>
-              
-              <div className="h-32 md:h-40 mb-6">
-                <AnimatePresence mode="wait">
-                  <motion.h1
-                    key={currentPhraseIndex}
-                    initial={{ opacity: 0, scale: 0.8 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    exit={{ opacity: 0, scale: 1.2 }}
-                    transition={{ duration: 0.5 }}
-                    className={`text-5xl md:text-7xl font-black ${phrases[currentPhraseIndex].color}`}
-                  >
-                    {phrases[currentPhraseIndex].text}
-                  </motion.h1>
-                </AnimatePresence>
-              </div>
-              
-              <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto font-medium">
-                Encontre os melhores profissionais para cuidar do seu lar em Moçambique. Rápido, seguro e confiável.
-              </p>
-              
-              <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                <Link to="/register-cliente">
-                  <Button 
-                    size="lg" 
-                    className="bg-accent hover:bg-accent/90 text-white border-0 transform hover:scale-105 transition-all shadow-xl shadow-accent/30"
-                    rightIcon={<ArrowRight size={18} />}
-                  >
-                    Solicitar Serviço
-                  </Button>
-                </Link>
-                <Link to="/register-prestador">
-                  <Button 
-                    variant="outline" 
-                    size="lg" 
-                    className="border-white/20 text-white hover:bg-white/10 transform hover:scale-105 transition-all"
-                  >
-                    Seja um Prestador
-                  </Button>
-                </Link>
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
+            {/* Lado esquerdo - Texto */}
+            <div className="text-center lg:text-left">
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.6 }}
+              >
+                <span className="inline-block py-1 px-4 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-xs font-black uppercase tracking-widest mb-6">
+                  <Sparkles className="inline w-4 h-4 mr-2 text-accent" />
+                  A Melhor Plataforma de Serviços em Moçambique
+                </span>
+                
+                {/* Título com animação de acúmulo */}
+                <div className="space-y-2 mb-6 min-h-[180px] md:min-h-[220px]">
+                  {displayedPhrases.map((phrase, index) => (
+                    <motion.h1
+                      key={phrase}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ duration: 0.5, delay: index * 0.1 }}
+                      className={`text-4xl md:text-6xl font-black ${
+                        index === 0 ? 'text-white' : 
+                        index === 1 ? 'text-accent' : 'text-white'
+                      }`}
+                    >
+                      {phrase}
+                    </motion.h1>
+                  ))}
+                </div>
+                
+                <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto lg:mx-0 font-medium">
+                  Encontre os melhores profissionais para cuidar do seu lar em Moçambique. Rápido, seguro e confiável.
+                </p>
+                
+                <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
+                  <Link to="/register-cliente">
+                    <Button 
+                      size="lg" 
+                      className="bg-accent hover:bg-accent/90 text-white border-0 transform hover:scale-105 transition-all shadow-xl shadow-accent/30"
+                      rightIcon={<ArrowRight size={18} />}
+                    >
+                      Solicitar Serviço
+                    </Button>
+                  </Link>
+                  <Link to="/register-prestador">
+                    <Button 
+                      variant="outline" 
+                      size="lg" 
+                      className="border-white/20 text-white hover:bg-white/10 transform hover:scale-105 transition-all"
+                    >
+                      Seja um Prestador
+                    </Button>
+                  </Link>
+                </div>
 
-              <div className="mt-16 flex items-center justify-center gap-8 text-sm font-bold text-white/60">
-                <div className="flex items-center gap-2">
-                  <Shield className="w-4 h-4 text-accent" />
-                  <span>100% Seguro</span>
+                <div className="mt-16 flex items-center justify-center lg:justify-start gap-8 text-sm font-bold text-white/60">
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-accent" />
+                    <span>100% Seguro</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Clock className="w-4 h-4 text-accent" />
+                    <span>Atendimento Rápido</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Heart className="w-4 h-4 text-accent" />
+                    <span>Qualidade Garantida</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-accent" />
-                  <span>Atendimento Rápido</span>
+              </motion.div>
+            </div>
+
+            {/* Lado direito - Moldura circular para imagem */}
+            <div className="flex justify-center items-center">
+              <div className="relative w-64 h-64 md:w-80 md:h-80">
+                {/* Círculo externo decorativo */}
+                <div className="absolute inset-0 rounded-full bg-accent/20 animate-pulse"></div>
+                
+                {/* Círculo do meio decorativo */}
+                <div className="absolute inset-4 rounded-full bg-white/10 backdrop-blur-sm border border-white/20"></div>
+                
+                {/* Moldura circular para upload de imagem */}
+                <div className="absolute inset-8 rounded-full overflow-hidden bg-gradient-to-br from-accent/30 to-orange-600/30 border-4 border-white/30 shadow-2xl">
+                  <UploadImage 
+                    currentImageUrl={user?.profileImageUrl}
+                    onUpload={(url) => {
+                      console.log('Imagem carregada:', url);
+                    }}
+                    collectionPath="users"
+                    docId={user?.id}
+                    field="profileImageUrl"
+                    isAdminOnly={false}
+                    className="w-full h-full object-cover"
+                  />
                 </div>
-                <div className="flex items-center gap-2">
-                  <Heart className="w-4 h-4 text-accent" />
-                  <span>Qualidade Garantida</span>
-                </div>
+                
+                {/* Ícone de câmera decorativo (quando não logado) */}
+                {!user && (
+                  <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-accent rounded-full flex items-center justify-center text-white shadow-xl border-4 border-white">
+                    <Camera className="w-6 h-6" />
+                  </div>
+                )}
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </section>
@@ -209,11 +254,14 @@ export default function Landing() {
                 whileHover={{ y: -10 }}
                 className="relative group"
               >
+                {/* Número grande e visível */}
                 <div className="absolute -top-6 -right-6 text-8xl font-black text-gray-100 opacity-60 group-hover:opacity-100 transition-opacity z-0">
                   {step.number}
                 </div>
                 
+                {/* Card */}
                 <div className="relative bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all z-10 overflow-hidden">
+                  {/* Fundo gradiente no hover */}
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   
                   <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
@@ -228,6 +276,7 @@ export default function Landing() {
                     {step.description}
                   </p>
                   
+                  {/* Linha decorativa animada */}
                   <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
                 </div>
               </motion.div>
@@ -261,20 +310,25 @@ export default function Landing() {
               >
                 <Link to={`/servicos?cat=${cat.id}`}>
                   <div className="bg-white p-8 rounded-3xl shadow-md border border-gray-100 h-full transition-all hover:shadow-2xl hover:border-accent/20 relative overflow-hidden">
+                    {/* Fundo gradiente animado */}
                     <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     
+                    {/* Ícone animado */}
                     <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
                       <cat.icon size={32} />
                     </div>
                     
+                    {/* Título */}
                     <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors relative z-10">
                       {cat.name}
                     </h3>
                     
+                    {/* Descrição */}
                     <p className="text-sm text-gray-500 mb-6 leading-relaxed relative z-10">
                       Profissionais qualificados prontos para atender suas necessidades.
                     </p>
                     
+                    {/* Link Detalhes */}
                     <div className="flex items-center text-accent font-black text-sm uppercase tracking-widest group-hover:gap-3 transition-all relative z-10">
                       Ver detalhes 
                       <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
