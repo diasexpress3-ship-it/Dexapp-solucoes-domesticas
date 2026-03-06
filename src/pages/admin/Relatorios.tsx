@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
@@ -8,7 +9,9 @@ import {
   TrendingUp, 
   Download, 
   Calendar,
-  Filter
+  Filter,
+  Home,
+  ArrowLeft
 } from 'lucide-react';
 import { 
   BarChart, 
@@ -23,6 +26,8 @@ import {
   Cell,
   Legend
 } from 'recharts';
+import { exportToPDF } from '../../utils/utils';
+import { useToast } from '../../contexts/ToastContext';
 
 const dataServicos = [
   { name: 'Limpeza', value: 45 },
@@ -44,12 +49,77 @@ const dataMensal = [
 const COLORS = ['#0A1D56', '#FF7A00', '#4F46E5', '#10B981', '#F59E0B'];
 
 export default function Relatorios() {
+  const navigate = useNavigate();
+  const { showToast } = useToast();
   const [dateRange, setDateRange] = useState('Este Mês');
+  const [isGenerating, setIsGenerating] = useState(false);
+
+  const handleExportPDF = () => {
+    setIsGenerating(true);
+    showToast('A gerar relatório PDF...', 'info');
+    
+    setTimeout(() => {
+      try {
+        const pdfData = dataMensal.map(item => [
+          item.name,
+          item.solicitacoes.toString(),
+          item.concluidas.toString(),
+          `${Math.round((item.concluidas / item.solicitacoes) * 100)}%`,
+          `MT ${(item.concluidas * 1200).toLocaleString()}`
+        ]);
+
+        exportToPDF(
+          'Relatório de Desempenho - DEXAPP',
+          ['Mês', 'Solicitações', 'Concluídas', 'Taxa', 'Receita'],
+          pdfData,
+          'relatorio_dexapp'
+        );
+        
+        showToast('PDF gerado com sucesso!', 'success');
+      } catch (error) {
+        showToast('Erro ao gerar PDF', 'error');
+      } finally {
+        setIsGenerating(false);
+      }
+    }, 1000);
+  };
+
+  const handlePeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setDateRange(e.target.value);
+    showToast(`Período alterado para: ${e.target.value}`, 'success');
+  };
 
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+        {/* Breadcrumb Navigation */}
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-8">
+          <button 
+            onClick={() => navigate('/')} 
+            className="flex items-center gap-1 hover:text-accent transition-colors"
+          >
+            <Home className="w-4 h-4" /> Início
+          </button>
+          <span>/</span>
+          <button 
+            onClick={() => navigate('/admin/dashboard')} 
+            className="hover:text-accent transition-colors"
+          >
+            Admin
+          </button>
+          <span>/</span>
+          <span className="text-primary font-bold">Relatórios</span>
+        </div>
+
+        {/* Header com botão Voltar */}
+        <div className="flex items-center gap-4 mb-8">
+          <button 
+            onClick={() => navigate(-1)}
+            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Voltar à página anterior"
+          >
+            <ArrowLeft className="w-5 h-5 text-gray-600" />
+          </button>
           <div>
             <h1 className="text-3xl font-black text-primary flex items-center gap-3">
               <BarChart3 size={32} className="text-accent" />
@@ -57,10 +127,37 @@ export default function Relatorios() {
             </h1>
             <p className="text-gray-500">Análise detalhada do crescimento e uso da plataforma.</p>
           </div>
+        </div>
+
+        {/* Controles de período e exportação */}
+        <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div className="flex gap-2">
-            <Button variant="outline" leftIcon={<Calendar size={18} />}>{dateRange}</Button>
-            <Button leftIcon={<Download size={18} />}>Exportar PDF</Button>
+            <select 
+              value={dateRange}
+              onChange={handlePeriodChange}
+              className="bg-gray-50 border-none rounded-xl px-4 py-2 font-bold text-sm text-primary outline-none focus:ring-2 focus:ring-accent/20"
+            >
+              <option value="Este Mês">Este Mês</option>
+              <option value="Últimos 30 Dias">Últimos 30 Dias</option>
+              <option value="Este Ano">Este Ano</option>
+              <option value="Últimos 12 Meses">Últimos 12 Meses</option>
+            </select>
+            <Button 
+              variant="outline" 
+              leftIcon={<Filter size={18} />}
+              className="rounded-xl"
+            >
+              Filtrar
+            </Button>
           </div>
+          <Button 
+            leftIcon={<Download size={18} />} 
+            onClick={handleExportPDF}
+            isLoading={isGenerating}
+            className="bg-accent hover:bg-accent/90 text-white"
+          >
+            {isGenerating ? 'A gerar...' : 'Exportar PDF'}
+          </Button>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
@@ -170,6 +267,17 @@ export default function Relatorios() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Botão Voltar flutuante */}
+        <div className="fixed bottom-6 left-6 z-40">
+          <button
+            onClick={() => navigate('/admin/dashboard')}
+            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+            title="Voltar ao Dashboard"
+          >
+            <ArrowLeft className="w-6 h-6" />
+          </button>
+        </div>
       </div>
     </AppLayout>
   );
