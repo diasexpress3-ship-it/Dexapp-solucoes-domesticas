@@ -7,7 +7,7 @@ import {
   Shield, Clock, Star, Users, 
   Search, UserCheck, CreditCard, ThumbsUp,
   Sparkles, ArrowRight, Heart, Camera,
-  LayoutDashboard, Building2
+  LayoutDashboard, Building2, Award, TrendingUp
 } from 'lucide-react';
 import { UploadImage } from '../../components/ui/UploadImage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -21,6 +21,15 @@ interface Images {
   feature2: string | null;
   feature3: string | null;
   feature4: string | null;
+  categoryLimpeza: string | null;
+  categoryEmpregadas: string | null;
+  categoryEletrica: string | null;
+  categoryCanalizacao: string | null;
+  categoryCarpintaria: string | null;
+  categoryConstrucao: string | null;
+  categoryJardinagem: string | null;
+  categoryPintura: string | null;
+  categoryReparacoes: string | null;
   partner1: string | null;
   partner2: string | null;
   partner3: string | null;
@@ -59,12 +68,18 @@ const PROCESS_STEPS = [
   }
 ];
 
-const FEATURES = [
-  { id: 'feature1', title: 'Segurança Total', icon: Shield },
-  { id: 'feature2', title: 'Atendimento Rápido', icon: Clock },
-  { id: 'feature3', title: 'Qualidade Garantida', icon: Star },
-  { id: 'feature4', title: 'Suporte 24/7', icon: Users },
-];
+// Mapeamento de categorias para campos de imagem
+const CATEGORY_FIELDS: Record<string, string> = {
+  '🧹 Limpeza Doméstica': 'categoryLimpeza',
+  '👥 Empregadas Domésticas & Babás': 'categoryEmpregadas',
+  '⚡ Manutenção Elétrica': 'categoryEletrica',
+  '💧 Canalização': 'categoryCanalizacao',
+  '🔨 Carpintaria & Marcenaria': 'categoryCarpintaria',
+  '🏗️ Construção & Obras': 'categoryConstrucao',
+  '🌿 Jardinagem & Exteriores': 'categoryJardinagem',
+  '🎨 Pintura & Acabamentos': 'categoryPintura',
+  '🛠️ Reparações Gerais': 'categoryReparacoes',
+};
 
 export default function Landing() {
   const { user } = useAuth();
@@ -78,6 +93,15 @@ export default function Landing() {
     feature2: null,
     feature3: null,
     feature4: null,
+    categoryLimpeza: null,
+    categoryEmpregadas: null,
+    categoryEletrica: null,
+    categoryCanalizacao: null,
+    categoryCarpintaria: null,
+    categoryConstrucao: null,
+    categoryJardinagem: null,
+    categoryPintura: null,
+    categoryReparacoes: null,
     partner1: null,
     partner2: null,
     partner3: null,
@@ -167,19 +191,21 @@ export default function Landing() {
           </nav>
 
           <div className="flex items-center gap-3">
-            {/* BOTÃO ADMIN - AGORA VISÍVEL */}
+            {/* BOTÃO ADMIN - CORRIGIDO */}
             {user?.role === 'admin' && (
-              <button
+              <Button
                 onClick={() => navigate('/admin/dashboard')}
-                className="bg-accent text-white px-4 py-2 rounded-lg font-bold hover:bg-accent/90 transition-all flex items-center gap-2 shadow-md"
+                variant="outline"
+                size="sm"
+                className="border-accent text-accent hover:bg-accent hover:text-white flex items-center gap-2"
+                leftIcon={<LayoutDashboard size={16} />}
               >
-                <LayoutDashboard size={18} />
                 Painel Admin
-              </button>
+              </Button>
             )}
             
-            {/* Imagem de perfil */}
-            <div className="relative">
+            {/* Imagem de perfil - CORRIGIDO: botão de upload sempre visível para admin */}
+            <div className="relative w-10 h-10">
               {user?.role === 'admin' ? (
                 <UploadImage
                   currentImageUrl={images.profile}
@@ -188,10 +214,10 @@ export default function Landing() {
                   docId="landingImages"
                   field="profile"
                   isAdminOnly={true}
-                  className="w-10 h-10 rounded-full border-2 border-accent"
+                  className="w-full h-full rounded-full border-2 border-accent object-cover"
                 />
               ) : (
-                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white">
+                <div className="w-full h-full rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white">
                   {images.profile ? (
                     <img src={images.profile} alt="Profile" className="w-full h-full rounded-full object-cover" />
                   ) : (
@@ -228,6 +254,7 @@ export default function Landing() {
           </div>
         )}
         
+        {/* Upload hero - CORRIGIDO: botão visível */}
         {user?.role === 'admin' && (
           <div className="absolute bottom-4 right-4 z-20">
             <UploadImage
@@ -288,18 +315,27 @@ export default function Landing() {
               </div>
             </div>
 
+            {/* Imagem de perfil circular - CORRIGIDO */}
             <div className="flex justify-center items-center">
               <div className="relative w-72 h-72 md:w-96 md:h-96">
                 <div className="absolute inset-12 rounded-full overflow-hidden bg-gradient-to-br from-accent to-orange-600 border-4 border-white/30 shadow-2xl">
-                  <UploadImage
-                    currentImageUrl={images.profile}
-                    onUpload={handleImageUpload('profile')}
-                    collectionPath="config"
-                    docId="landingImages"
-                    field="profile"
-                    isAdminOnly={true}
-                    className="w-full h-full object-cover"
-                  />
+                  {user?.role === 'admin' ? (
+                    <UploadImage
+                      currentImageUrl={images.profile}
+                      onUpload={handleImageUpload('profile')}
+                      collectionPath="config"
+                      docId="landingImages"
+                      field="profile"
+                      isAdminOnly={true}
+                      className="w-full h-full object-cover"
+                    />
+                  ) : (
+                    <img 
+                      src={images.profile || 'https://via.placeholder.com/400'} 
+                      alt="Profile" 
+                      className="w-full h-full object-cover"
+                    />
+                  )}
                 </div>
               </div>
             </div>
@@ -346,48 +382,130 @@ export default function Landing() {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {FEATURES.map((feature, index) => (
-              <div key={feature.id} className="relative">
-                <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
-                  <div className="relative h-48 mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-accent/10 to-accent/5">
-                    {images[feature.id as keyof Images] ? (
-                      <img src={images[feature.id as keyof Images] as string} alt={feature.title} className="w-full h-full object-cover" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <feature.icon className="w-16 h-16 text-accent/30" />
-                      </div>
-                    )}
+            {[1, 2, 3, 4].map((num) => {
+              const field = `feature${num}` as keyof Images;
+              return (
+                <div key={num} className="relative">
+                  <div className="bg-white p-8 rounded-3xl shadow-xl border border-gray-100">
+                    <div className="relative h-48 mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-accent/10 to-accent/5">
+                      {images[field] ? (
+                        <img src={images[field] as string} alt={`Feature ${num}`} className="w-full h-full object-cover" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Shield className="w-16 h-16 text-accent/30" />
+                        </div>
+                      )}
+                      
+                      {/* BOTÃO DE UPLOAD PARA ADMIN - CORRIGIDO */}
+                      {user?.role === 'admin' && (
+                        <div className="absolute bottom-2 right-2">
+                          <UploadImage
+                            currentImageUrl={images[field]}
+                            onUpload={handleImageUpload(field)}
+                            collectionPath="config"
+                            docId="landingImages"
+                            field={field}
+                            isAdminOnly={true}
+                            label="Alterar"
+                            className="w-10 h-10 rounded-lg shadow-xl"
+                          />
+                        </div>
+                      )}
+                    </div>
                     
-                    {/* BOTÃO DE UPLOAD PARA ADMIN */}
-                    {user?.role === 'admin' && (
-                      <div className="absolute bottom-2 right-2">
-                        <UploadImage
-                          currentImageUrl={images[feature.id as keyof Images]}
-                          onUpload={handleImageUpload(feature.id as keyof Images)}
-                          collectionPath="config"
-                          docId="landingImages"
-                          field={feature.id}
-                          isAdminOnly={true}
-                          label="Alterar"
-                          className="w-10 h-10 rounded-lg"
-                        />
-                      </div>
-                    )}
+                    <h3 className="text-xl font-black text-primary mb-2">
+                      {num === 1 && 'Segurança Total'}
+                      {num === 2 && 'Atendimento Rápido'}
+                      {num === 3 && 'Qualidade Garantida'}
+                      {num === 4 && 'Suporte 24/7'}
+                    </h3>
+                    <p className="text-sm text-gray-500">
+                      Profissionais verificados e qualidade garantida.
+                    </p>
                   </div>
-                  
-                  <h3 className="text-xl font-black text-primary mb-2">{feature.title}</h3>
-                  <p className="text-sm text-gray-500">
-                    Profissionais verificados e qualidade garantida.
-                  </p>
                 </div>
-              </div>
-            ))}
+              );
+            })}
+          </div>
+        </div>
+      </section>
+
+      {/* Categories Section - CORRIGIDA (estava sumindo) */}
+      <section className="py-24 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-black text-primary mb-4">
+              Nossos <span className="text-accent">Serviços</span>
+            </h2>
+            <p className="text-gray-500 max-w-2xl mx-auto">
+              Explore nossas categorias e encontre o profissional ideal
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {SERVICE_CATEGORIES && SERVICE_CATEGORIES.length > 0 ? (
+              SERVICE_CATEGORIES.slice(0, 6).map((cat, index) => {
+                const fieldName = CATEGORY_FIELDS[cat.name] || 'categoryReparacoes';
+                return (
+                  <div key={cat.id} className="group">
+                    <Link to={`/servicos?cat=${cat.id}`}>
+                      <div className="bg-white p-8 rounded-3xl shadow-md border border-gray-100 h-full hover:shadow-2xl transition-all">
+                        {/* Imagem da categoria */}
+                        <div className="relative h-32 mb-6 rounded-2xl overflow-hidden bg-gradient-to-br from-accent/10 to-accent/5">
+                          {images[fieldName as keyof Images] ? (
+                            <img 
+                              src={images[fieldName as keyof Images] as string} 
+                              alt={cat.name} 
+                              className="w-full h-full object-cover"
+                            />
+                          ) : (
+                            <div className={`w-full h-full bg-gradient-to-br ${cat.color} opacity-20`} />
+                          )}
+                          
+                          {/* BOTÃO DE UPLOAD PARA ADMIN */}
+                          {user?.role === 'admin' && (
+                            <div className="absolute bottom-2 right-2">
+                              <UploadImage
+                                currentImageUrl={images[fieldName as keyof Images]}
+                                onUpload={handleImageUpload(fieldName as keyof Images)}
+                                collectionPath="config"
+                                docId="landingImages"
+                                field={fieldName}
+                                isAdminOnly={true}
+                                label="Alterar"
+                                className="w-8 h-8 rounded-lg shadow-xl"
+                              />
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-6`}>
+                          <cat.icon size={32} />
+                        </div>
+                        
+                        <h3 className="text-xl font-black text-primary mb-3">{cat.name}</h3>
+                        <p className="text-sm text-gray-500 mb-6">
+                          Profissionais qualificados prontos para atender.
+                        </p>
+                        
+                        <div className="flex items-center text-accent font-black text-sm">
+                          Ver detalhes 
+                          <ArrowRight size={16} className="ml-2" />
+                        </div>
+                      </div>
+                    </Link>
+                  </div>
+                );
+              })
+            ) : (
+              <p className="text-center col-span-3">Carregando categorias...</p>
+            )}
           </div>
         </div>
       </section>
 
       {/* Partners Section */}
-      <section className="py-24 bg-white">
+      <section className="py-24 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-black text-primary mb-4">
@@ -396,56 +514,40 @@ export default function Landing() {
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-5 gap-8">
-            {[1, 2, 3, 4, 5].map((num) => (
-              <div key={num} className="relative">
-                <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
-                  <div className="relative h-24 w-full rounded-lg overflow-hidden bg-gray-50">
-                    {images[`partner${num}` as keyof Images] ? (
-                      <img src={images[`partner${num}` as keyof Images] as string} alt={`Partner ${num}`} className="w-full h-full object-contain p-4" />
-                    ) : (
-                      <div className="w-full h-full flex items-center justify-center">
-                        <Building2 className="w-12 h-12 text-gray-300" />
-                      </div>
-                    )}
-                    
-                    {/* BOTÃO DE UPLOAD PARA ADMIN */}
-                    {user?.role === 'admin' && (
-                      <div className="absolute bottom-2 right-2">
-                        <UploadImage
-                          currentImageUrl={images[`partner${num}` as keyof Images]}
-                          onUpload={handleImageUpload(`partner${num}` as keyof Images)}
-                          collectionPath="config"
-                          docId="landingImages"
-                          field={`partner${num}`}
-                          isAdminOnly={true}
-                          label="Alterar"
-                          className="w-8 h-8 rounded-lg"
-                        />
-                      </div>
-                    )}
+            {[1, 2, 3, 4, 5].map((num) => {
+              const field = `partner${num}` as keyof Images;
+              return (
+                <div key={num} className="relative">
+                  <div className="bg-white p-6 rounded-2xl shadow-md border border-gray-100">
+                    <div className="relative h-24 w-full rounded-lg overflow-hidden bg-gray-50">
+                      {images[field] ? (
+                        <img src={images[field] as string} alt={`Partner ${num}`} className="w-full h-full object-contain p-4" />
+                      ) : (
+                        <div className="w-full h-full flex items-center justify-center">
+                          <Building2 className="w-12 h-12 text-gray-300" />
+                        </div>
+                      )}
+                      
+                      {/* BOTÃO DE UPLOAD PARA ADMIN */}
+                      {user?.role === 'admin' && (
+                        <div className="absolute bottom-2 right-2">
+                          <UploadImage
+                            currentImageUrl={images[field]}
+                            onUpload={handleImageUpload(field)}
+                            collectionPath="config"
+                            docId="landingImages"
+                            field={field}
+                            isAdminOnly={true}
+                            label="Alterar"
+                            className="w-8 h-8 rounded-lg shadow-xl"
+                          />
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      {/* CTA Section */}
-      <section className="py-20 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="bg-gradient-to-br from-primary via-primary to-blue-900 rounded-[4rem] p-16 md:p-24 text-center text-white relative overflow-hidden">
-            <h2 className="text-5xl md:text-6xl font-black mb-6">Pronto para começar?</h2>
-            <p className="text-xl text-white/90 mb-12 max-w-2xl mx-auto">
-              Junte-se a milhares de moçambicanos que já confiam na DEXAPP.
-            </p>
-            <div className="flex flex-col md:flex-row items-center justify-center gap-6">
-              <Link to="/register-cliente">
-                <Button size="lg" className="bg-accent hover:bg-accent/90 text-white px-12 py-6 text-xl rounded-2xl">
-                  Criar Conta Grátis
-                </Button>
-              </Link>
-            </div>
+              );
+            })}
           </div>
         </div>
       </section>
