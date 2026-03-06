@@ -140,60 +140,14 @@ export default function AdminDashboard() {
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        {/* Header com logo clicável */}
-        <div className="flex items-center justify-between mb-8">
-          <button 
-            onClick={handleLogoClick}
-            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
-            title="Ir para Landing Page"
-          >
-            <div className="w-8 h-8 bg-gradient-to-br from-accent to-orange-600 rounded-lg flex items-center justify-center text-white font-bold">
-              D
-            </div>
-            <span className="text-xl font-black text-primary">DEX<span className="text-accent">-app</span></span>
-          </button>
-          
-          <div className="flex gap-2">
-            <Button 
-              variant="outline" 
-              leftIcon={<Home className="w-5 h-5" />} 
-              onClick={handleLogoClick}
-            >
-              Landing Page
-            </Button>
-          </div>
-        </div>
-
-        {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-          <button 
-            onClick={handleLogoClick}
-            className="flex items-center gap-1 hover:text-accent transition-colors"
-            title="Ir para Landing Page"
-          >
-            <Home className="w-4 h-4" /> Início
-          </button>
-          <span>/</span>
-          <span className="text-primary font-bold">Admin Dashboard</span>
-        </div>
-
-        {/* Header com botões de navegação */}
+        {/* Header com saudação e botões - SEM LOGO DUPLICADO */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-          <div className="flex items-center gap-4">
-            <button 
-              onClick={() => navigate(-1)}
-              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-              title="Voltar à página anterior"
-            >
-              <ArrowLeft className="w-5 h-5 text-gray-600" />
-            </button>
-            <div>
-              <h1 className="text-3xl font-black text-primary flex items-center gap-3">
-                <TrendingUp size={32} className="text-accent" />
-                Painel Administrativo
-              </h1>
-              <p className="text-gray-500">Visão geral do desempenho da plataforma.</p>
-            </div>
+          <div>
+            <h1 className="text-3xl font-black text-primary flex items-center gap-3">
+              <TrendingUp size={32} className="text-accent" />
+              Painel Administrativo
+            </h1>
+            <p className="text-gray-500">Visão geral do desempenho da plataforma.</p>
           </div>
           <div className="flex gap-2">
             <Button 
@@ -483,17 +437,6 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Botão Voltar flutuante */}
-        <div className="fixed bottom-6 left-6 z-40">
-          <button
-            onClick={handleLogoClick}
-            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
-            title="Ir para Landing Page"
-          >
-            <Home className="w-6 h-6" />
-          </button>
-        </div>
       </div>
     </AppLayout>
   );
