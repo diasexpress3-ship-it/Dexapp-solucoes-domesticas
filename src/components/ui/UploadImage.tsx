@@ -1,128 +1,210 @@
-import React, { useState } from 'react';
-import { Camera, Loader2, X, Upload } from 'lucide-react';
-import { Button } from './Button';
+import React, { useState, useRef } from 'react';
+import { Camera, Loader2, Upload, X, User } from 'lucide-react';
+import { doc, updateDoc, setDoc, getDoc } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { motion, AnimatePresence } from 'framer-motion';
 
-interface UploadImageProps {
+interface ProfileImageUploadProps {
   currentImageUrl?: string;
-  onUploadSuccess: (url: string) => void;
-  folder?: string;
-  label?: string;
+  onUpload?: (url: string) => void;
+  userId?: string;
   className?: string;
+  size?: 'sm' | 'md' | 'lg';
 }
 
-export const UploadImage = ({
+export const ProfileImageUpload: React.FC<ProfileImageUploadProps> = ({
   currentImageUrl,
-  onUploadSuccess,
-  label,
+  onUpload,
+  userId,
   className = '',
-}: UploadImageProps) => {
-  const [isUploading, setIsUploading] = useState(false);
-  const [previewUrl, setPreviewUrl] = useState(currentImageUrl);
+  size = 'md'
+}) => {
+  const { user } = useAuth();
   const { showToast } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(currentImageUrl || null);
+  const [showMenu, setShowMenu] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+  const sizes = {
+    sm: 'w-8 h-8',
+    md: 'w-12 h-12',
+    lg: 'w-16 h-16'
+  };
+
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Validate file type
+    // Verificações de segurança
     if (!file.type.startsWith('image/')) {
-      showToast('Por favor, selecione uma imagem válida.', 'error');
+      showToast('Por favor, selecione uma imagem válida', 'error');
       return;
     }
 
-    // Validate file size (max 5MB)
     if (file.size > 5 * 1024 * 1024) {
-      showToast('A imagem deve ter no máximo 5MB.', 'error');
+      showToast('Imagem muito grande. Máximo 5MB', 'error');
       return;
     }
 
+    // Preview local
+    const localPreview = URL.createObjectURL(file);
+    setPreviewUrl(localPreview);
     setIsUploading(true);
 
+    const formData = new FormData();
+    formData.append('image', file);
+
+    // ✅ Usando VITE_IMGBB_KEY conforme solicitado
+    const apiKey = import.meta.env.VITE_IMGBB_KEY;
+    
+    if (!apiKey) {
+      showToast('Chave da API ImgBB não configurada', 'error');
+      setIsUploading(false);
+      setPreviewUrl(currentImageUrl || null);
+      URL.revokeObjectURL(localPreview);
+      return;
+    }
+
     try {
-      const apiKey = import.meta.env.VITE_PUBLIC_IMGBB_KEY;
-      if (!apiKey) {
-        throw new Error('ImgBB API Key not found');
-      }
-
-      const formData = new FormData();
-      formData.append('image', file);
-
       const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
         method: 'POST',
         body: formData,
       });
 
+      if (!response.ok) {
+        throw new Error(`Erro HTTP: ${response.status}`);
+      }
+
       const result = await response.json();
 
-      if (result.success) {
+      if (result.success && result.data && result.data.url) {
         const url = result.data.url;
         setPreviewUrl(url);
-        onUploadSuccess(url);
-        showToast('Imagem enviada com sucesso!', 'success');
+        
+        // Salvar no Firestore
+        const targetUserId = userId || user?.id;
+        if (targetUserId) {
+          try {
+            const userRef = doc(db, 'users', targetUserId);
+            const userSnap = await getDoc(userRef);
+            
+            if (userSnap.exists()) {
+              await updateDoc(userRef, { 
+                profileImageUrl: url 
+              });
+            } else {
+              await setDoc(userRef, { 
+                profileImageUrl: url,
+                id: targetUserId,
+                nome: user?.nome || 'Usuário',
+                email: user?.email || '',
+                profile: user?.profile || 'cliente',
+                status: 'ativo'
+              });
+            }
+          } catch (firestoreError) {
+            console.error("Erro ao salvar no Firestore:", firestoreError);
+            showToast('Imagem carregada, mas erro ao salvar no perfil', 'warning');
+          }
+        }
+
+        if (onUpload) onUpload(url);
+        showToast('Imagem carregada com sucesso!', 'success');
       } else {
-        throw new Error(result.error?.message || 'Erro ao enviar imagem');
+        throw new Error('Falha no upload - resposta inválida');
       }
-    } catch (error: any) {
-      console.error('Upload error:', error);
-      showToast(error.message || 'Erro ao enviar imagem para o servidor.', 'error');
+    } catch (error) {
+      console.error("Erro detalhado no upload:", error);
+      showToast('Erro ao carregar imagem. Tente novamente.', 'error');
+      setPreviewUrl(currentImageUrl || null);
     } finally {
       setIsUploading(false);
+      URL.revokeObjectURL(localPreview);
+      setShowMenu(false);
     }
   };
 
-  const handleRemove = () => {
-    setPreviewUrl('');
-    onUploadSuccess('');
+  const handleRemoveImage = async () => {
+    setPreviewUrl(null);
+    const targetUserId = userId || user?.id;
+    
+    if (targetUserId) {
+      try {
+        const userRef = doc(db, 'users', targetUserId);
+        await updateDoc(userRef, { profileImageUrl: null });
+        showToast('Imagem removida com sucesso', 'info');
+      } catch (error) {
+        console.error("Erro ao remover imagem:", error);
+        showToast('Erro ao remover imagem', 'error');
+      }
+    }
+    
+    if (onUpload) onUpload('');
+    setShowMenu(false);
   };
 
   return (
-    <div className={`space-y-2 ${className}`}>
-      {label && <label className="block text-sm font-bold text-primary">{label}</label>}
-      
-      <div className="relative group">
-        <div className={`
-          relative w-full aspect-video rounded-2xl border-2 border-dashed transition-all overflow-hidden flex items-center justify-center
-          ${previewUrl ? 'border-transparent' : 'border-gray-200 bg-gray-50 hover:bg-gray-100'}
-        `}>
-          {previewUrl ? (
-            <>
-              <img 
-                src={previewUrl} 
-                alt="Preview" 
-                className="w-full h-full object-cover"
-                referrerPolicy="no-referrer"
-              />
-              <div className="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center gap-2">
-                <label className="cursor-pointer p-2 bg-white rounded-full text-primary hover:bg-gray-100 transition-colors">
-                  <Camera size={20} />
-                  <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} disabled={isUploading} />
-                </label>
-                <button 
-                  onClick={handleRemove}
-                  className="p-2 bg-white rounded-full text-red-500 hover:bg-gray-100 transition-colors"
-                >
-                  <X size={20} />
-                </button>
-              </div>
-            </>
-          ) : (
-            <label className="cursor-pointer flex flex-col items-center gap-2 text-gray-400 hover:text-primary transition-colors">
-              <Upload size={32} />
-              <span className="text-xs font-bold uppercase tracking-wider">Carregar Imagem</span>
-              <input type="file" className="hidden" accept="image/*" onChange={handleFileChange} disabled={isUploading} />
-            </label>
-          )}
+    <div className={`relative ${className}`}>
+      <button
+        onClick={() => setShowMenu(!showMenu)}
+        className={`relative ${sizes[size]} rounded-full overflow-hidden bg-gradient-to-br from-primary to-blue-900 text-white flex items-center justify-center shadow-lg hover:shadow-xl transition-all group border-2 border-white/20 hover:border-accent/50`}
+        title="Alterar foto de perfil"
+      >
+        {isUploading ? (
+          <Loader2 className="w-5 h-5 animate-spin" />
+        ) : previewUrl ? (
+          <img 
+            src={previewUrl} 
+            alt="Perfil" 
+            className="w-full h-full object-cover"
+            referrerPolicy="no-referrer"
+          />
+        ) : (
+          <User className="w-5 h-5 group-hover:scale-110 transition-transform" />
+        )}
+      </button>
 
-          {isUploading && (
-            <div className="absolute inset-0 bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center gap-2">
-              <Loader2 size={32} className="text-accent animate-spin" />
-              <span className="text-xs font-bold text-primary uppercase">Enviando...</span>
-            </div>
-          )}
-        </div>
-      </div>
-      <p className="text-[10px] text-gray-400 font-medium">Formatos aceites: JPG, PNG. Máx 5MB.</p>
+      <AnimatePresence>
+        {showMenu && (
+          <motion.div
+            initial={{ opacity: 0, y: -10, scale: 0.95 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: -10, scale: 0.95 }}
+            className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-gray-100 overflow-hidden z-50"
+          >
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept="image/*"
+              className="hidden"
+            />
+            
+            <button
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+              className="w-full px-4 py-3 text-left text-sm font-bold text-gray-700 hover:bg-gray-50 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              <Upload size={16} className="text-accent" />
+              {isUploading ? 'Carregando...' : 'Upload imagem'}
+            </button>
+            
+            {previewUrl && (
+              <button
+                onClick={handleRemoveImage}
+                disabled={isUploading}
+                className="w-full px-4 py-3 text-left text-sm font-bold text-rose-600 hover:bg-rose-50 flex items-center gap-2 transition-colors disabled:opacity-50 disabled:cursor-not-allowed border-t border-gray-100"
+              >
+                <X size={16} />
+                Remover imagem
+              </button>
+            )}
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };
