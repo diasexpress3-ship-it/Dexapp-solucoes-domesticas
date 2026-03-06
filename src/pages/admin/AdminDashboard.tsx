@@ -133,21 +133,54 @@ export default function AdminDashboard() {
     }, 1500);
   };
 
-  const handleLogoClick = () => {
+  const handleGoToLanding = () => {
     navigate('/'); // Vai para Landing Page
+  };
+
+  const handleNewAdmin = () => {
+    navigate('/admin/usuarios/novo'); // Vai para o formulário de novo admin
   };
 
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        {/* Header com saudação e botões - SEM LOGO DUPLICADO */}
+        {/* Breadcrumb Navigation com botão Início funcional */}
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
+          <button 
+            onClick={handleGoToLanding}
+            className="flex items-center gap-1 hover:text-accent transition-colors"
+            title="Ir para Landing Page"
+          >
+            <Home className="w-4 h-4" /> Início
+          </button>
+          <span>/</span>
+          <span className="text-primary font-bold">Admin Dashboard</span>
+        </div>
+
+        {/* Header com botões de navegação e ação */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
-          <div>
-            <h1 className="text-3xl font-black text-primary flex items-center gap-3">
-              <TrendingUp size={32} className="text-accent" />
-              Painel Administrativo
-            </h1>
-            <p className="text-gray-500">Visão geral do desempenho da plataforma.</p>
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => navigate(-1)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Voltar à página anterior"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <button 
+              onClick={handleGoToLanding}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Ir para Landing Page"
+            >
+              <Home className="w-5 h-5 text-gray-600" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-black text-primary flex items-center gap-3">
+                <TrendingUp size={32} className="text-accent" />
+                Painel Administrativo
+              </h1>
+              <p className="text-gray-500">Visão geral do desempenho da plataforma.</p>
+            </div>
           </div>
           <div className="flex gap-2">
             <Button 
@@ -159,7 +192,7 @@ export default function AdminDashboard() {
             </Button>
             <Button 
               leftIcon={<UserPlus className="w-5 h-5" />} 
-              onClick={() => navigate('/admin/usuarios/novo')}
+              onClick={handleNewAdmin}
               className="bg-accent hover:bg-accent/90 text-white"
             >
               Novo Admin
@@ -437,6 +470,17 @@ export default function AdminDashboard() {
             </div>
           </CardContent>
         </Card>
+
+        {/* Botão flutuante para Landing Page */}
+        <div className="fixed bottom-6 left-6 z-40">
+          <button
+            onClick={handleGoToLanding}
+            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
+            title="Ir para Landing Page"
+          >
+            <Home className="w-6 h-6" />
+          </button>
+        </div>
       </div>
     </AppLayout>
   );
