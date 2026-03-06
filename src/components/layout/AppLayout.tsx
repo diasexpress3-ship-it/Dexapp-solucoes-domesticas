@@ -39,30 +39,30 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
   ];
 
   // Função para obter o nome amigável do perfil
-  const getProfileName = (role: string) => {
+  const getProfileName = (profile: string) => {
     const profiles: Record<string, string> = {
       admin: 'Administrador',
       cliente: 'Cliente',
       prestador: 'Prestador',
       central: 'Central'
     };
-    return profiles[role] || role;
+    return profiles[profile] || profile;
   };
 
   // Função para obter a cor do perfil
-  const getProfileColor = (role: string) => {
+  const getProfileColor = (profile: string) => {
     const colors: Record<string, string> = {
       admin: 'bg-purple-500',
       cliente: 'bg-blue-500',
       prestador: 'bg-orange-500',
       central: 'bg-green-500'
     };
-    return colors[role] || 'bg-primary';
+    return colors[profile] || 'bg-primary';
   };
 
   // Função para obter a especialidade do prestador
   const getEspecialidade = () => {
-    if (user?.role === 'prestador' && user.prestadorData?.especialidades) {
+    if (user?.profile === 'prestador' && user.prestadorData?.especialidades) {
       const especialidades = user.prestadorData.especialidades;
       return especialidades.length > 0 ? especialidades[0] : 'Profissional';
     }
@@ -92,7 +92,7 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
     ],
   };
 
-  const currentDashboardLinks = user ? dashboardLinks[user.role] : [];
+  const currentDashboardLinks = user ? dashboardLinks[user.profile] : [];
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -131,90 +131,28 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
           {/* User Info / Auth Buttons */}
           <div className="hidden lg:flex items-center gap-4">
             {user ? (
-              <div className="flex items-center gap-4 relative">
-                {/* Profile Button */}
-                <button
-                  onClick={() => setShowProfileMenu(!showProfileMenu)}
-                  className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-50 transition-all"
-                >
-                  <div className={`w-10 h-10 rounded-xl ${getProfileColor(user.role)} flex items-center justify-center text-white font-bold shadow-sm`}>
+              <div className="flex items-center gap-4">
+                {/* Profile Info */}
+                <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 rounded-xl">
+                  <div className={`w-8 h-8 rounded-lg ${getProfileColor(user.profile)} flex items-center justify-center text-white font-bold text-sm`}>
                     {user.nome?.charAt(0) || 'U'}
                   </div>
-                  
                   <div className="text-left">
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-primary">{user.nome?.split(' ')[0]}</span>
-                      <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-black ${
-                        user.role === 'admin' ? 'bg-purple-100 text-purple-700' :
-                        user.role === 'cliente' ? 'bg-blue-100 text-blue-700' :
-                        user.role === 'prestador' ? 'bg-orange-100 text-orange-700' :
-                        'bg-green-100 text-green-700'
-                      }`}>
-                        {getProfileName(user.role)}
-                      </span>
-                    </div>
-                    
-                    {user.role === 'prestador' && getEspecialidade() && (
-                      <div className="flex items-center gap-1 text-xs text-gray-500">
-                        <Briefcase size={12} className="text-accent" />
-                        <span>{getEspecialidade()}</span>
-                      </div>
-                    )}
-                    
-                    {user.role !== 'prestador' && (
-                      <p className="text-xs text-gray-400">{user.email}</p>
-                    )}
+                    <p className="text-xs font-bold text-primary">{user.nome}</p>
+                    <p className="text-[10px] text-gray-500">{getProfileName(user.profile)}</p>
                   </div>
-                  <ChevronDown size={16} className={`text-gray-400 transition-transform ${showProfileMenu ? 'rotate-180' : ''}`} />
-                </button>
+                </div>
 
-                {/* Profile Dropdown Menu */}
-                <AnimatePresence>
-                  {showProfileMenu && (
-                    <motion.div
-                      initial={{ opacity: 0, y: -10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      exit={{ opacity: 0, y: -10 }}
-                      className="absolute top-full right-0 mt-2 w-64 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-50"
-                    >
-                      <div className="p-4 bg-gradient-to-r from-primary/5 to-accent/5 border-b border-gray-100">
-                        <p className="font-bold text-primary">{user.nome}</p>
-                        <p className="text-xs text-gray-500 mt-1">{user.email}</p>
-                        {user.role === 'prestador' && user.prestadorData?.rating && (
-                          <div className="flex items-center gap-1 mt-2">
-                            <Star size={12} className="text-yellow-500 fill-yellow-500" />
-                            <span className="text-xs font-bold">{user.prestadorData.rating}</span>
-                            <span className="text-xs text-gray-400">· {user.prestadorData.trabalhos || 0} trabalhos</span>
-                          </div>
-                        )}
-                      </div>
-
-                      <div className="p-2">
-                        {currentDashboardLinks.map((link) => (
-                          <Link
-                            key={link.path}
-                            to={link.path}
-                            onClick={() => setShowProfileMenu(false)}
-                            className="flex items-center gap-3 px-4 py-2 rounded-xl hover:bg-gray-50 transition-colors"
-                          >
-                            <link.icon size={16} className="text-accent" />
-                            <span className="text-sm font-bold text-gray-700">{link.name}</span>
-                          </Link>
-                        ))}
-                      </div>
-
-                      <div className="p-2 border-t border-gray-100">
-                        <button
-                          onClick={handleLogout}
-                          className="flex items-center gap-3 px-4 py-2 rounded-xl hover:bg-rose-50 transition-colors w-full"
-                        >
-                          <LogOut size={16} className="text-rose-500" />
-                          <span className="text-sm font-bold text-rose-500">Sair</span>
-                        </button>
-                      </div>
-                    </motion.div>
-                  )}
-                </AnimatePresence>
+                {/* Logout Button - SEMPRE VISÍVEL */}
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleLogout}
+                  className="border-rose-200 text-rose-600 hover:bg-rose-50 hover:border-rose-300"
+                  leftIcon={<LogOut size={16} />}
+                >
+                  Sair
+                </Button>
               </div>
             ) : (
               <div className="flex items-center gap-3">
@@ -248,7 +186,7 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
             className="fixed inset-0 z-40 bg-white pt-24 px-6 lg:hidden overflow-y-auto"
           >
             <div className="flex flex-col gap-6">
-              {/* Mobile Navigation Links - SEMPRE VISÍVEIS */}
+              {/* Mobile Navigation Links */}
               <div className="space-y-4">
                 <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Menu</p>
                 {navLinks.map((link) => (
@@ -269,22 +207,23 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
               {/* User Info in Mobile */}
               {user ? (
                 <div className="flex flex-col gap-4">
+                  {/* Perfil do usuário */}
                   <div className="flex items-center gap-3 p-4 bg-gray-50 rounded-2xl">
-                    <div className={`w-12 h-12 rounded-xl ${getProfileColor(user.role)} flex items-center justify-center text-white font-bold text-xl`}>
+                    <div className={`w-12 h-12 rounded-xl ${getProfileColor(user.profile)} flex items-center justify-center text-white font-bold text-xl`}>
                       {user.nome?.charAt(0) || 'U'}
                     </div>
-                    <div>
+                    <div className="flex-1">
                       <p className="font-bold text-primary">{user.nome}</p>
                       <div className="flex items-center gap-2 mt-1">
                         <span className={`text-[10px] px-2 py-0.5 rounded-full uppercase font-black ${
-                          user.role === 'admin' ? 'bg-purple-100 text-purple-700' :
-                          user.role === 'cliente' ? 'bg-blue-100 text-blue-700' :
-                          user.role === 'prestador' ? 'bg-orange-100 text-orange-700' :
+                          user.profile === 'admin' ? 'bg-purple-100 text-purple-700' :
+                          user.profile === 'cliente' ? 'bg-blue-100 text-blue-700' :
+                          user.profile === 'prestador' ? 'bg-orange-100 text-orange-700' :
                           'bg-green-100 text-green-700'
                         }`}>
-                          {getProfileName(user.role)}
+                          {getProfileName(user.profile)}
                         </span>
-                        {user.role === 'prestador' && getEspecialidade() && (
+                        {user.profile === 'prestador' && getEspecialidade() && (
                           <span className="text-xs text-gray-500">· {getEspecialidade()}</span>
                         )}
                       </div>
@@ -304,8 +243,15 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
                     </Link>
                   ))}
                   
-                  <Button variant="danger" fullWidth onClick={handleLogout} className="mt-4">
-                    <LogOut className="w-4 h-4 mr-2" /> Sair da Conta
+                  {/* Botão de Logout Mobile - SEMPRE VISÍVEL */}
+                  <Button 
+                    variant="danger" 
+                    fullWidth 
+                    onClick={handleLogout} 
+                    className="mt-4"
+                    leftIcon={<LogOut size={18} />}
+                  >
+                    Sair da Conta
                   </Button>
                 </div>
               ) : (
