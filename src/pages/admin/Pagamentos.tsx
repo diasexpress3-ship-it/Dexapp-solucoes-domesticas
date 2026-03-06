@@ -121,7 +121,7 @@ export default function Pagamentos() {
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
         {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-8">
+        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
           <button 
             onClick={() => navigate('/')} 
             className="flex items-center gap-1 hover:text-accent transition-colors"
@@ -139,12 +139,12 @@ export default function Pagamentos() {
           <span className="text-primary font-bold">Pagamentos</span>
         </div>
 
-        {/* Header com botão Voltar */}
+        {/* Header */}
         <div className="flex items-center gap-4 mb-8">
           <button 
             onClick={() => navigate(-1)}
             className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Voltar à página anterior"
+            title="Voltar"
           >
             <ArrowLeft className="w-5 h-5 text-gray-600" />
           </button>
@@ -319,17 +319,6 @@ export default function Pagamentos() {
             </div>
           </CardContent>
         </Card>
-
-        {/* Botão Voltar flutuante */}
-        <div className="fixed bottom-6 left-6 z-40">
-          <button
-            onClick={() => navigate('/admin/dashboard')}
-            className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
-            title="Voltar ao Dashboard"
-          >
-            <ArrowLeft className="w-6 h-6" />
-          </button>
-        </div>
       </div>
     </AppLayout>
   );
