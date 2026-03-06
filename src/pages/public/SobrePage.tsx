@@ -18,12 +18,14 @@ import {
   Zap,
   Home,
   MapPin,
-  MessageCircle
+  MessageCircle,
+  LayoutDashboard
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
 import { doc, getDoc, onSnapshot, setDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
+import { Link } from 'react-router-dom';
 
 // Ícone Rocket customizado
 const RocketIcon = (props: any) => (
@@ -62,7 +64,7 @@ const VALUES = [
 ];
 
 const TIMELINE = [
-  { year: '2020', event: 'Fundação da DEXAPP', description: 'Iniciamos com a missão de revolucionar serviços domésticos.', icon: RocketIcon, color: 'from-purple-400 to-purple-600' },
+  { year: '2020', event: 'Fundação da DEX-app', description: 'Iniciamos com a missão de revolucionar serviços domésticos.', icon: RocketIcon, color: 'from-purple-400 to-purple-600' },
   { year: '2021', event: 'Primeiros 100 prestadores', description: 'Alcançamos a marca de 100 profissionais verificados.', icon: Users, color: 'from-blue-400 to-blue-600' },
   { year: '2022', event: 'Lançamento do App Mobile', description: 'Disponibilizamos nosso aplicativo para iOS e Android.', icon: Zap, color: 'from-yellow-400 to-yellow-600' },
   { year: '2023', event: '+5000 clientes atendidos', description: 'Ultrapassamos a marca de 5 mil famílias atendidas.', icon: Award, color: 'from-green-400 to-green-600' },
@@ -74,6 +76,10 @@ export default function SobrePage() {
   const navigate = useNavigate();
   const { user } = useAuth();
   
+  // DEBUG
+  console.log('👤 SobrePage - usuário:', user);
+  console.log('👑 SobrePage - é admin?', user?.role === 'admin');
+  
   const [images, setImages] = useState<Images>({
     team: null,
     office: null,
@@ -81,6 +87,8 @@ export default function SobrePage() {
     aboutMission: null,
     aboutVision: null,
   });
+
+  const isAdmin = user?.role === 'admin';
 
   // Buscar imagens
   useEffect(() => {
@@ -109,11 +117,50 @@ export default function SobrePage() {
   }, []);
 
   const handleImageUpload = useCallback((field: keyof Images) => (url: string) => {
+    console.log(`📸 Upload ${field}:`, url);
     setImages(prev => ({ ...prev, [field]: url }));
   }, []);
 
   return (
     <AppLayout>
+      {/* Header - com botão admin */}
+      <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl shadow-lg py-4 border-b border-gray-100">
+        <div className="container mx-auto px-6 flex items-center justify-between">
+          <Link to="/" className="flex items-center gap-2">
+            <div className="w-10 h-10 bg-gradient-to-br from-accent to-orange-600 rounded-xl flex items-center justify-center text-white font-black text-xl">
+              D
+            </div>
+            <span className="text-xl font-black text-primary">DEX<span className="text-accent">-app</span></span>
+          </Link>
+          
+          <nav className="hidden md:flex items-center gap-8">
+            <Link to="/" className="text-sm font-bold text-gray-600 hover:text-accent">Início</Link>
+            <Link to="/servicos" className="text-sm font-bold text-gray-600 hover:text-accent">Serviços</Link>
+            <Link to="/sobre" className="text-sm font-bold text-accent border-b-2 border-accent">Sobre</Link>
+            <Link to="/contacto" className="text-sm font-bold text-gray-600 hover:text-accent">Contacto</Link>
+          </nav>
+
+          <div className="flex items-center gap-3">
+            {/* BOTÃO ADMIN */}
+            {isAdmin && (
+              <Button
+                onClick={() => navigate('/admin/dashboard')}
+                variant="outline"
+                size="sm"
+                className="border-accent text-accent hover:bg-accent hover:text-white"
+                leftIcon={<LayoutDashboard size={16} />}
+              >
+                Painel Admin
+              </Button>
+            )}
+            
+            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white">
+              <span className="text-sm font-bold">A</span>
+            </div>
+          </div>
+        </div>
+      </header>
+
       {/* Hero Section - COM BOTÃO DE UPLOAD */}
       <section className="relative bg-gradient-to-br from-primary to-blue-900 pt-32 pb-24 text-white">
         {images.aboutHero && (
@@ -123,7 +170,7 @@ export default function SobrePage() {
         )}
         
         {/* BOTÃO DE UPLOAD PARA ADMIN */}
-        {user?.role === 'admin' && (
+        {isAdmin && (
           <div className="absolute bottom-4 right-4 z-20">
             <UploadImage
               currentImageUrl={images.aboutHero}
@@ -141,7 +188,7 @@ export default function SobrePage() {
         <div className="container mx-auto px-4 relative z-10">
           <div className="max-w-3xl">
             <h1 className="text-5xl font-black mb-6">
-              Sobre a <span className="text-accent">DEXAPP</span>
+              Sobre a <span className="text-accent">DEX-app</span>
             </h1>
             <p className="text-xl opacity-90">
               Transformando a forma como você cuida do seu lar.
@@ -161,7 +208,7 @@ export default function SobrePage() {
             />
             
             {/* BOTÃO DE UPLOAD PARA ADMIN */}
-            {user?.role === 'admin' && (
+            {isAdmin && (
               <div className="absolute top-4 right-4">
                 <UploadImage
                   currentImageUrl={images.team}
