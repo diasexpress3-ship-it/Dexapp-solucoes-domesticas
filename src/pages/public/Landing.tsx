@@ -85,9 +85,10 @@ export default function Landing() {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  // DEBUG: Verificar no console se o usuário é admin
-  console.log('👤 Usuário atual:', user);
-  console.log('👑 É admin?', user?.role === 'admin');
+  // DEBUG - Verificar no console
+  console.log('👤 Usuário completo:', user);
+  console.log('👑 role:', user?.role);
+  console.log('👑 é admin?', user?.role === 'admin');
   
   const [displayedPhrases, setDisplayedPhrases] = useState<string[]>([]);
   const [images, setImages] = useState<Images>({
@@ -180,11 +181,11 @@ export default function Landing() {
   return (
     <div className="flex flex-col min-h-screen bg-white">
       {/* ======================================== */}
-      {/* HEADER - COM BOTÃO ADMIN */}
+      {/* HEADER - COM BOTÃO ADMIN (FORÇADO) */}
       {/* ======================================== */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl shadow-lg py-4 border-b border-gray-100">
         <div className="container mx-auto px-6 flex items-center justify-between">
-          {/* Logo */}
+          {/* Logo - CORRIGIDO para DEX-app */}
           <Link to="/" className="flex items-center gap-2 group">
             <div className="w-10 h-10 bg-gradient-to-br from-accent to-orange-600 rounded-xl flex items-center justify-center text-white font-black text-xl">
               D
@@ -204,10 +205,13 @@ export default function Landing() {
 
           {/* Área do usuário */}
           <div className="flex items-center gap-3">
-            {/* BOTÃO ADMIN - COM VERIFICAÇÃO EXPLÍCITA */}
+            {/* BOTÃO ADMIN - FORÇADO COM VERIFICAÇÃO DUPLA */}
             {isAdmin && (
               <Button
-                onClick={() => navigate('/admin/dashboard')}
+                onClick={() => {
+                  console.log('🔘 Clicou no botão admin, navegando para /admin/dashboard');
+                  navigate('/admin/dashboard');
+                }}
                 variant="outline"
                 size="sm"
                 className="border-accent text-accent hover:bg-accent hover:text-white flex items-center gap-2"
@@ -217,7 +221,7 @@ export default function Landing() {
               </Button>
             )}
             
-            {/* Imagem de perfil - COM VERIFICAÇÃO EXPLÍCITA */}
+            {/* Imagem de perfil - FORÇADO para admin */}
             <div className="relative w-10 h-10">
               {isAdmin ? (
                 <UploadImage
@@ -227,7 +231,7 @@ export default function Landing() {
                   docId="landingImages"
                   field="profile"
                   isAdminOnly={true}
-                  className="w-full h-full rounded-full border-2 border-accent object-cover"
+                  className="w-full h-full rounded-full border-2 border-accent object-cover cursor-pointer"
                 />
               ) : (
                 <div className="w-full h-full rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white">
@@ -239,6 +243,13 @@ export default function Landing() {
                 </div>
               )}
             </div>
+            
+            {/* Texto indicador de admin (temporário para debug) */}
+            {isAdmin && (
+              <span className="text-xs font-bold text-accent bg-accent/10 px-2 py-1 rounded-full">
+                Admin
+              </span>
+            )}
             
             {/* Botões de login/registro */}
             {!user && (
@@ -270,7 +281,7 @@ export default function Landing() {
           </div>
         )}
         
-        {/* Upload hero - COM VERIFICAÇÃO EXPLÍCITA */}
+        {/* Upload hero - FORÇADO para admin */}
         {isAdmin && (
           <div className="absolute bottom-4 right-4 z-20">
             <UploadImage
@@ -331,7 +342,7 @@ export default function Landing() {
               </div>
             </div>
 
-            {/* Imagem de perfil circular */}
+            {/* Imagem de perfil circular - FORÇADO para admin */}
             <div className="flex justify-center items-center">
               <div className="relative w-72 h-72 md:w-96 md:h-96">
                 <div className="absolute inset-12 rounded-full overflow-hidden bg-gradient-to-br from-accent to-orange-600 border-4 border-white/30 shadow-2xl">
@@ -343,7 +354,7 @@ export default function Landing() {
                       docId="landingImages"
                       field="profile"
                       isAdminOnly={true}
-                      className="w-full h-full object-cover"
+                      className="w-full h-full object-cover cursor-pointer"
                     />
                   ) : (
                     <img 
@@ -397,7 +408,7 @@ export default function Landing() {
         <div className="container mx-auto px-4">
           <div className="text-center mb-16">
             <h2 className="text-4xl md:text-5xl font-black text-primary mb-4">
-              Por que escolher a <span className="text-accent">DEXAPP</span>?
+              Por que escolher a <span className="text-accent">DEX-app</span>?
             </h2>
           </div>
 
@@ -416,7 +427,7 @@ export default function Landing() {
                         </div>
                       )}
                       
-                      {/* BOTÃO DE UPLOAD - COM VERIFICAÇÃO EXPLÍCITA */}
+                      {/* BOTÃO DE UPLOAD - FORÇADO */}
                       {isAdmin && (
                         <div className="absolute bottom-2 right-2">
                           <UploadImage
@@ -484,7 +495,7 @@ export default function Landing() {
                             <div className={`w-full h-full bg-gradient-to-br ${cat.color} opacity-20`} />
                           )}
                           
-                          {/* BOTÃO DE UPLOAD - COM VERIFICAÇÃO EXPLÍCITA */}
+                          {/* BOTÃO DE UPLOAD - FORÇADO */}
                           {isAdmin && (
                             <div className="absolute bottom-2 right-2">
                               <UploadImage
@@ -552,7 +563,7 @@ export default function Landing() {
                         </div>
                       )}
                       
-                      {/* BOTÃO DE UPLOAD - COM VERIFICAÇÃO EXPLÍCITA */}
+                      {/* BOTÃO DE UPLOAD - FORÇADO */}
                       {isAdmin && (
                         <div className="absolute bottom-2 right-2">
                           <UploadImage
@@ -577,7 +588,7 @@ export default function Landing() {
       </section>
 
       {/* ======================================== */}
-      {/* FOOTER - RESTAURADO */}
+      {/* FOOTER - COM DEX-app */}
       {/* ======================================== */}
       <footer className="bg-gray-900 text-white pt-16 pb-8">
         <div className="container mx-auto px-4">
