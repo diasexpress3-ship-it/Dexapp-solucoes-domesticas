@@ -10,143 +10,53 @@ service cloud.firestore {
       return isAuthenticated() && 
         get(/databases/$(database)/documents/users/$(request.auth.uid)).data.profile == 'admin';
     }
-    
-    function isCentral() {
-      return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.profile == 'central';
-    }
-    
-    function isPrestador() {
-      return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.profile == 'prestador';
-    }
-    
-    function isCliente() {
-      return isAuthenticated() && 
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.profile == 'cliente';
-    }
-    
-    function isOwner(userId) {
-      return isAuthenticated() && request.auth.uid == userId;
-    }
 
-    // ===== REGRA GERAL: ADMIN E CENTRAL TÊM ACESSO TOTAL =====
-    match /{document=**} {
-      allow read, write: if isAdmin() || isCentral();
-    }
-    
-    // ===== REGRAS ESPECÍFICAS POR COLEÇÃO =====
-    
-    // 1. USERS - regras específicas
+    // ===== REGRAS PARA USUÁRIOS - CORRIGIDAS =====
     match /users/{userId} {
-      // Criar conta (sem autenticação)
+      // CRIAR: permitir durante registro (sem autenticação)
       allow create: if !isAuthenticated() || request.auth.uid == userId;
       
-      // Ler: autenticados, admin, central
+      // LER: usuário pode ler seu próprio documento
+      // Admin pode ler todos
       allow read: if isAuthenticated() && (
-        isOwner(userId) || 
-        isAdmin() || 
-        isCentral()
+        request.auth.uid == userId || 
+        isAdmin()
       );
       
-      // Atualizar: admin, central, ou próprio usuário
+      // ATUALIZAR: próprio usuário ou admin
       allow update: if isAuthenticated() && (
-        isAdmin() ||
-        isCentral() ||
-        isOwner(userId)
+        request.auth.uid == userId || 
+        isAdmin()
       );
       
-      // Deletar: apenas admin
+      // DELETAR: apenas admin
       allow delete: if isAdmin();
     }
-    
-    // 2. SOLICITACOES - pedidos de serviço
+
+    // ===== REGRAS PARA SOLICITAÇÕES =====
     match /solicitacoes/{solicitacaoId} {
-      // Ler: admin, central, dono, prestador atribuído
-      allow read: if isAuthenticated() && (
-        isAdmin() ||
-        isCentral() ||
-        resource.data.clienteId == request.auth.uid ||
-        resource.data.prestadorId == request.auth.uid
-      );
-      
-      // Criar: cliente autenticado
-      allow create: if isAuthenticated() && isCliente();
-      
-      // Atualizar: admin, central, dono, prestador atribuído
-      allow update: if isAuthenticated() && (
-        isAdmin() ||
-        isCentral() ||
-        resource.data.clienteId == request.auth.uid ||
-        (isPrestador() && resource.data.prestadorId == request.auth.uid)
-      );
-      
-      // Deletar: admin ou central
-      allow delete: if isAdmin() || isCentral();
+      allow read, write: if isAuthenticated();
     }
-    
-    // 3. PAGAMENTOS - transações
+
+    // ===== REGRAS PARA PAGAMENTOS =====
     match /pagamentos/{pagamentoId} {
-      // Ler: admin, central, dono, prestador
-      allow read: if isAuthenticated() && (
-        isAdmin() ||
-        isCentral() ||
-        resource.data.clienteId == request.auth.uid ||
-        resource.data.prestadorId == request.auth.uid
-      );
-      
-      // Criar: qualquer autenticado
-      allow create: if isAuthenticated();
-      
-      // Atualizar status: admin, central
-      allow update: if isAdmin() || isCentral();
-      
-      // Deletar: admin ou central
-      allow delete: if isAdmin() || isCentral();
+      allow read, write: if isAuthenticated();
     }
-    
-    // 4. SERVICOS - catálogo de serviços
-    match /servicos/{servicoId} {
-      // Ler: qualquer um (público)
+
+    // ===== REGRAS PÚBLICAS =====
+    match /services/{serviceId} {
       allow read: if true;
-      
-      // Escrever: admin ou central
-      allow write: if isAdmin() || isCentral();
+      allow write: if isAdmin();
     }
-    
-    // 5. RELATÓRIOS - admin e central
-    match /relatorios/{relatorioId} {
-      allow read, write: if isAdmin() || isCentral();
-    }
-    
-    // 6. CONFIGURAÇÕES - admin e central
+
     match /config/{configId} {
-      allow read: if isAuthenticated();
-      allow write: if isAdmin() || isCentral();
+      allow read: if true;
+      allow write: if isAdmin();
     }
-    
-    // 7. LOGS - admin e central
-    match /logs/{logId} {
-      allow read, write: if isAdmin() || isCentral();
-    }
-    
-    // 8. EMERGENCIAS - central pode gerir
-    match /emergencias/{emergenciaId} {
-      allow read, write: if isAuthenticated() && (
-        isAdmin() ||
-        isCentral() ||
-        resource.data.usuarioId == request.auth.uid
-      );
-    }
-    
-    // 9. NOTIFICACOES - central pode enviar
-    match /notificacoes/{notificacaoId} {
-      allow read: if isAuthenticated() && (
-        isAdmin() ||
-        isCentral() ||
-        resource.data.usuarioId == request.auth.uid
-      );
-      allow write: if isAdmin() || isCentral();
+
+    // ===== NEGAR TODO O RESTO =====
+    match /{document=**} {
+      allow read, write: if false;
     }
   }
 }
