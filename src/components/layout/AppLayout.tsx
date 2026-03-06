@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Wrench, History, Wallet, Calendar, Settings,
   MessageSquare, Phone, Info, Home, 
   Facebook, Instagram, Twitter, MessageCircle,
-  ChevronDown, Star, Briefcase
+  ChevronDown, Star, Briefcase, Users, Shield, FileText
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../ui/Button';
@@ -30,13 +30,61 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
     navigate('/');
   };
 
-  // Links de navegação públicos - SEMPRE VISÍVEIS
-  const navLinks = [
-    { name: 'Início', path: '/', icon: Home },
-    { name: 'Serviços', path: '/servicos', icon: Wrench },
-    { name: 'Sobre', path: '/sobre', icon: Info },
-    { name: 'Contacto', path: '/contacto', icon: Phone },
-  ];
+  // Verificar se está em uma página de admin
+  const isAdminPage = location.pathname.startsWith('/admin');
+  const isClientePage = location.pathname.startsWith('/cliente');
+  const isPrestadorPage = location.pathname.startsWith('/prestador');
+  const isCentralPage = location.pathname.startsWith('/central');
+
+  // Links de navegação - DINÂMICOS baseado na página atual
+  const getNavLinks = () => {
+    // Se estiver em páginas do admin
+    if (isAdminPage) {
+      return [
+        { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+        { name: 'Utilizadores', path: '/admin/usuarios', icon: Users },
+        { name: 'Prestadores', path: '/admin/prestadores', icon: Shield },
+        { name: 'Pagamentos', path: '/admin/pagamentos', icon: Wallet },
+        { name: 'Relatórios', path: '/admin/relatorios', icon: FileText },
+        { name: 'Configurações', path: '/admin/configuracoes', icon: Settings },
+      ];
+    }
+    
+    // Se estiver em páginas do cliente
+    if (isClientePage) {
+      return [
+        { name: 'Dashboard', path: '/cliente/dashboard', icon: LayoutDashboard },
+        { name: 'Nova Solicitação', path: '/cliente/nova-solicitacao', icon: Wrench },
+        { name: 'Agenda', path: '/cliente/agenda', icon: Calendar },
+        { name: 'Carteira', path: '/cliente/carteira', icon: Wallet },
+      ];
+    }
+    
+    // Se estiver em páginas do prestador
+    if (isPrestadorPage) {
+      return [
+        { name: 'Dashboard', path: '/prestador/dashboard', icon: LayoutDashboard },
+        { name: 'Agenda', path: '/prestador/agenda', icon: Calendar },
+      ];
+    }
+    
+    // Se estiver em páginas da central
+    if (isCentralPage) {
+      return [
+        { name: 'Dashboard', path: '/central/dashboard', icon: LayoutDashboard },
+      ];
+    }
+    
+    // Links públicos (Landing Page)
+    return [
+      { name: 'Início', path: '/', icon: Home },
+      { name: 'Serviços', path: '/servicos', icon: Wrench },
+      { name: 'Sobre', path: '/sobre', icon: Info },
+      { name: 'Contacto', path: '/contacto', icon: Phone },
+    ];
+  };
+
+  const navLinks = getNavLinks();
 
   // Função para obter o nome amigável do perfil
   const getProfileName = (profile: string) => {
@@ -70,6 +118,14 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
   };
 
   const dashboardLinks = {
+    admin: [
+      { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
+      { name: 'Utilizadores', path: '/admin/usuarios', icon: User },
+      { name: 'Prestadores', path: '/admin/prestadores', icon: ShieldCheck },
+      { name: 'Pagamentos', path: '/admin/pagamentos', icon: Wallet },
+      { name: 'Relatórios', path: '/admin/relatorios', icon: History },
+      { name: 'Configurações', path: '/admin/configuracoes', icon: Settings },
+    ],
     cliente: [
       { name: 'Dashboard', path: '/cliente/dashboard', icon: LayoutDashboard },
       { name: 'Nova Solicitação', path: '/cliente/nova-solicitacao', icon: Wrench },
@@ -82,13 +138,6 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
     ],
     central: [
       { name: 'Dashboard', path: '/central/dashboard', icon: LayoutDashboard },
-    ],
-    admin: [
-      { name: 'Dashboard', path: '/admin/dashboard', icon: LayoutDashboard },
-      { name: 'Utilizadores', path: '/admin/usuarios', icon: User },
-      { name: 'Prestadores', path: '/admin/prestadores', icon: ShieldCheck },
-      { name: 'Pagamentos', path: '/admin/pagamentos', icon: Wallet },
-      { name: 'Relatórios', path: '/admin/relatorios', icon: History },
     ],
   };
 
@@ -103,8 +152,12 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
         }`}
       >
         <div className="container mx-auto px-6 flex items-center justify-between">
-          {/* Logo */}
-          <Link to="/" className="flex items-center gap-3 group">
+          {/* Logo - SEMPRE leva para a página correta */}
+          <Link 
+            to={user ? `/${user.profile}/dashboard` : '/'} 
+            className="flex items-center gap-3 group"
+            onClick={() => setIsMenuOpen(false)}
+          >
             <div className="w-10 h-10 bg-gradient-to-br from-accent to-orange-600 rounded-xl flex items-center justify-center shadow-lg shadow-orange-500/20 group-hover:rotate-6 transition-transform">
               <ShieldCheck className="w-6 h-6 text-white" />
             </div>
@@ -113,7 +166,7 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
             </span>
           </Link>
 
-          {/* Desktop Navigation - SEMPRE VISÍVEL */}
+          {/* Desktop Navigation - DINÂMICO */}
           <nav className="hidden lg:flex items-center gap-8">
             {navLinks.map((link) => (
               <Link 
@@ -143,7 +196,18 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
                   </div>
                 </div>
 
-                {/* Logout Button - SEMPRE VISÍVEL */}
+                {/* Botão Início para Landing Page - SEMPRE visível para usuários logados */}
+                <Button 
+                  variant="ghost" 
+                  size="sm" 
+                  onClick={() => navigate('/')}
+                  className="text-accent hover:bg-accent/10"
+                  leftIcon={<Home size={16} />}
+                >
+                  Início
+                </Button>
+
+                {/* Logout Button */}
                 <Button 
                   variant="outline" 
                   size="sm" 
@@ -186,7 +250,7 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
             className="fixed inset-0 z-40 bg-white pt-24 px-6 lg:hidden overflow-y-auto"
           >
             <div className="flex flex-col gap-6">
-              {/* Mobile Navigation Links */}
+              {/* Mobile Navigation Links - DINÂMICOS */}
               <div className="space-y-4">
                 <p className="text-xs font-black text-gray-400 uppercase tracking-widest">Menu</p>
                 {navLinks.map((link) => (
@@ -230,6 +294,16 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
                     </div>
                   </div>
 
+                  {/* Botão Início no Mobile */}
+                  <Link 
+                    to="/"
+                    onClick={() => setIsMenuOpen(false)}
+                    className="flex items-center gap-3 text-lg font-bold text-accent"
+                  >
+                    <Home className="w-5 h-5" />
+                    Início (Landing Page)
+                  </Link>
+
                   <p className="text-lg font-black text-primary">Painel</p>
                   {currentDashboardLinks.map((link) => (
                     <Link 
@@ -243,7 +317,7 @@ export const AppLayout: React.FC<{ children?: React.ReactNode }> = ({ children }
                     </Link>
                   ))}
                   
-                  {/* Botão de Logout Mobile - SEMPRE VISÍVEL */}
+                  {/* Botão de Logout Mobile */}
                   <Button 
                     variant="danger" 
                     fullWidth 
