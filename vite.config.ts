@@ -2,8 +2,6 @@ import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
 import { defineConfig, loadEnv } from 'vite';
-import { visualizer } from 'rollup-plugin-visualizer';
-import compression from 'vite-plugin-compression';
 
 // https://vitejs.dev/config/
 export default defineConfig(({ mode }) => {
@@ -19,42 +17,16 @@ export default defineConfig(({ mode }) => {
     // PLUGINS
     // ========================================
     plugins: [
-      // React com suporte a Fast Refresh otimizado
+      // React com suporte a Fast Refresh
       react({
-        // Melhorar performance do Fast Refresh
         fastRefresh: true,
-        // Incluir JSX runtime
         jsxRuntime: 'automatic',
-        // Excluir arquivos de teste do HMR
         exclude: /\.(spec|test)\.(ts|tsx)$/,
       }),
       
       // Tailwind CSS
       tailwindcss(),
-      
-      // Compressão gzip/brotli para produção
-      isProduction && compression({
-        algorithm: 'brotliCompress',
-        ext: '.br',
-        threshold: 10240, // 10kb
-        deleteOriginFile: false,
-      }),
-      
-      isProduction && compression({
-        algorithm: 'gzip',
-        ext: '.gz',
-        threshold: 10240,
-        deleteOriginFile: false,
-      }),
-      
-      // Visualizador de bundle (apenas em análise)
-      process.env.ANALYZE === 'true' && visualizer({
-        filename: 'dist/stats.html',
-        open: true,
-        gzipSize: true,
-        brotliSize: true,
-      }),
-    ].filter(Boolean),
+    ],
 
     // ========================================
     // DEFINIÇÕES GLOBAIS
@@ -62,10 +34,6 @@ export default defineConfig(({ mode }) => {
     define: {
       'process.env.GEMINI_API_KEY': JSON.stringify(env.GEMINI_API_KEY),
       'process.env.VITE_IMGBB_KEY': JSON.stringify(env.VITE_IMGBB_KEY),
-      'process.env.NODE_ENV': JSON.stringify(mode),
-      // Definir variáveis para ambiente de produção
-      __DEV__: !isProduction,
-      __PROD__: isProduction,
     },
 
     // ========================================
@@ -93,32 +61,16 @@ export default defineConfig(({ mode }) => {
     server: {
       port: 3000,
       open: true,
-      host: true, // Permitir acesso na rede local
+      host: true,
       
-      // CRÍTICO: Configuração para SPA - resolve erro 404 ao dar refresh
+      // CRÍTICO: Resolve erro 404 ao dar refresh
       historyApiFallback: true,
       
       // Configuração do HMR
       hmr: {
-        // Desabilitar HMR apenas se explicitamente definido
         overlay: true,
         clientPort: 3000,
         timeout: 5000,
-      },
-      
-      // Proxy para API (se necessário)
-      proxy: {
-        '/api': {
-          target: env.VITE_API_URL || 'http://localhost:5000',
-          changeOrigin: true,
-          rewrite: (path) => path.replace(/^\/api/, ''),
-        },
-      },
-      
-      // Otimizações para desenvolvimento
-      watch: {
-        usePolling: false,
-        interval: 100,
       },
     },
 
@@ -128,63 +80,35 @@ export default defineConfig(({ mode }) => {
     build: {
       outDir: 'dist',
       assetsDir: 'assets',
-      sourcemap: isDevelopment, // Sourcemap apenas em dev
-      minify: 'terser', // Melhor minificação
-      target: 'es2020', // Target moderno
+      sourcemap: isDevelopment,
+      minify: 'terser',
+      target: 'es2020',
       
       // Configurações do terser
       terserOptions: {
         compress: {
-          drop_console: isProduction, // Remover console.log em produção
+          drop_console: isProduction,
           drop_debugger: true,
           pure_funcs: ['console.log', 'console.info', 'console.debug'],
         },
         format: {
-          comments: false, // Remover comentários
+          comments: false,
         },
       },
       
-      // Divisão de chunks para melhor cache
+      // Divisão de chunks
       rollupOptions: {
         output: {
-          // Nomenclatura dos arquivos
-          entryFileNames: `assets/[name].[hash].js`,
-          chunkFileNames: `assets/[name].[hash].js`,
-          assetFileNames: `assets/[name].[hash].[ext]`,
-          
-          // Divisão manual de chunks
-          manualChunks: (id) => {
-            // React e ReactDOM
-            if (id.includes('node_modules/react/') || 
-                id.includes('node_modules/react-dom/') ||
-                id.includes('node_modules/react-router-dom/')) {
-              return 'vendor-react';
-            }
-            
-            // Firebase
-            if (id.includes('node_modules/firebase/')) {
-              return 'vendor-firebase';
-            }
-            
-            // UI Libraries
-            if (id.includes('node_modules/framer-motion/') ||
-                id.includes('node_modules/lucide-react/')) {
-              return 'vendor-ui';
-            }
-            
-            // Outros node_modules
-            if (id.includes('node_modules/')) {
-              return 'vendor-other';
-            }
+          manualChunks: {
+            'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+            'vendor-firebase': ['firebase/app', 'firebase/firestore'],
+            'vendor-ui': ['framer-motion', 'lucide-react'],
           },
         },
       },
       
-      // Otimizações de chunk
-      chunkSizeWarningLimit: 1000, // 1MB
-      assetsInlineLimit: 4096, // 4kb - inline small assets
-      
-      // Relatório de tamanhos
+      chunkSizeWarningLimit: 1000,
+      assetsInlineLimit: 4096,
       reportCompressedSize: true,
     },
 
@@ -211,31 +135,8 @@ export default defineConfig(({ mode }) => {
       port: 3000,
       open: true,
       host: true,
-      
       // CRÍTICO: Também necessário no preview
       historyApiFallback: true,
-    },
-
-    // ========================================
-    // CONFIGURAÇÕES DE DEPENDÊNCIAS
-    // ========================================
-    ssr: {
-      noExternal: ['framer-motion'],
-    },
-
-    // ========================================
-    // CONFIGURAÇÕES DE CSS
-    // ========================================
-    css: {
-      devSourcemap: isDevelopment,
-      modules: {
-        localsConvention: 'camelCase',
-      },
-      preprocessorOptions: {
-        scss: {
-          additionalData: `@import "@styles/variables.scss";`,
-        },
-      },
     },
   };
 });
