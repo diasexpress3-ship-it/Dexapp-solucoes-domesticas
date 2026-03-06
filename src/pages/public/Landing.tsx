@@ -9,13 +9,14 @@ import {
   Search, UserCheck, CreditCard, ThumbsUp,
   Sparkles, ArrowRight, Heart
 } from 'lucide-react';
-// IMPORTANTE: Não importar UploadImage aqui se estiver causando erro
+import { UploadImage } from '../../components/ui/UploadImage';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Landing() {
+  const { user } = useAuth();
   const processRef = useRef(null);
   const isInView = useInView(processRef, { once: true, amount: 0.3 });
   
-  // Estado para controlar a frase atual no título
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
   const phrases = [
     { text: "Soluções Domésticas", color: "text-white" },
@@ -82,19 +83,28 @@ export default function Landing() {
           </nav>
 
           <div className="flex items-center gap-3">
-            {/* Temporariamente removido o UploadImage até resolver o erro */}
-            <div className="w-8 h-8 rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white">
-              <span className="text-xs font-bold">D</span>
-            </div>
+            <UploadImage 
+              currentImageUrl={user?.profileImageUrl}
+              onUpload={(url) => {
+                console.log('Imagem carregada:', url);
+              }}
+              collectionPath="users"
+              docId={user?.id}
+              field="profileImageUrl"
+              isAdminOnly={false}
+              className="w-8 h-8 rounded-full"
+            />
             
-            <>
-              <Link to="/login">
-                <Button variant="ghost" size="sm">Login</Button>
-              </Link>
-              <Link to="/register-cliente">
-                <Button size="sm">Começar</Button>
-              </Link>
-            </>
+            {!user && (
+              <>
+                <Link to="/login">
+                  <Button variant="ghost" size="sm">Login</Button>
+                </Link>
+                <Link to="/register-cliente">
+                  <Button size="sm">Começar</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -118,7 +128,6 @@ export default function Landing() {
                 A Melhor Plataforma de Serviços em Moçambique
               </span>
               
-              {/* Título com animação zoom in/out */}
               <div className="h-32 md:h-40 mb-6">
                 <AnimatePresence mode="wait">
                   <motion.h1
@@ -200,14 +209,11 @@ export default function Landing() {
                 whileHover={{ y: -10 }}
                 className="relative group"
               >
-                {/* Número grande e visível */}
                 <div className="absolute -top-6 -right-6 text-8xl font-black text-gray-100 opacity-60 group-hover:opacity-100 transition-opacity z-0">
                   {step.number}
                 </div>
                 
-                {/* Card */}
                 <div className="relative bg-white p-8 rounded-3xl shadow-xl border border-gray-100 hover:shadow-2xl transition-all z-10 overflow-hidden">
-                  {/* Fundo gradiente no hover */}
                   <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                   
                   <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${step.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
@@ -222,7 +228,6 @@ export default function Landing() {
                     {step.description}
                   </p>
                   
-                  {/* Linha decorativa animada */}
                   <div className="absolute bottom-0 left-0 w-full h-1 bg-gradient-to-r from-transparent via-accent to-transparent scale-x-0 group-hover:scale-x-100 transition-transform duration-500" />
                 </div>
               </motion.div>
@@ -256,25 +261,20 @@ export default function Landing() {
               >
                 <Link to={`/servicos?cat=${cat.id}`}>
                   <div className="bg-white p-8 rounded-3xl shadow-md border border-gray-100 h-full transition-all hover:shadow-2xl hover:border-accent/20 relative overflow-hidden">
-                    {/* Fundo gradiente animado */}
                     <div className="absolute inset-0 bg-gradient-to-br from-accent/5 to-transparent opacity-0 group-hover:opacity-100 transition-opacity" />
                     
-                    {/* Ícone animado */}
                     <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 group-hover:rotate-3 transition-transform relative z-10`}>
                       <cat.icon size={32} />
                     </div>
                     
-                    {/* Título */}
                     <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors relative z-10">
                       {cat.name}
                     </h3>
                     
-                    {/* Descrição */}
                     <p className="text-sm text-gray-500 mb-6 leading-relaxed relative z-10">
                       Profissionais qualificados prontos para atender suas necessidades.
                     </p>
                     
-                    {/* Link Detalhes */}
                     <div className="flex items-center text-accent font-black text-sm uppercase tracking-widest group-hover:gap-3 transition-all relative z-10">
                       Ver detalhes 
                       <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
