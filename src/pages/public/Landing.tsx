@@ -11,7 +11,7 @@ import {
   Home, Phone, Info, Menu,
   Smartphone
 } from 'lucide-react';
-import { ProfileImageUpload } from '../../components/ui/ProfileImageUpload'; // ← CAMINHO CORRETO
+import { UploadImage } from '../../components/ui/UploadImage'; // ← IMPORT CORRETO
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function Landing() {
@@ -86,11 +86,19 @@ export default function Landing() {
           </nav>
 
           <div className="flex items-center gap-3">
-            {/* Profile Image Upload - Zona superior direita */}
-            <ProfileImageUpload 
+            {/* Usando o componente UploadImage original */}
+            <UploadImage 
               currentImageUrl={user?.profileImageUrl}
-              userId={user?.id}
-              size="sm"
+              onUpload={(url) => {
+                if (user) {
+                  console.log('Imagem carregada:', url);
+                }
+              }}
+              collectionPath="users"
+              docId={user?.id}
+              field="profileImageUrl"
+              isAdminOnly={false}
+              className="w-8 h-8 rounded-full"
             />
             
             {!user && (
