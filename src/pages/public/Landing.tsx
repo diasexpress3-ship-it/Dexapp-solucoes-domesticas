@@ -6,7 +6,8 @@ import { motion } from 'framer-motion';
 import { 
   Shield, Clock, Star, Users, 
   Search, UserCheck, CreditCard, ThumbsUp,
-  Sparkles, ArrowRight, Heart
+  Sparkles, ArrowRight, Heart, Wrench, Hammer,
+  Droplet, Zap, Scissors, Flower2, Building2, Paintbrush
 } from 'lucide-react';
 
 export default function Landing() {
@@ -144,8 +145,58 @@ export default function Landing() {
         </div>
       </section>
 
+      {/* Categories Section */}
+      <section className="py-24 bg-gray-50">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <h2 className="text-4xl md:text-5xl font-black text-primary mb-4">
+              Nossos <span className="text-accent">Serviços</span>
+            </h2>
+            <p className="text-gray-500 max-w-2xl mx-auto">
+              Explore nossas categorias e encontre o profissional ideal para o seu serviço
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-8">
+            {SERVICE_CATEGORIES.slice(0, 6).map((cat, index) => (
+              <motion.div
+                key={cat.id}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: index * 0.1 }}
+                className="group cursor-pointer"
+              >
+                <div className="bg-white p-8 rounded-3xl shadow-md border border-gray-100 h-full transition-all hover:shadow-2xl hover:border-accent/20 hover:-translate-y-2">
+                  <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white mb-6 shadow-lg group-hover:scale-110 transition-transform`}>
+                    <cat.icon size={32} />
+                  </div>
+                  <h3 className="text-xl font-black text-primary mb-3 group-hover:text-accent transition-colors">
+                    {cat.name}
+                  </h3>
+                  <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+                    Profissionais qualificados prontos para atender suas necessidades de {cat.name.toLowerCase()}.
+                  </p>
+                  <div className="flex items-center text-accent font-black text-sm uppercase tracking-widest group-hover:gap-3 transition-all">
+                    Ver detalhes 
+                    <ArrowRight size={16} className="ml-2 group-hover:translate-x-1 transition-transform" />
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+
+          <div className="text-center mt-12">
+            <Link to="/servicos" className="inline-flex items-center gap-2 text-accent font-bold hover:gap-3 transition-all">
+              Ver todos os serviços
+              <ArrowRight size={16} />
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* CTA Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-20 bg-white">
         <div className="container mx-auto px-4">
           <div className="bg-gradient-to-br from-primary via-primary to-blue-900 rounded-3xl p-12 md:p-20 text-center text-white relative overflow-hidden">
             <div className="absolute top-0 left-0 w-64 h-64 bg-accent/20 rounded-full -ml-32 -mt-32 animate-pulse"></div>
