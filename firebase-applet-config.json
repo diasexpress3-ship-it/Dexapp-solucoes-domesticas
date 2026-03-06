@@ -1,10 +1,10 @@
 {
-  "projectId": "diasexpress-4073f",
-  "appId": "1:174659717968:web:19830054cf76af1fd6fa55",
-  "apiKey": "AIzaSyDqN7J0A7ebBpUhSo5EyVwb5ZmZ2HaTezU",
-  "authDomain": "diasexpress-4073f.firebaseapp.com",
+  "projectId": "dexapp---solucoes-domesticas",
+  "appId": "1:378106336470:web:2943cfc10ae46fd7056577",
+  "apiKey": "AIzaSyAFRs_NG8CQzi1KxuQjqKPuYjMKBDzwHmw",
+  "authDomain": "dexapp---solucoes-domesticas.firebaseapp.com",
   "firestoreDatabaseId": "(default)",
-  "storageBucket": "diasexpress-4073f.firebasestorage.app",
-  "messagingSenderId": "174659717968",
+  "storageBucket": "dexapp---solucoes-domesticas.firebasestorage.app",
+  "messagingSenderId": "378106336470",
   "measurementId": ""
 }
