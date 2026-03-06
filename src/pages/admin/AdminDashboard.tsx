@@ -126,28 +126,13 @@ export default function AdminDashboard() {
     showToast('Exportação iniciada!', 'success');
   };
 
-  const handleExportRelatorio = () => {
-    showToast('A gerar relatório semanal...', 'info');
-    setTimeout(() => {
-      showToast('Relatório gerado com sucesso!', 'success');
-    }, 1500);
-  };
-
-  const handleGoToLanding = () => {
-    navigate('/'); // Vai para Landing Page
-  };
-
-  const handleNewAdmin = () => {
-    navigate('/admin/usuarios/novo'); // Vai para o formulário de novo admin
-  };
-
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        {/* Breadcrumb Navigation com botão Início funcional */}
+        {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
           <button 
-            onClick={handleGoToLanding}
+            onClick={() => navigate('/')} 
             className="flex items-center gap-1 hover:text-accent transition-colors"
             title="Ir para Landing Page"
           >
@@ -157,7 +142,7 @@ export default function AdminDashboard() {
           <span className="text-primary font-bold">Admin Dashboard</span>
         </div>
 
-        {/* Header com botões de navegação e ação */}
+        {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 mb-8">
           <div className="flex items-center gap-4">
             <button 
@@ -168,7 +153,7 @@ export default function AdminDashboard() {
               <ArrowLeft className="w-5 h-5 text-gray-600" />
             </button>
             <button 
-              onClick={handleGoToLanding}
+              onClick={() => navigate('/')}
               className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
               title="Ir para Landing Page"
             >
@@ -192,7 +177,7 @@ export default function AdminDashboard() {
             </Button>
             <Button 
               leftIcon={<UserPlus className="w-5 h-5" />} 
-              onClick={handleNewAdmin}
+              onClick={() => navigate('/admin/usuarios/novo')}
               className="bg-accent hover:bg-accent/90 text-white"
             >
               Novo Admin
@@ -315,6 +300,7 @@ export default function AdminDashboard() {
           </div>
         </div>
 
+        {/* Resto do código permanece igual */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
           {/* Revenue Chart */}
           <Card className="lg:col-span-2">
@@ -336,29 +322,10 @@ export default function AdminDashboard() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                    <XAxis 
-                      dataKey="name" 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 12, fontWeight: 'bold', fill: '#9ca3af' }}
-                    />
-                    <YAxis 
-                      axisLine={false} 
-                      tickLine={false} 
-                      tick={{ fontSize: 12, fontWeight: 'bold', fill: '#9ca3af' }}
-                      tickFormatter={(value) => `MT ${value}`}
-                    />
-                    <Tooltip 
-                      contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }}
-                    />
-                    <Area 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="#FF7A00" 
-                      strokeWidth={3}
-                      fillOpacity={1} 
-                      fill="url(#colorRevenue)" 
-                    />
+                    <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 'bold', fill: '#9ca3af' }} />
+                    <YAxis axisLine={false} tickLine={false} tick={{ fontSize: 12, fontWeight: 'bold', fill: '#9ca3af' }} tickFormatter={(value) => `MT ${value}`} />
+                    <Tooltip contentStyle={{ borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)' }} />
+                    <Area type="monotone" dataKey="revenue" stroke="#FF7A00" strokeWidth={3} fillOpacity={1} fill="url(#colorRevenue)" />
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -369,12 +336,7 @@ export default function AdminDashboard() {
           <Card>
             <CardHeader className="flex flex-row items-center justify-between">
               <h3 className="font-black text-primary">Novos Utilizadores</h3>
-              <Button 
-                variant="ghost" 
-                size="sm" 
-                className="text-accent font-bold"
-                onClick={() => navigate('/admin/usuarios')}
-              >
+              <Button variant="ghost" size="sm" className="text-accent font-bold" onClick={() => navigate('/admin/usuarios')}>
                 Ver todos
               </Button>
             </CardHeader>
@@ -407,11 +369,7 @@ export default function AdminDashboard() {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <h3 className="font-black text-primary">Últimas Transações</h3>
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => navigate('/admin/pagamentos')}
-            >
+            <Button variant="outline" size="sm" onClick={() => navigate('/admin/pagamentos')}>
               Ver Histórico Completo
             </Button>
           </CardHeader>
@@ -442,24 +400,12 @@ export default function AdminDashboard() {
                         <p className="text-sm font-black text-primary">{formatCurrency(p.valor)}</p>
                       </td>
                       <td className="p-4">
-                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
-                          p.status === 'confirmado' ? 'bg-green-100 text-green-700' :
-                          p.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
-                          'bg-red-100 text-red-700'
-                        }`}>
+                        <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${p.status === 'confirmado' ? 'bg-green-100 text-green-700' : p.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' : 'bg-red-100 text-red-700'}`}>
                           {p.status}
                         </span>
                       </td>
                       <td className="p-4 text-right">
-                        <Button 
-                          variant="ghost" 
-                          size="sm" 
-                          className="text-accent font-bold"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            navigate('/admin/pagamentos');
-                          }}
-                        >
+                        <Button variant="ghost" size="sm" className="text-accent font-bold" onClick={(e) => { e.stopPropagation(); navigate('/admin/pagamentos'); }}>
                           Detalhes
                         </Button>
                       </td>
@@ -474,7 +420,7 @@ export default function AdminDashboard() {
         {/* Botão flutuante para Landing Page */}
         <div className="fixed bottom-6 left-6 z-40">
           <button
-            onClick={handleGoToLanding}
+            onClick={() => navigate('/')}
             className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
             title="Ir para Landing Page"
           >
