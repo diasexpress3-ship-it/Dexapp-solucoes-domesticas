@@ -86,10 +86,10 @@ export default function Landing() {
   const { user } = useAuth();
   const navigate = useNavigate();
   
-  // DEBUG
+  // DEBUG - Mostra o objeto completo
   console.log('👤 Usuário completo:', user);
-  console.log('👑 role:', user?.role);
-  console.log('👑 é admin?', user?.role === 'admin');
+  console.log('👑 profile:', user?.profile);
+  console.log('👑 é admin?', user?.profile === 'admin');
   
   const [displayedPhrases, setDisplayedPhrases] = useState<string[]>([]);
   const [images, setImages] = useState<Images>({
@@ -176,7 +176,8 @@ export default function Landing() {
     setImages(prev => ({ ...prev, [field]: url }));
   }, []);
 
-  const isAdmin = user?.role === 'admin';
+  // CORREÇÃO: usar profile em vez de role
+  const isAdmin = user?.profile === 'admin';
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
@@ -205,7 +206,7 @@ export default function Landing() {
 
           {/* Área do usuário */}
           <div className="flex items-center gap-4">
-            {/* BOTÃO ADMIN - Para admin */}
+            {/* BOTÃO ADMIN - CORRIGIDO: usa profile */}
             {isAdmin && (
               <Button
                 onClick={() => navigate('/admin/dashboard')}
@@ -235,7 +236,7 @@ export default function Landing() {
               </span>
             )}
             
-            {/* Avatar - UploadImage para admin, imagem normal para não-admin */}
+            {/* Avatar - UploadImage para admin */}
             <div className="relative w-10 h-10">
               {isAdmin ? (
                 <UploadImage
