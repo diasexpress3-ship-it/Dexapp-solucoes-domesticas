@@ -11,6 +11,8 @@ import {
 } from 'lucide-react';
 import { UploadImage } from '../../components/ui/UploadImage';
 import { useAuth } from '../../contexts/AuthContext';
+import { doc, onSnapshot } from 'firebase/firestore';
+import { db } from '../../services/firebase';
 
 export default function Landing() {
   const { user } = useAuth();
@@ -19,6 +21,7 @@ export default function Landing() {
   
   const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
   const [displayedPhrases, setDisplayedPhrases] = useState<string[]>([]);
+  const [profileImageUrl, setProfileImageUrl] = useState<string | null>(null);
   
   const phrases = [
     "Soluções Domésticas",
@@ -26,29 +29,61 @@ export default function Landing() {
     "no seu Celular"
   ];
 
+  // Monitorar mudanças na imagem de perfil em tempo real
   useEffect(() => {
-    // Inicia com a primeira frase
-    setDisplayedPhrases([phrases[0]]);
-    
-    const interval = setInterval(() => {
-      setCurrentPhraseIndex((prev) => {
-        const nextIndex = (prev + 1) % phrases.length;
-        
-        // Adiciona a próxima frase mantendo as anteriores
-        setDisplayedPhrases(prevPhrases => {
-          const newPhrases = [...prevPhrases];
-          if (!newPhrases.includes(phrases[nextIndex])) {
-            newPhrases.push(phrases[nextIndex]);
+    if (user?.id) {
+      const unsubscribe = onSnapshot(doc(db, 'users', user.id), (doc) => {
+        if (doc.exists()) {
+          const data = doc.data();
+          if (data.profileImageUrl) {
+            setProfileImageUrl(data.profileImageUrl);
           }
-          return newPhrases;
-        });
-        
-        return nextIndex;
+        }
       });
-    }, 2000);
+      return () => unsubscribe();
+    }
+  }, [user?.id]);
 
-    return () => clearInterval(interval);
+  // Efeito para animação do título
+  useEffect(() => {
+    let timeoutIds: NodeJS.Timeout[] = [];
+    
+    const animatePhrases = () => {
+      // Limpa frases anteriores
+      setDisplayedPhrases([]);
+      
+      // Mostra primeira frase
+      timeoutIds.push(setTimeout(() => {
+        setDisplayedPhrases(['Soluções Domésticas']);
+      }, 0));
+      
+      // Mostra segunda frase
+      timeoutIds.push(setTimeout(() => {
+        setDisplayedPhrases(['Soluções Domésticas', 'ao seu Alcance']);
+      }, 1500));
+      
+      // Mostra terceira frase
+      timeoutIds.push(setTimeout(() => {
+        setDisplayedPhrases(['Soluções Domésticas', 'ao seu Alcance', 'no seu Celular']);
+      }, 3000));
+      
+      // Reinicia o ciclo
+      timeoutIds.push(setTimeout(() => {
+        animatePhrases();
+      }, 5000));
+    };
+    
+    animatePhrases();
+    
+    return () => {
+      timeoutIds.forEach(id => clearTimeout(id));
+    };
   }, []);
+
+  const handleImageUpload = (url: string) => {
+    console.log('Imagem carregada com sucesso:', url);
+    setProfileImageUrl(url);
+  };
 
   const processSteps = [
     {
@@ -138,20 +173,23 @@ export default function Landing() {
                 
                 {/* Título com animação de acúmulo */}
                 <div className="space-y-2 mb-6 min-h-[180px] md:min-h-[220px]">
-                  {displayedPhrases.map((phrase, index) => (
-                    <motion.h1
-                      key={phrase}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ duration: 0.5, delay: index * 0.1 }}
-                      className={`text-4xl md:text-6xl font-black ${
-                        index === 0 ? 'text-white' : 
-                        index === 1 ? 'text-accent' : 'text-white'
-                      }`}
-                    >
-                      {phrase}
-                    </motion.h1>
-                  ))}
+                  <AnimatePresence mode="popLayout">
+                    {displayedPhrases.map((phrase, index) => (
+                      <motion.h1
+                        key={phrase}
+                        initial={{ opacity: 0, x: -50 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        exit={{ opacity: 0, x: 50 }}
+                        transition={{ duration: 0.5, delay: index * 0.1 }}
+                        className={`text-4xl md:text-6xl font-black ${
+                          index === 0 ? 'text-white' : 
+                          index === 1 ? 'text-accent' : 'text-white'
+                        }`}
+                      >
+                        {phrase}
+                      </motion.h1>
+                    ))}
+                  </AnimatePresence>
                 </div>
                 
                 <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto lg:mx-0 font-medium">
@@ -208,10 +246,8 @@ export default function Landing() {
                 {/* Moldura circular para upload de imagem */}
                 <div className="absolute inset-8 rounded-full overflow-hidden bg-gradient-to-br from-accent/30 to-orange-600/30 border-4 border-white/30 shadow-2xl">
                   <UploadImage 
-                    currentImageUrl={user?.profileImageUrl}
-                    onUpload={(url) => {
-                      console.log('Imagem carregada:', url);
-                    }}
+                    currentImageUrl={profileImageUrl}
+                    onUpload={handleImageUpload}
                     collectionPath="users"
                     docId={user?.id}
                     field="profileImageUrl"
@@ -220,8 +256,8 @@ export default function Landing() {
                   />
                 </div>
                 
-                {/* Ícone de câmera decorativo (quando não logado) */}
-                {!user && (
+                {/* Ícone de câmera decorativo (quando não tem imagem) */}
+                {!profileImageUrl && (
                   <div className="absolute -bottom-2 -right-2 w-12 h-12 bg-accent rounded-full flex items-center justify-center text-white shadow-xl border-4 border-white">
                     <Camera className="w-6 h-6" />
                   </div>
