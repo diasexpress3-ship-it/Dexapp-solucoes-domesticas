@@ -28,6 +28,7 @@ import {
 } from 'recharts';
 import { exportToPDF } from '../../utils/utils';
 import { useToast } from '../../contexts/ToastContext';
+import { useAuth } from '../../contexts/AuthContext';
 
 const dataServicos = [
   { name: 'Limpeza', value: 45 },
@@ -50,6 +51,7 @@ const COLORS = ['#0A1D56', '#FF7A00', '#4F46E5', '#10B981', '#F59E0B'];
 
 export default function Relatorios() {
   const navigate = useNavigate();
+  const { user } = useAuth();
   const { showToast } = useToast();
   const [dateRange, setDateRange] = useState('Este Mês');
   const [isGenerating, setIsGenerating] = useState(false);
@@ -89,13 +91,41 @@ export default function Relatorios() {
     showToast(`Período alterado para: ${e.target.value}`, 'success');
   };
 
+  const handleLogoClick = () => {
+    navigate('/'); // Vai para Landing Page
+  };
+
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
+        {/* Header com logo clicável */}
+        <div className="flex items-center justify-between mb-8">
+          <button 
+            onClick={handleLogoClick}
+            className="flex items-center gap-2 hover:opacity-80 transition-opacity"
+            title="Ir para Landing Page"
+          >
+            <div className="w-8 h-8 bg-gradient-to-br from-accent to-orange-600 rounded-lg flex items-center justify-center text-white font-bold">
+              D
+            </div>
+            <span className="text-xl font-black text-primary">DEX<span className="text-accent">-app</span></span>
+          </button>
+          
+          <div className="flex gap-2">
+            <Button 
+              variant="outline" 
+              leftIcon={<Home className="w-5 h-5" />} 
+              onClick={handleLogoClick}
+            >
+              Landing Page
+            </Button>
+          </div>
+        </div>
+
         {/* Breadcrumb Navigation */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-8">
           <button 
-            onClick={() => navigate('/')} 
+            onClick={handleLogoClick}
             className="flex items-center gap-1 hover:text-accent transition-colors"
           >
             <Home className="w-4 h-4" /> Início
@@ -180,6 +210,7 @@ export default function Relatorios() {
                     outerRadius={120}
                     paddingAngle={5}
                     dataKey="value"
+                    label
                   >
                     {dataServicos.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
@@ -271,11 +302,11 @@ export default function Relatorios() {
         {/* Botão Voltar flutuante */}
         <div className="fixed bottom-6 left-6 z-40">
           <button
-            onClick={() => navigate('/admin/dashboard')}
+            onClick={handleLogoClick}
             className="bg-primary text-white p-4 rounded-full shadow-lg hover:bg-primary/90 transition-colors"
-            title="Voltar ao Dashboard"
+            title="Ir para Landing Page"
           >
-            <ArrowLeft className="w-6 h-6" />
+            <Home className="w-6 h-6" />
           </button>
         </div>
       </div>
