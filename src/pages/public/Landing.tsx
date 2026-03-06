@@ -1,8 +1,8 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Button } from '../../components/ui/Button';
 import { SERVICE_CATEGORIES } from '../../constants/categories';
-import { motion, useInView } from 'framer-motion';
+import { motion, useInView, AnimatePresence } from 'framer-motion';
 import { useRef } from 'react';
 import { 
   Shield, Clock, Star, Users, 
@@ -11,10 +11,29 @@ import {
   Home, Phone, Info, Menu,
   Smartphone
 } from 'lucide-react';
+import { ProfileImageUpload } from '../../components/ui/ProfileImageUpload';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function Landing() {
+  const { user } = useAuth();
   const processRef = useRef(null);
   const isInView = useInView(processRef, { once: true, amount: 0.3 });
+  
+  // Estado para controlar a frase atual no título
+  const [currentPhraseIndex, setCurrentPhraseIndex] = useState(0);
+  const phrases = [
+    { text: "Soluções Domésticas", color: "text-white" },
+    { text: "ao seu Alcance", color: "text-accent" },
+    { text: "no seu Celular", color: "text-white" }
+  ];
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      setCurrentPhraseIndex((prev) => (prev + 1) % phrases.length);
+    }, 3000); // Muda a cada 3 segundos
+
+    return () => clearInterval(interval);
+  }, []);
 
   const processSteps = [
     {
@@ -67,12 +86,23 @@ export default function Landing() {
           </nav>
 
           <div className="flex items-center gap-3">
-            <Link to="/login">
-              <Button variant="ghost" size="sm">Login</Button>
-            </Link>
-            <Link to="/register-cliente">
-              <Button size="sm">Começar</Button>
-            </Link>
+            {/* Profile Image Upload - Zona superior direita */}
+            <ProfileImageUpload 
+              currentImageUrl={user?.profileImageUrl}
+              userId={user?.id}
+              size="sm"
+            />
+            
+            {!user && (
+              <>
+                <Link to="/login">
+                  <Button variant="ghost" size="sm">Login</Button>
+                </Link>
+                <Link to="/register-cliente">
+                  <Button size="sm">Começar</Button>
+                </Link>
+              </>
+            )}
           </div>
         </div>
       </header>
@@ -96,43 +126,21 @@ export default function Landing() {
                 A Melhor Plataforma de Serviços em Moçambique
               </span>
               
-              {/* Título com 3 linhas animadas */}
-              <h1 className="text-5xl md:text-7xl font-black mb-6 leading-tight">
-                {/* Primeira linha */}
-                <div className="relative inline-block mb-2">
-                  <span className="relative z-10">Soluções Domésticas</span>
-                  <motion.span 
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ delay: 0.3, duration: 0.8 }}
-                    className="absolute bottom-2 left-0 h-3 bg-accent/30 -z-10"
-                  />
-                </div>
-                <br />
-                
-                {/* Segunda linha */}
-                <div className="relative inline-block mb-2">
-                  <span className="relative z-10">ao seu Alcance</span>
-                  <motion.span 
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ delay: 0.8, duration: 0.8 }}
-                    className="absolute bottom-2 left-0 h-3 bg-accent/30 -z-10"
-                  />
-                </div>
-                <br />
-                
-                {/* Terceira linha */}
-                <div className="relative inline-block">
-                  <span className="relative z-10">no seu Celular</span>
-                  <motion.span 
-                    initial={{ width: 0 }}
-                    animate={{ width: '100%' }}
-                    transition={{ delay: 1.3, duration: 0.8 }}
-                    className="absolute bottom-2 left-0 h-3 bg-accent/30 -z-10"
-                  />
-                </div>
-              </h1>
+              {/* Título com animação zoom in/out */}
+              <div className="h-32 md:h-40 mb-6">
+                <AnimatePresence mode="wait">
+                  <motion.h1
+                    key={currentPhraseIndex}
+                    initial={{ opacity: 0, scale: 0.8 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    exit={{ opacity: 0, scale: 1.2 }}
+                    transition={{ duration: 0.5 }}
+                    className={`text-5xl md:text-7xl font-black ${phrases[currentPhraseIndex].color}`}
+                  >
+                    {phrases[currentPhraseIndex].text}
+                  </motion.h1>
+                </AnimatePresence>
+              </div>
               
               <p className="text-xl text-white/80 mb-10 max-w-2xl mx-auto font-medium">
                 Encontre os melhores profissionais para cuidar do seu lar em Moçambique. Rápido, seguro e confiável.
