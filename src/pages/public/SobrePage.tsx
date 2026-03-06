@@ -19,7 +19,8 @@ import {
   Home,
   MapPin,
   MessageCircle,
-  LayoutDashboard
+  LayoutDashboard,
+  LogOut
 } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 import { useAuth } from '../../contexts/AuthContext';
@@ -78,7 +79,8 @@ export default function SobrePage() {
   
   // DEBUG
   console.log('👤 SobrePage - usuário:', user);
-  console.log('👑 SobrePage - é admin?', user?.role === 'admin');
+  console.log('👑 SobrePage - profile:', user?.profile);
+  console.log('👑 SobrePage - é admin?', user?.profile === 'admin');
   
   const [images, setImages] = useState<Images>({
     team: null,
@@ -88,7 +90,8 @@ export default function SobrePage() {
     aboutVision: null,
   });
 
-  const isAdmin = user?.role === 'admin';
+  // CORREÇÃO: usar profile em vez de role
+  const isAdmin = user?.profile === 'admin';
 
   // Buscar imagens
   useEffect(() => {
@@ -123,7 +126,7 @@ export default function SobrePage() {
 
   return (
     <AppLayout>
-      {/* Header - com botão admin */}
+      {/* Header - com botão admin e avatar clicável */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl shadow-lg py-4 border-b border-gray-100">
         <div className="container mx-auto px-6 flex items-center justify-between">
           <Link to="/" className="flex items-center gap-2">
@@ -140,8 +143,8 @@ export default function SobrePage() {
             <Link to="/contacto" className="text-sm font-bold text-gray-600 hover:text-accent">Contacto</Link>
           </nav>
 
-          <div className="flex items-center gap-3">
-            {/* BOTÃO ADMIN */}
+          <div className="flex items-center gap-4">
+            {/* BOTÃO ADMIN - CORRIGIDO: usa profile */}
             {isAdmin && (
               <Button
                 onClick={() => navigate('/admin/dashboard')}
@@ -154,9 +157,49 @@ export default function SobrePage() {
               </Button>
             )}
             
-            <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white">
-              <span className="text-sm font-bold">A</span>
-            </div>
+            {/* BOTÃO INÍCIO */}
+            <button
+              onClick={() => navigate('/')}
+              className="flex items-center gap-2 text-gray-600 hover:text-accent transition-colors"
+              title="Ir para Início"
+            >
+              <Home size={20} />
+              <span className="text-sm font-bold hidden sm:inline">Início</span>
+            </button>
+            
+            {/* Texto "Administrador" - indicador visual */}
+            {isAdmin && (
+              <span className="text-sm font-bold text-accent bg-accent/10 px-3 py-1.5 rounded-full">
+                Administrador
+              </span>
+            )}
+            
+            {/* AVATAR CLICÁVEL - AGORA LEVA PARA DASHBOARD */}
+            <button
+              onClick={() => isAdmin ? navigate('/admin/dashboard') : navigate('/login')}
+              className="relative group"
+              title={isAdmin ? "Ir para Painel Admin" : "Fazer Login"}
+            >
+              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white shadow-lg group-hover:scale-105 transition-transform cursor-pointer">
+                <span className="text-sm font-bold">{isAdmin ? 'A' : 'D'}</span>
+              </div>
+              
+              {/* Tooltip no hover */}
+              <span className="absolute -bottom-8 right-0 bg-gray-900 text-white text-xs py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap">
+                {isAdmin ? 'Painel Admin' : 'Login'}
+              </span>
+            </button>
+
+            {/* Botão Sair */}
+            {user && (
+              <button
+                onClick={() => {/* implementar logout */}}
+                className="text-gray-400 hover:text-rose-600 transition-colors"
+                title="Sair"
+              >
+                <LogOut size={20} />
+              </button>
+            )}
           </div>
         </div>
       </header>
