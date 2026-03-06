@@ -31,15 +31,15 @@ import AgendaPagePrestador from './pages/prestador/AgendaPagePrestador';
 // Central Pages
 import CentralDashboard from './pages/central/Dashboard';
 
-// Admin Pages
+// Admin Pages - CORRIGIDO: importações nomeadas
 import AdminDashboard from './pages/admin/Dashboard';
 import Usuarios from './pages/admin/Usuarios';
 import Prestadores from './pages/admin/Prestadores';
 import Pagamentos from './pages/admin/Pagamentos';
 import Relatorios from './pages/admin/Relatorios';
 import Configuracoes from './pages/admin/Configuracoes';
-import NovoAdmin from './pages/admin/NovoAdmin';
-import NovoUsuario from './pages/admin/NovoUsuario';
+import { NovoAdmin } from './pages/admin/NovoAdmin'; // ← CORRIGIDO: importação nomeada
+import NovoUsuario from './pages/admin/NovoUsuario'; // ← Esta é exportação default, mantém assim
 
 const ProtectedRoute = ({ children, allowedProfiles }: { children: React.ReactNode, allowedProfiles?: string[] }) => {
   const { user, loading, firebaseUser } = useAuth();
@@ -55,7 +55,7 @@ const ProtectedRoute = ({ children, allowedProfiles }: { children: React.ReactNo
   return <>{children}</>;
 };
 
-// Componente de redirecionamento da raiz - AGORA ADMIN VAI PARA LANDING
+// Componente de redirecionamento da raiz - ADMIN VAI PARA LANDING
 const HomeRedirect = () => {
   const { user, loading, firebaseUser } = useAuth();
 
