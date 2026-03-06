@@ -1,114 +1,152 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    
-    // ===============================================================
-    // Assumed Data Model
-    // ===============================================================
-    //
-    // Collection: users
-    // Fields:
-    //   - id: string (required)
-    //   - nome: string (required)
-    //   - email: string (optional)
-    //   - telefone: string (required)
-    //   - role: string ('cliente', 'prestador', 'central', 'admin')
-    //   - status: string ('ativo', 'pendente', 'bloqueado', 'suspenso')
-    //   - dataCadastro: timestamp
-    //
-    // Collection: solicitacoes
-    // Fields:
-    //   - clienteId: string (required)
-    //   - clienteNome: string
-    //   - status: string
-    //   - valorTotal: number
-    //
-    // Collection: pagamentos
-    // Fields:
-    //   - clienteId: string (required)
-    //   - valor: number
-    //   - status: string
-    //
-    // Collection: config
-    // Fields:
-    //   - landingImagens: map
-    //   - configuracoes: map
-    //
-    // ===============================================================
-
-    // ===============================================================
-    // Helper Functions
-    // ===============================================================
-    
+    // ===== FUNÇÕES AUXILIARES =====
     function isAuthenticated() {
       return request.auth != null;
     }
-
+    
+    function isAdmin() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.profile == 'admin';
+    }
+    
+    function isCentral() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.profile == 'central';
+    }
+    
+    function isPrestador() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.profile == 'prestador';
+    }
+    
+    function isCliente() {
+      return isAuthenticated() && 
+        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.profile == 'cliente';
+    }
+    
     function isOwner(userId) {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
-    function isAdmin() {
-      return isAuthenticated() && (
-        get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'admin' ||
-        (request.auth.token.email == "startbusiness26@gmail.com" && request.auth.token.email_verified == true)
-      );
+    // ===== REGRA GERAL: ADMIN E CENTRAL TÊM ACESSO TOTAL =====
+    match /{document=**} {
+      allow read, write: if isAdmin() || isCentral();
     }
-
-    function isCentral() {
-      return isAuthenticated() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'central';
-    }
-
-    function isValidUser(data) {
-      return data.nome is string && data.nome.size() > 0 &&
-             data.telefone is string && data.telefone.size() >= 9 &&
-             data.role in ['cliente', 'prestador', 'central', 'admin'] &&
-             data.status in ['ativo', 'pendente', 'bloqueado', 'suspenso'];
-    }
-
-    // ===============================================================
-    // Rules
-    // ===============================================================
-
+    
+    // ===== REGRAS ESPECÍFICAS POR COLEÇÃO =====
+    
+    // 1. USERS - regras específicas
     match /users/{userId} {
-      allow read: if isOwner(userId) || isAdmin() || isCentral();
-      allow create: if isAuthenticated() && isValidUser(request.resource.data) && (
-        (request.resource.data.role == 'cliente' && request.resource.data.status == 'ativo') ||
-        (request.resource.data.role == 'prestador' && request.resource.data.status == 'pendente') ||
-        isAdmin()
-      );
-      allow update: if (isOwner(userId) && request.resource.data.role == resource.data.role) || isAdmin() || isCentral();
-      allow delete: if isAdmin();
-    }
-
-    match /solicitacoes/{solicitacaoId} {
+      // Criar conta (sem autenticação)
+      allow create: if !isAuthenticated() || request.auth.uid == userId;
+      
+      // Ler: autenticados, admin, central
       allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.clienteId || 
-        request.auth.uid == resource.data.prestadorId || 
-        isAdmin() || isCentral()
+        isOwner(userId) || 
+        isAdmin() || 
+        isCentral()
       );
-      allow create: if isAuthenticated() && request.resource.data.clienteId == request.auth.uid;
+      
+      // Atualizar: admin, central, ou próprio usuário
       allow update: if isAuthenticated() && (
-        request.auth.uid == resource.data.clienteId || 
-        request.auth.uid == resource.data.prestadorId || 
-        isAdmin() || isCentral()
+        isAdmin() ||
+        isCentral() ||
+        isOwner(userId)
       );
+      
+      // Deletar: apenas admin
       allow delete: if isAdmin();
     }
-
-    match /pagamentos/{pagamentoId} {
+    
+    // 2. SOLICITACOES - pedidos de serviço
+    match /solicitacoes/{solicitacaoId} {
+      // Ler: admin, central, dono, prestador atribuído
       allow read: if isAuthenticated() && (
-        request.auth.uid == resource.data.clienteId || 
-        isAdmin() || isCentral()
+        isAdmin() ||
+        isCentral() ||
+        resource.data.clienteId == request.auth.uid ||
+        resource.data.prestadorId == request.auth.uid
       );
-      allow create: if isAuthenticated() && request.resource.data.clienteId == request.auth.uid;
-      allow update: if isAdmin() || isCentral();
-      allow delete: if isAdmin();
+      
+      // Criar: cliente autenticado
+      allow create: if isAuthenticated() && isCliente();
+      
+      // Atualizar: admin, central, dono, prestador atribuído
+      allow update: if isAuthenticated() && (
+        isAdmin() ||
+        isCentral() ||
+        resource.data.clienteId == request.auth.uid ||
+        (isPrestador() && resource.data.prestadorId == request.auth.uid)
+      );
+      
+      // Deletar: admin ou central
+      allow delete: if isAdmin() || isCentral();
     }
-
+    
+    // 3. PAGAMENTOS - transações
+    match /pagamentos/{pagamentoId} {
+      // Ler: admin, central, dono, prestador
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        isCentral() ||
+        resource.data.clienteId == request.auth.uid ||
+        resource.data.prestadorId == request.auth.uid
+      );
+      
+      // Criar: qualquer autenticado
+      allow create: if isAuthenticated();
+      
+      // Atualizar status: admin, central
+      allow update: if isAdmin() || isCentral();
+      
+      // Deletar: admin ou central
+      allow delete: if isAdmin() || isCentral();
+    }
+    
+    // 4. SERVICOS - catálogo de serviços
+    match /servicos/{servicoId} {
+      // Ler: qualquer um (público)
+      allow read: if true;
+      
+      // Escrever: admin ou central
+      allow write: if isAdmin() || isCentral();
+    }
+    
+    // 5. RELATÓRIOS - admin e central
+    match /relatorios/{relatorioId} {
+      allow read, write: if isAdmin() || isCentral();
+    }
+    
+    // 6. CONFIGURAÇÕES - admin e central
     match /config/{configId} {
-      allow read: if true; // Public config for landing page
-      allow write: if isAdmin();
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isCentral();
+    }
+    
+    // 7. LOGS - admin e central
+    match /logs/{logId} {
+      allow read, write: if isAdmin() || isCentral();
+    }
+    
+    // 8. EMERGENCIAS - central pode gerir
+    match /emergencias/{emergenciaId} {
+      allow read, write: if isAuthenticated() && (
+        isAdmin() ||
+        isCentral() ||
+        resource.data.usuarioId == request.auth.uid
+      );
+    }
+    
+    // 9. NOTIFICACOES - central pode enviar
+    match /notificacoes/{notificacaoId} {
+      allow read: if isAuthenticated() && (
+        isAdmin() ||
+        isCentral() ||
+        resource.data.usuarioId == request.auth.uid
+      );
+      allow write: if isAdmin() || isCentral();
     }
   }
 }
