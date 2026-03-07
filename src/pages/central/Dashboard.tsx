@@ -45,7 +45,12 @@ import {
   FileText,
   IdCard,
   Upload,
-  Download as DownloadIcon
+  Download as DownloadIcon,
+  Wallet,
+  Send,
+  CheckCircle,
+  ThumbsUp,
+  ThumbsDown
 } from 'lucide-react';
 import { formatCurrency, formatDate, translateStatus, exportToCSV } from '../../utils/utils';
 import { useToast } from '../../contexts/ToastContext';
@@ -66,6 +71,9 @@ interface CentralStats {
   prestadoresAtivos: number;
   totalClientes: number;
   valorTotalMovimentado: number;
+  totalSaquesPendentes: number;
+  totalSaquesAprovados: number;
+  valorSaquesPendentes: number;
 }
 
 interface PrestadorPendente {
@@ -83,6 +91,23 @@ interface PrestadorPendente {
   };
 }
 
+interface SaqueRequest {
+  id: string;
+  prestadorId: string;
+  prestadorNome: string;
+  valor: number;
+  status: 'pendente' | 'aprovado' | 'rejeitado';
+  dataSolicitacao: Date;
+  dataProcessamento?: Date;
+  processadoPor?: string;
+  observacao?: string;
+  metodoPagamento: string;
+  dadosBancarios: {
+    banco: string;
+    conta: string;
+  };
+}
+
 export default function CentralDashboard() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
@@ -90,13 +115,17 @@ export default function CentralDashboard() {
   const [filteredSolicitacoes, setFilteredSolicitacoes] = useState<Solicitacao[]>([]);
   const [prestadoresPendentes, setPrestadoresPendentes] = useState<PrestadorPendente[]>([]);
   const [prestadoresPendentesDocumentos, setPrestadoresPendentesDocumentos] = useState<PrestadorPendente[]>([]);
+  const [saquesPendentes, setSaquesPendentes] = useState<SaqueRequest[]>([]);
+  const [saquesProcessados, setSaquesProcessados] = useState<SaqueRequest[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('todas');
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const { showToast } = useToast();
   const [selectedPrestador, setSelectedPrestador] = useState<PrestadorPendente | null>(null);
+  const [selectedSaque, setSelectedSaque] = useState<SaqueRequest | null>(null);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
+  const [showSaqueModal, setShowSaqueModal] = useState(false);
   const [stats, setStats] = useState<CentralStats>({
     totalSolicitacoes: 0,
     pendentes: 0,
@@ -109,7 +138,10 @@ export default function CentralDashboard() {
     prestadoresPendentesDocumentos: 0,
     prestadoresAtivos: 0,
     totalClientes: 0,
-    valorTotalMovimentado: 0
+    valorTotalMovimentado: 0,
+    totalSaquesPendentes: 0,
+    totalSaquesAprovados: 0,
+    valorSaquesPendentes: 0
   });
 
   const handleLogout = async () => {
@@ -216,12 +248,50 @@ export default function CentralDashboard() {
       }));
     });
 
+    // Buscar saques pendentes
+    const saquesPendentesQuery = query(
+      collection(db, 'saques'),
+      where('status', '==', 'pendente'),
+      orderBy('dataSolicitacao', 'desc')
+    );
+    const unsubscribeSaquesPendentes = onSnapshot(saquesPendentesQuery, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaqueRequest));
+      setSaquesPendentes(docs);
+      
+      const totalValor = docs.reduce((acc, curr) => acc + curr.valor, 0);
+      setStats(prev => ({
+        ...prev,
+        totalSaquesPendentes: docs.length,
+        valorSaquesPendentes: totalValor
+      }));
+    });
+
+    // Buscar saques processados (aprovados/rejeitados)
+    const saquesProcessadosQuery = query(
+      collection(db, 'saques'),
+      where('status', 'in', ['aprovado', 'rejeitado']),
+      orderBy('dataProcessamento', 'desc'),
+      orderBy('dataSolicitacao', 'desc')
+    );
+    const unsubscribeSaquesProcessados = onSnapshot(saquesProcessadosQuery, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as SaqueRequest));
+      setSaquesProcessados(docs);
+      
+      const aprovados = docs.filter(d => d.status === 'aprovado').length;
+      setStats(prev => ({
+        ...prev,
+        totalSaquesAprovados: aprovados
+      }));
+    });
+
     return () => {
       unsubscribeSolicitacoes();
       unsubscribePrestadoresPendentes();
       unsubscribePrestadoresDocumentos();
       unsubscribePrestadoresAtivos();
       unsubscribeClientes();
+      unsubscribeSaquesPendentes();
+      unsubscribeSaquesProcessados();
     };
   }, []);
 
@@ -340,7 +410,6 @@ export default function CentralDashboard() {
   const handleRequestDocuments = async (id: string) => {
     setActionLoading(id);
     try {
-      // Aqui você pode implementar o envio de notificação para o prestador
       showToast('Notificação enviada ao prestador para enviar documentos', 'success');
     } catch (error) {
       console.error('Erro ao notificar prestador:', error);
@@ -385,6 +454,56 @@ export default function CentralDashboard() {
   };
 
   // ============================================
+  // FUNÇÕES CRUD - SAQUES
+  // ============================================
+
+  const handleViewSaque = (saque: SaqueRequest) => {
+    setSelectedSaque(saque);
+    setShowSaqueModal(true);
+  };
+
+  const handleApproveSaque = async (id: string) => {
+    if (!window.confirm(`Confirmar aprovação do saque de ${formatCurrency(selectedSaque?.valor || 0)}?`)) return;
+    
+    setActionLoading(id);
+    try {
+      await updateDoc(doc(db, 'saques', id), {
+        status: 'aprovado',
+        dataProcessamento: new Date(),
+        processadoPor: user?.id
+      });
+      showToast('Saque aprovado com sucesso!', 'success');
+      setShowSaqueModal(false);
+    } catch (error) {
+      console.error('Erro ao aprovar saque:', error);
+      showToast('Erro ao aprovar saque', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRejectSaque = async (id: string) => {
+    const motivo = window.prompt('Motivo da rejeição (opcional):');
+    
+    setActionLoading(id);
+    try {
+      await updateDoc(doc(db, 'saques', id), {
+        status: 'rejeitado',
+        dataProcessamento: new Date(),
+        processadoPor: user?.id,
+        observacao: motivo || 'Rejeitado pela central'
+      });
+      showToast('Saque rejeitado', 'info');
+      setShowSaqueModal(false);
+    } catch (error) {
+      console.error('Erro ao rejeitar saque:', error);
+      showToast('Erro ao rejeitar saque', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  // ============================================
   // FUNÇÕES DE EXPORTAÇÃO
   // ============================================
 
@@ -401,6 +520,19 @@ export default function CentralDashboard() {
     }));
     exportToCSV(data, `solicitacoes_${new Date().toISOString().split('T')[0]}`);
     showToast('Relatório exportado com sucesso!', 'success');
+  };
+
+  const handleExportSaques = () => {
+    const data = saquesPendentes.map(s => ({
+      ID: s.id,
+      Prestador: s.prestadorNome,
+      Valor: formatCurrency(s.valor),
+      Data: formatDate(s.dataSolicitacao),
+      Banco: s.dadosBancarios?.banco || 'N/A',
+      Conta: s.dadosBancarios?.conta || 'N/A'
+    }));
+    exportToCSV(data, `saques_pendentes_${new Date().toISOString().split('T')[0]}`);
+    showToast('Lista de saques exportada!', 'success');
   };
 
   const handleRefresh = () => {
@@ -512,6 +644,103 @@ export default function CentralDashboard() {
             </CardContent>
           </Card>
         </div>
+
+        {/* ======================================== */}
+        {/* SAQUES PENDENTES */}
+        {/* ======================================== */}
+        {saquesPendentes.length > 0 && (
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-4">
+              <h2 className="text-xl font-black text-primary flex items-center gap-2">
+                <Wallet size={20} className="text-accent" />
+                Saques Pendentes ({stats.totalSaquesPendentes})
+              </h2>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleExportSaques}
+                leftIcon={<Download size={14} />}
+              >
+                Exportar Lista
+              </Button>
+            </div>
+            
+            <Card className="bg-yellow-50 border-yellow-200 mb-4">
+              <CardContent className="p-4">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm font-bold text-yellow-700">Valor total pendente:</span>
+                  <span className="text-xl font-black text-yellow-700">{formatCurrency(stats.valorSaquesPendentes)}</span>
+                </div>
+              </CardContent>
+            </Card>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {saquesPendentes.map((saque) => (
+                <motion.div
+                  key={saque.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <Card className="border-l-4 border-l-yellow-400 hover:shadow-lg transition-all cursor-pointer"
+                        onClick={() => handleViewSaque(saque)}>
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-yellow-50 flex items-center justify-center text-yellow-600">
+                            <Send size={20} />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-primary">{saque.prestadorNome}</h4>
+                            <p className="text-xs text-gray-500">{formatDate(saque.dataSolicitacao)}</p>
+                          </div>
+                        </div>
+                        <span className="text-xs font-bold bg-yellow-100 text-yellow-700 px-2 py-1 rounded-full">
+                          Pendente
+                        </span>
+                      </div>
+                      
+                      <div className="mb-3">
+                        <p className="text-2xl font-black text-primary">{formatCurrency(saque.valor)}</p>
+                        <p className="text-xs text-gray-500">
+                          {saque.dadosBancarios?.banco} - Conta {saque.dadosBancarios?.conta}
+                        </p>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleRejectSaque(saque.id);
+                          }}
+                          disabled={actionLoading === saque.id}
+                          className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
+                        >
+                          <ThumbsDown size={14} className="mr-1" />
+                          Rejeitar
+                        </Button>
+                        <Button
+                          variant="primary"
+                          size="sm"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleApproveSaque(saque.id);
+                          }}
+                          disabled={actionLoading === saque.id}
+                          className="flex-1 bg-green-600 hover:bg-green-700"
+                        >
+                          <ThumbsUp size={14} className="mr-1" />
+                          Aprovar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* ======================================== */}
         {/* PRESTADORES PENDENTES (DOCUMENTOS) */}
@@ -779,6 +1008,7 @@ export default function CentralDashboard() {
                         s.status === 'aguardando_orcamento' ? 'bg-blue-400' :
                         s.status === 'prestador_atribuido' ? 'bg-indigo-400' :
                         s.status === 'em_andamento' ? 'bg-purple-400' :
+                        s.status === 'aguardando_pagamento_final' ? 'bg-orange-400' :
                         s.status === 'concluido' ? 'bg-green-400' :
                         s.status === 'cancelado' ? 'bg-red-400' :
                         'bg-gray-400'
@@ -804,6 +1034,7 @@ export default function CentralDashboard() {
                               )}
                               <span className={`inline-block mt-2 ml-2 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
                                 s.status === 'concluido' ? 'bg-green-100 text-green-700' :
+                                s.status === 'aguardando_pagamento_final' ? 'bg-orange-100 text-orange-700' :
                                 s.status === 'buscando_prestador' ? 'bg-yellow-100 text-yellow-700' :
                                 s.status === 'aguardando_orcamento' ? 'bg-blue-100 text-blue-700' :
                                 s.status === 'prestador_atribuido' ? 'bg-indigo-100 text-indigo-700' :
@@ -847,6 +1078,16 @@ export default function CentralDashboard() {
                             <div className="text-right mr-2">
                               <p className="text-xs font-bold text-primary">{formatCurrency(s.valorTotal)}</p>
                               <p className="text-[10px] text-gray-400">Total</p>
+                              {s.status === 'concluido' && (
+                                <>
+                                  <p className="text-xs font-bold text-green-600 mt-1">
+                                    Prestador: {formatCurrency(Math.round(s.valorTotal * 0.6))}
+                                  </p>
+                                  <p className="text-[10px] text-gray-400">
+                                    Plataforma: {formatCurrency(Math.round(s.valorTotal * 0.4))}
+                                  </p>
+                                </>
+                              )}
                             </div>
 
                             <Button
@@ -923,7 +1164,7 @@ export default function CentralDashboard() {
                           </div>
                         </div>
 
-                        {/* Endereço (se disponível) */}
+                        {/* Endereço */}
                         {s.endereco && (
                           <div className="mt-4 pt-4 border-t border-gray-100">
                             <div className="flex items-center gap-2 text-xs text-gray-500">
@@ -1050,6 +1291,87 @@ export default function CentralDashboard() {
                 >
                   Notificar Prestador
                 </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* Modal de Visualização de Saque */}
+      <Modal isOpen={showSaqueModal} onClose={() => setShowSaqueModal(false)} title="Detalhes do Saque">
+        {selectedSaque && (
+          <div className="space-y-6">
+            <div className="flex items-center justify-between pb-4 border-b">
+              <div>
+                <h3 className="font-bold text-primary">{selectedSaque.prestadorNome}</h3>
+                <p className="text-sm text-gray-500">Solicitado em {formatDate(selectedSaque.dataSolicitacao)}</p>
+              </div>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                selectedSaque.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
+                selectedSaque.status === 'aprovado' ? 'bg-green-100 text-green-700' :
+                'bg-red-100 text-red-700'
+              }`}>
+                {selectedSaque.status === 'pendente' ? 'Pendente' :
+                 selectedSaque.status === 'aprovado' ? 'Aprovado' : 'Rejeitado'}
+              </span>
+            </div>
+
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-sm text-gray-500 mb-1">Valor do Saque</p>
+              <p className="text-3xl font-black text-primary">{formatCurrency(selectedSaque.valor)}</p>
+            </div>
+
+            <div className="space-y-3">
+              <h4 className="font-bold text-primary">Dados Bancários</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">Banco</p>
+                  <p className="font-bold text-primary">{selectedSaque.dadosBancarios?.banco || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Conta</p>
+                  <p className="font-bold text-primary">{selectedSaque.dadosBancarios?.conta || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+
+            {selectedSaque.observacao && (
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs text-gray-500 mb-1">Observação</p>
+                <p className="text-sm text-primary">{selectedSaque.observacao}</p>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowSaqueModal(false)}
+                className="flex-1"
+              >
+                Fechar
+              </Button>
+              {selectedSaque.status === 'pendente' && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      handleRejectSaque(selectedSaque.id);
+                      setShowSaqueModal(false);
+                    }}
+                    className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    Rejeitar
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      handleApproveSaque(selectedSaque.id);
+                      setShowSaqueModal(false);
+                    }}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    Aprovar
+                  </Button>
+                </>
               )}
             </div>
           </div>
