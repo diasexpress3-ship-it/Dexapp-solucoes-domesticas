@@ -9,7 +9,7 @@ import {
   Sparkles, ArrowRight, Heart, Camera,
   LayoutDashboard, Building2, Award, TrendingUp,
   Mail, Phone, MapPin, Facebook, Instagram, Linkedin,
-  Home, LogOut
+  Home, LogOut, User, LogIn
 } from 'lucide-react';
 import { UploadImage } from '../../components/ui/UploadImage';
 import { useAuth } from '../../contexts/AuthContext';
@@ -114,8 +114,11 @@ const CATEGORY_FIELDS: Record<string, string> = {
 };
 
 export default function Landing() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
+  
+  console.log('👤 Landing - usuário logado:', user);
+  console.log('👤 Landing - profile:', user?.profile);
   
   const [displayedPhrases, setDisplayedPhrases] = useState<string[]>([]);
   const [images, setImages] = useState<Images>({
@@ -206,21 +209,52 @@ export default function Landing() {
 
   const goToAdminDashboard = () => {
     console.log('🔘 Clicou no botão Painel Admin');
-    console.log('👤 Usuário:', user);
-    console.log('👑 isAdmin:', isAdmin);
-    
     if (isAdmin) {
-      console.log('✅ Navegando para /admin/dashboard');
       navigate('/admin/dashboard');
+    }
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+    } catch (error) {
+      console.error('Erro ao fazer logout:', error);
+    }
+  };
+
+  const handleSolicitarServico = () => {
+    if (user) {
+      // Se estiver logado, vai para nova solicitação
+      if (user.profile === 'cliente') {
+        navigate('/cliente/nova-solicitacao');
+      } else {
+        navigate('/servicos');
+      }
     } else {
-      console.log('❌ Usuário não é admin');
+      // Se não estiver logado, vai para registro
+      navigate('/register-cliente');
+    }
+  };
+
+  const handleSerPrestador = () => {
+    if (user) {
+      // Se estiver logado, vai para dashboard
+      if (user.profile === 'prestador') {
+        navigate('/prestador/dashboard');
+      } else {
+        navigate('/register-prestador');
+      }
+    } else {
+      // Se não estiver logado, vai para registro
+      navigate('/register-prestador');
     }
   };
 
   return (
     <div className="flex flex-col min-h-screen bg-white">
       {/* ======================================== */}
-      {/* HEADER */}
+      {/* HEADER - CORRIGIDO COM LOGOUT */}
       {/* ======================================== */}
       <header className="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-xl shadow-lg py-4 border-b border-gray-100">
         <div className="container mx-auto px-6 flex items-center justify-between">
@@ -242,9 +276,9 @@ export default function Landing() {
             <Link to="/contacto" className="text-sm font-bold text-gray-600 hover:text-accent">Contacto</Link>
           </nav>
 
-          {/* Área do usuário */}
+          {/* Área do usuário - CORRIGIDA */}
           <div className="flex items-center gap-4">
-            {/* BOTÃO ADMIN */}
+            {/* BOTÃO ADMIN (só para admin) */}
             {isAdmin && (
               <Button
                 onClick={goToAdminDashboard}
@@ -267,14 +301,14 @@ export default function Landing() {
               <span className="text-sm font-bold hidden sm:inline">Início</span>
             </button>
             
-            {/* Texto "Administrador" */}
+            {/* TEXTO ADMIN (só para admin) */}
             {isAdmin && (
               <span className="text-sm font-bold text-accent bg-accent/10 px-3 py-1.5 rounded-full">
                 Administrador
               </span>
             )}
             
-            {/* Avatar */}
+            {/* AVATAR */}
             <div className="relative w-10 h-10">
               {isAdmin ? (
                 <UploadImage
@@ -287,25 +321,45 @@ export default function Landing() {
                   className="w-full h-full rounded-full border-2 border-accent object-cover cursor-pointer"
                 />
               ) : (
-                <div className="w-full h-full rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white shadow-lg">
-                  {images.profile ? (
-                    <img src={images.profile} alt="Profile" className="w-full h-full rounded-full object-cover" />
+                <div 
+                  className="w-full h-full rounded-full bg-gradient-to-br from-primary to-blue-900 flex items-center justify-center text-white shadow-lg cursor-pointer hover:scale-105 transition-transform"
+                  onClick={() => user ? navigate(`/${user.profile}/dashboard`) : navigate('/login')}
+                  title={user ? `Ir para Dashboard ${user.profile}` : 'Fazer Login'}
+                >
+                  {user ? (
+                    <span className="text-sm font-bold">{user.nome?.charAt(0).toUpperCase()}</span>
                   ) : (
-                    <span className="text-sm font-bold">D</span>
+                    <User size={20} />
                   )}
                 </div>
               )}
             </div>
 
-            {/* Botão Sair */}
-            {user && (
-              <button
-                onClick={() => console.log('Logout')}
-                className="text-gray-400 hover:text-rose-600 transition-colors"
-                title="Sair"
+            {/* BOTÕES DE AUTENTICAÇÃO - CORRIGIDOS */}
+            {!user ? (
+              <>
+                <Link to="/login">
+                  <Button variant="ghost" size="sm" className="flex items-center gap-2">
+                    <LogIn size={16} />
+                    Login
+                  </Button>
+                </Link>
+                <Link to="/register-cliente">
+                  <Button size="sm" className="bg-accent hover:bg-accent/90 text-white">
+                    Começar
+                  </Button>
+                </Link>
+              </>
+            ) : (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={handleLogout}
+                className="text-rose-600 hover:bg-rose-50 flex items-center gap-2"
               >
-                <LogOut size={20} />
-              </button>
+                <LogOut size={16} />
+                Sair
+              </Button>
             )}
           </div>
         </div>
@@ -373,17 +427,20 @@ export default function Landing() {
                 Encontre os melhores profissionais para cuidar do seu lar em Moçambique.
               </p>
               
+              {/* BOTÕES CORRIGIDOS - AGORA FUNCIONAM */}
               <div className="flex flex-col sm:flex-row items-center justify-center lg:justify-start gap-4">
-                <Link to="/register-cliente">
-                  <Button size="lg" className="bg-accent hover:bg-accent/90 text-white px-8 py-4 text-lg rounded-2xl">
-                    Solicitar Serviço
-                  </Button>
-                </Link>
-                <Link to="/register-prestador">
-                  <Button variant="outline" size="lg" className="border-2 border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg rounded-2xl">
-                    Quero ser Prestador
-                  </Button>
-                </Link>
+                <button
+                  onClick={handleSolicitarServico}
+                  className="bg-accent hover:bg-accent/90 text-white px-8 py-4 text-lg rounded-2xl font-bold transition-all transform hover:scale-105 shadow-lg"
+                >
+                  Solicitar Serviço
+                </button>
+                <button
+                  onClick={handleSerPrestador}
+                  className="border-2 border-white/30 text-white hover:bg-white/10 px-8 py-4 text-lg rounded-2xl font-bold transition-all transform hover:scale-105 backdrop-blur-sm"
+                >
+                  Quero ser Prestador
+                </button>
               </div>
             </div>
 
