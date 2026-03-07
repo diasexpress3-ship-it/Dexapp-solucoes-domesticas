@@ -1,325 +1,794 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { 
-  DollarSign, 
-  Search, 
-  Filter, 
-  CheckCircle2, 
-  XCircle, 
-  Clock, 
-  ArrowUpRight, 
-  ArrowDownRight,
-  Eye,
-  Download,
-  FileText,
-  TrendingUp,
-  Home,
-  ArrowLeft
-} from 'lucide-react';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { collection, onSnapshot, query, orderBy, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase';
-import { Pagamento } from '../../types';
-import { formatCurrency, formatDate, exportToCSV, exportToPDF } from '../../utils/utils';
-import { ExportButtons } from '../../components/ui/ExportButtons';
+import { Modal } from '../../components/ui/Modal';
+import { 
+  ArrowLeft,
+  Home,
+  LogOut,
+  RefreshCw,
+  Download,
+  Filter,
+  Search,
+  Wallet,
+  DollarSign,
+  CheckCircle2,
+  XCircle,
+  Clock,
+  AlertCircle,
+  Eye,
+  ThumbsUp,
+  ThumbsDown,
+  Send,
+  User,
+  Building,
+  Calendar,
+  TrendingUp,
+  FileText,
+  Printer,
+  Mail,
+  Phone,
+  Copy,
+  Check,
+  Loader2
+} from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { collection, query, onSnapshot, orderBy, doc, updateDoc, where } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { formatCurrency, formatDate, exportToCSV } from '../../utils/utils';
+import { motion } from 'framer-motion';
 
+// ============================================
+// INTERFACES
+// ============================================
+interface Saque {
+  id: string;
+  prestadorId: string;
+  prestadorNome: string;
+  prestadorEmail?: string;
+  prestadorTelefone?: string;
+  valor: number;
+  status: 'pendente' | 'aprovado' | 'rejeitado' | 'processado';
+  dataSolicitacao: Date;
+  dataProcessamento?: Date;
+  processadoPor?: string;
+  observacao?: string;
+  metodoPagamento: string;
+  dadosBancarios: {
+    banco: string;
+    conta: string;
+    titular?: string;
+    nib?: string;
+  };
+  comprovativo?: string;
+}
+
+interface PagamentoStats {
+  totalPendente: number;
+  totalAprovado: number;
+  totalProcessado: number;
+  totalRejeitado: number;
+  valorPendente: number;
+  valorAprovado: number;
+  valorProcessado: number;
+  valorRejeitado: number;
+}
+
+// ============================================
+// COMPONENTE PRINCIPAL
+// ============================================
 export default function Pagamentos() {
   const navigate = useNavigate();
-  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('todos');
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, logout } = useAuth();
   const { showToast } = useToast();
+  
+  const [saques, setSaques] = useState<Saque[]>([]);
+  const [filteredSaques, setFilteredSaques] = useState<Saque[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('pendente');
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedSaque, setSelectedSaque] = useState<Saque | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [copiado, setCopiado] = useState<string | null>(null);
+  
+  const [stats, setStats] = useState<PagamentoStats>({
+    totalPendente: 0,
+    totalAprovado: 0,
+    totalProcessado: 0,
+    totalRejeitado: 0,
+    valorPendente: 0,
+    valorAprovado: 0,
+    valorProcessado: 0,
+    valorRejeitado: 0
+  });
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+      showToast('Logout efetuado com sucesso!', 'success');
+    } catch (error) {
+      showToast('Erro ao fazer logout', 'error');
+    }
+  };
+
+  // ============================================
+  // BUSCAR SAQUES
+  // ============================================
   useEffect(() => {
-    const q = query(collection(db, 'pagamentos'), orderBy('data', 'desc'));
-    const unsubscribe = onSnapshot(q, (snap) => {
-      let data = snap.docs.map(d => ({ id: d.id, ...d.data() } as Pagamento));
-      if (statusFilter !== 'todos') {
-        data = data.filter(p => p.status === statusFilter);
-      }
-      setPagamentos(data);
+    const q = query(
+      collection(db, 'saques'),
+      orderBy('dataSolicitacao', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        dataSolicitacao: doc.data().dataSolicitacao?.toDate?.() || new Date(doc.data().dataSolicitacao),
+        dataProcessamento: doc.data().dataProcessamento?.toDate?.() || null
+      } as Saque));
+      
+      setSaques(docs);
+      
+      // Calcular estatísticas
+      const pendentes = docs.filter(s => s.status === 'pendente');
+      const aprovados = docs.filter(s => s.status === 'aprovado');
+      const processados = docs.filter(s => s.status === 'processado');
+      const rejeitados = docs.filter(s => s.status === 'rejeitado');
+      
+      setStats({
+        totalPendente: pendentes.length,
+        totalAprovado: aprovados.length,
+        totalProcessado: processados.length,
+        totalRejeitado: rejeitados.length,
+        valorPendente: pendentes.reduce((acc, curr) => acc + curr.valor, 0),
+        valorAprovado: aprovados.reduce((acc, curr) => acc + curr.valor, 0),
+        valorProcessado: processados.reduce((acc, curr) => acc + curr.valor, 0),
+        valorRejeitado: rejeitados.reduce((acc, curr) => acc + curr.valor, 0)
+      });
+
+      filterSaques(filterStatus, docs);
       setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [statusFilter]);
+  }, []);
 
-  const filteredPagamentos = pagamentos.filter(p => 
-    p.clienteNome?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.id.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // ============================================
+  // FILTRAR SAQUES
+  // ============================================
+  useEffect(() => {
+    filterSaques(filterStatus, saques);
+  }, [searchTerm, saques]);
 
-  const handleStatusChange = async (pagamentoId: string, newStatus: Pagamento['status']) => {
-    try {
-      await updateDoc(doc(db, 'pagamentos', pagamentoId), { status: newStatus });
-      showToast('Status do pagamento atualizado.', 'success');
-    } catch (error) {
-      showToast('Erro ao atualizar status.', 'error');
+  const filterSaques = (status: string, docs = saques) => {
+    let filtered = docs;
+
+    // Filtro por status
+    if (status !== 'todos') {
+      filtered = filtered.filter(s => s.status === status);
     }
+
+    // Filtro por busca
+    if (searchTerm) {
+      filtered = filtered.filter(s => 
+        s.prestadorNome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.prestadorEmail?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        s.dadosBancarios?.conta.includes(searchTerm)
+      );
+    }
+
+    setFilteredSaques(filtered);
   };
 
-  const handleConfirmar = async (pagamentoId: string) => {
+  const handleStatusChange = (status: string) => {
+    setFilterStatus(status);
+    filterSaques(status);
+  };
+
+  // ============================================
+  // FUNÇÕES CRUD
+  // ============================================
+  const handleViewDetails = (saque: Saque) => {
+    setSelectedSaque(saque);
+    setShowDetailsModal(true);
+  };
+
+  const handleApprove = async (id: string) => {
+    if (!window.confirm('Confirmar aprovação deste saque?')) return;
+    
+    setActionLoading(id);
     try {
-      await updateDoc(doc(db, 'pagamentos', pagamentoId), { 
-        status: 'confirmado',
-        dataConfirmacao: new Date().toISOString()
+      await updateDoc(doc(db, 'saques', id), {
+        status: 'aprovado',
+        dataProcessamento: new Date(),
+        processadoPor: user?.id
       });
-      showToast('Pagamento confirmado com sucesso!', 'success');
+      showToast('Saque aprovado com sucesso!', 'success');
     } catch (error) {
-      showToast('Erro ao confirmar pagamento.', 'error');
+      console.error('Erro ao aprovar saque:', error);
+      showToast('Erro ao aprovar saque', 'error');
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const handleRejeitar = async (pagamentoId: string) => {
+  const handleProcess = async (id: string) => {
+    if (!window.confirm('Confirmar que o pagamento foi processado?')) return;
+    
+    setActionLoading(id);
     try {
-      await updateDoc(doc(db, 'pagamentos', pagamentoId), { 
-        status: 'falhou',
-        dataRejeicao: new Date().toISOString()
+      await updateDoc(doc(db, 'saques', id), {
+        status: 'processado',
+        dataProcessamento: new Date(),
+        processadoPor: user?.id
       });
-      showToast('Pagamento rejeitado.', 'info');
+      showToast('Pagamento marcado como processado!', 'success');
+      setShowDetailsModal(false);
     } catch (error) {
-      showToast('Erro ao rejeitar pagamento.', 'error');
+      console.error('Erro ao processar saque:', error);
+      showToast('Erro ao processar saque', 'error');
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const exportHeaders = ['ID', 'Cliente', 'Valor', 'Método', 'Tipo', 'Status', 'Data'];
-  const exportData = filteredPagamentos.map(p => ({
-    ID: p.id,
-    Cliente: p.clienteNome || 'N/A',
-    Valor: p.valor,
-    Método: p.metodo,
-    Tipo: p.tipo,
-    Status: p.status,
-    Data: formatDate(p.data)
-  }));
-
-  const pdfData = filteredPagamentos.map(p => [
-    p.id.slice(-6).toUpperCase(),
-    p.clienteNome || 'N/A',
-    formatCurrency(p.valor),
-    p.metodo,
-    p.tipo,
-    p.status,
-    formatDate(p.data)
-  ]);
-
-  const stats = {
-    total: pagamentos.filter(p => p.status === 'confirmado').reduce((acc, curr) => acc + curr.valor, 0),
-    pendente: pagamentos.filter(p => p.status === 'pendente').reduce((acc, curr) => acc + curr.valor, 0),
-    hoje: pagamentos.filter(p => {
-      const d = p.data instanceof Date ? p.data : (p.data as any)?.toDate?.() || new Date((p.data as any).seconds * 1000);
-      return d.toDateString() === new Date().toDateString() && p.status === 'confirmado';
-    }).reduce((acc, curr) => acc + curr.valor, 0)
+  const handleReject = async () => {
+    if (!selectedSaque) return;
+    
+    setActionLoading(selectedSaque.id);
+    try {
+      await updateDoc(doc(db, 'saques', selectedSaque.id), {
+        status: 'rejeitado',
+        dataProcessamento: new Date(),
+        processadoPor: user?.id,
+        observacao: rejectReason || 'Rejeitado pela central'
+      });
+      showToast('Saque rejeitado', 'info');
+      setShowRejectModal(false);
+      setShowDetailsModal(false);
+      setRejectReason('');
+    } catch (error) {
+      console.error('Erro ao rejeitar saque:', error);
+      showToast('Erro ao rejeitar saque', 'error');
+    } finally {
+      setActionLoading(null);
+    }
   };
 
+  const handleCopyToClipboard = (texto: string, tipo: string) => {
+    navigator.clipboard.writeText(texto);
+    setCopiado(tipo);
+    setTimeout(() => setCopiado(null), 2000);
+    showToast(`${tipo} copiado!`, 'success');
+  };
+
+  const handleExportCSV = () => {
+    const data = filteredSaques.map(s => ({
+      ID: s.id,
+      Prestador: s.prestadorNome,
+      Email: s.prestadorEmail || '',
+      Telefone: s.prestadorTelefone || '',
+      Valor: formatCurrency(s.valor),
+      Status: s.status,
+      DataSolicitacao: formatDate(s.dataSolicitacao),
+      DataProcessamento: s.dataProcessamento ? formatDate(s.dataProcessamento) : '',
+      Banco: s.dadosBancarios?.banco || '',
+      Conta: s.dadosBancarios?.conta || ''
+    }));
+    exportToCSV(data, `saques_${new Date().toISOString().split('T')[0]}`);
+    showToast('Lista exportada com sucesso!', 'success');
+  };
+
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-          <button 
-            onClick={() => navigate('/')} 
-            className="flex items-center gap-1 hover:text-accent transition-colors"
-          >
-            <Home className="w-4 h-4" /> Início
-          </button>
-          <span>/</span>
-          <button 
-            onClick={() => navigate('/admin/dashboard')} 
-            className="hover:text-accent transition-colors"
-          >
-            Admin
-          </button>
-          <span>/</span>
-          <span className="text-primary font-bold">Pagamentos</span>
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button 
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Voltar"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-black text-primary flex items-center gap-3">
-              <DollarSign size={32} className="text-accent" />
-              Gestão Financeira
-            </h1>
-            <p className="text-gray-500">Controle de pagamentos, depósitos e saques.</p>
-          </div>
-        </div>
-
-        {/* Botões de exportação */}
+        {/* ======================================== */}
+        {/* HEADER */}
+        {/* ======================================== */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div className="flex flex-wrap gap-2">
-            <ExportButtons 
-              data={exportData}
-              filename="pagamentos_dexapp"
-              title="Relatório Financeiro - DEXAPP"
-              headers={exportHeaders}
-              pdfData={pdfData}
-            />
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => navigate(-1)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Voltar"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-black text-primary flex items-center gap-3">
+                <Wallet size={32} className="text-accent" />
+                Gestão de Pagamentos
+              </h1>
+              <p className="text-gray-500">Gerencie os saques solicitados pelos prestadores.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/')}
+              leftIcon={<Home size={16} />}
+              className="border-gray-300 text-gray-600 hover:bg-gray-50"
+            >
+              Início
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              leftIcon={<LogOut size={16} />}
+              className="border-rose-200 text-rose-600 hover:bg-rose-50"
+            >
+              Sair
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              leftIcon={<Download size={16} />}
+            >
+              Exportar
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => window.location.reload()}
+              title="Atualizar"
+            >
+              <RefreshCw size={18} />
+            </Button>
           </div>
         </div>
 
-        {/* Financial Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-          <Card className="bg-white border-gray-100">
+        {/* ======================================== */}
+        {/* STATS CARDS */}
+        {/* ======================================== */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+          <Card className="bg-gradient-to-br from-yellow-500 to-yellow-600 text-white">
             <CardContent className="p-6">
-              <p className="text-xs font-bold uppercase text-gray-400 mb-1">Total Confirmado</p>
-              <h3 className="text-3xl font-black text-primary">{formatCurrency(stats.total)}</h3>
-              <div className="mt-4 flex items-center text-green-500 text-xs font-bold">
-                <ArrowUpRight size={14} className="mr-1" /> +15% vs mês anterior
+              <div className="flex items-center justify-between mb-2">
+                <Clock size={24} className="opacity-80" />
               </div>
+              <p className="text-xs font-bold opacity-60 uppercase tracking-wider">Pendentes</p>
+              <h3 className="text-2xl font-black">{stats.totalPendente}</h3>
+              <p className="text-xs opacity-80 mt-1">{formatCurrency(stats.valorPendente)}</p>
             </CardContent>
           </Card>
-          <Card className="bg-white border-gray-100">
+
+          <Card className="bg-gradient-to-br from-green-500 to-green-600 text-white">
             <CardContent className="p-6">
-              <p className="text-xs font-bold uppercase text-gray-400 mb-1">Pendente de Validação</p>
-              <h3 className="text-3xl font-black text-orange-500">{formatCurrency(stats.pendente)}</h3>
-              <div className="mt-4 flex items-center text-orange-500 text-xs font-bold">
-                <Clock size={14} className="mr-1" /> {pagamentos.filter(p => p.status === 'pendente').length} transações
+              <div className="flex items-center justify-between mb-2">
+                <CheckCircle2 size={24} className="opacity-80" />
               </div>
+              <p className="text-xs font-bold opacity-60 uppercase tracking-wider">Aprovados</p>
+              <h3 className="text-2xl font-black">{stats.totalAprovado}</h3>
+              <p className="text-xs opacity-80 mt-1">{formatCurrency(stats.valorAprovado)}</p>
             </CardContent>
           </Card>
-          <Card className="bg-primary text-white">
+
+          <Card className="bg-gradient-to-br from-blue-500 to-blue-600 text-white">
             <CardContent className="p-6">
-              <p className="text-xs font-bold uppercase opacity-70 mb-1">Receita de Hoje</p>
-              <h3 className="text-3xl font-black">{formatCurrency(stats.hoje)}</h3>
-              <div className="mt-4 flex items-center text-white/70 text-xs font-bold">
-                <TrendingUp size={14} className="mr-1" /> Meta diária: 80%
+              <div className="flex items-center justify-between mb-2">
+                <Send size={24} className="opacity-80" />
               </div>
+              <p className="text-xs font-bold opacity-60 uppercase tracking-wider">Processados</p>
+              <h3 className="text-2xl font-black">{stats.totalProcessado}</h3>
+              <p className="text-xs opacity-80 mt-1">{formatCurrency(stats.valorProcessado)}</p>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gradient-to-br from-red-500 to-red-600 text-white">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <XCircle size={24} className="opacity-80" />
+              </div>
+              <p className="text-xs font-bold opacity-60 uppercase tracking-wider">Rejeitados</p>
+              <h3 className="text-2xl font-black">{stats.totalRejeitado}</h3>
+              <p className="text-xs opacity-80 mt-1">{formatCurrency(stats.valorRejeitado)}</p>
             </CardContent>
           </Card>
         </div>
 
+        {/* ======================================== */}
+        {/* FILTROS */}
+        {/* ======================================== */}
         <Card className="mb-8">
           <CardContent className="p-4">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <Input
-                  placeholder="Pesquisar por cliente ou ID..."
+                  placeholder="Pesquisar por prestador, email ou conta..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  leftIcon={<Search size={20} className="text-gray-400" />}
-                  className="rounded-xl border-gray-100"
+                  leftIcon={<Search size={18} />}
                 />
               </div>
-              <div className="flex gap-2">
-                <select 
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="bg-gray-50 border-none rounded-xl px-4 py-2 font-bold text-sm text-primary outline-none focus:ring-2 focus:ring-accent/20"
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={filterStatus === 'todos' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('todos')}
                 >
-                  <option value="todos">Todos os Status</option>
-                  <option value="confirmado">Confirmados</option>
-                  <option value="pendente">Pendentes</option>
-                  <option value="falhou">Falhou</option>
-                </select>
-                <Button variant="outline" size="icon" className="rounded-xl">
-                  <Filter size={20} />
+                  Todos
+                </Button>
+                <Button
+                  variant={filterStatus === 'pendente' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('pendente')}
+                  className="border-yellow-200 text-yellow-700 hover:bg-yellow-50"
+                >
+                  Pendentes
+                </Button>
+                <Button
+                  variant={filterStatus === 'aprovado' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('aprovado')}
+                  className="border-green-200 text-green-700 hover:bg-green-50"
+                >
+                  Aprovados
+                </Button>
+                <Button
+                  variant={filterStatus === 'processado' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('processado')}
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                >
+                  Processados
+                </Button>
+                <Button
+                  variant={filterStatus === 'rejeitado' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('rejeitado')}
+                  className="border-red-200 text-red-700 hover:bg-red-50"
+                >
+                  Rejeitados
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <Card>
-          <CardContent className="p-0">
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="bg-gray-50 border-b border-gray-100">
-                    <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Transação / Data</th>
-                    <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Cliente</th>
-                    <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Valor / Tipo</th>
-                    <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest">Status</th>
-                    <th className="p-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-right">Ações</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-50">
-                  {filteredPagamentos.map((p) => (
-                    <tr key={p.id} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="p-4">
-                        <p className="text-xs font-bold text-primary">#{p.id.slice(-8).toUpperCase()}</p>
-                        <p className="text-[10px] text-gray-400">{formatDate(p.data)}</p>
-                      </td>
-                      <td className="p-4">
-                        <p className="text-sm font-bold text-primary">{p.clienteNome || 'N/A'}</p>
-                        <p className="text-[10px] text-gray-400">{p.metodo}</p>
-                      </td>
-                      <td className="p-4">
-                        <p className="text-sm font-black text-primary">{formatCurrency(p.valor)}</p>
-                        <p className="text-[10px] text-accent font-bold uppercase tracking-wider">{p.tipo}</p>
-                      </td>
-                      <td className="p-4">
-                        {p.status === 'pendente' ? (
-                          <div className="flex gap-2">
-                            <Button 
-                              size="sm" 
-                              className="bg-green-600 hover:bg-green-700 text-white text-xs"
-                              onClick={() => handleConfirmar(p.id)}
-                            >
-                              Confirmar
-                            </Button>
-                            <Button 
-                              size="sm" 
-                              variant="outline" 
-                              className="text-red-600 border-red-200 hover:bg-red-50 text-xs"
-                              onClick={() => handleRejeitar(p.id)}
-                            >
-                              Rejeitar
-                            </Button>
+        {/* ======================================== */}
+        {/* LISTA DE SAQUES */}
+        {/* ======================================== */}
+        <div className="space-y-4">
+          {filteredSaques.length > 0 ? (
+            filteredSaques.map((saque) => (
+              <motion.div
+                key={saque.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Card className={`hover:shadow-lg transition-all cursor-pointer ${
+                  saque.status === 'pendente' ? 'border-l-4 border-l-yellow-400' :
+                  saque.status === 'aprovado' ? 'border-l-4 border-l-green-400' :
+                  saque.status === 'processado' ? 'border-l-4 border-l-blue-400' :
+                  'border-l-4 border-l-red-400'
+                }`}
+                onClick={() => handleViewDetails(saque)}>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          saque.status === 'pendente' ? 'bg-yellow-100 text-yellow-600' :
+                          saque.status === 'aprovado' ? 'bg-green-100 text-green-600' :
+                          saque.status === 'processado' ? 'bg-blue-100 text-blue-600' :
+                          'bg-red-100 text-red-600'
+                        }`}>
+                          <DollarSign size={24} />
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-primary">{saque.prestadorNome}</h4>
+                          <div className="flex items-center gap-2 text-xs text-gray-500 mt-1">
+                            <Calendar size={12} />
+                            <span>{formatDate(saque.dataSolicitacao)}</span>
+                            <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                            <Building size={12} />
+                            <span>{saque.dadosBancarios?.banco || 'N/A'}</span>
                           </div>
-                        ) : (
-                          <select
-                            value={p.status}
-                            onChange={(e) => handleStatusChange(p.id, e.target.value as Pagamento['status'])}
-                            className={`text-[10px] font-black uppercase px-2 py-1 rounded-full border-none outline-none cursor-pointer ${
-                              p.status === 'confirmado' ? 'bg-green-100 text-green-700' :
-                              p.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
-                              'bg-red-100 text-red-700'
-                            }`}
-                          >
-                            <option value="confirmado">Confirmado</option>
-                            <option value="pendente">Pendente</option>
-                            <option value="falhou">Falhou</option>
-                          </select>
-                        )}
-                      </td>
-                      <td className="p-4 text-right">
-                        <div className="flex items-center justify-end gap-2">
-                          {p.comprovativoUrl && (
-                            <Button 
-                              variant="ghost" 
-                              size="icon" 
-                              className="text-accent"
-                              onClick={() => window.open(p.comprovativoUrl, '_blank')}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-xl font-black text-primary">{formatCurrency(saque.valor)}</p>
+                          <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${
+                            saque.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
+                            saque.status === 'aprovado' ? 'bg-green-100 text-green-700' :
+                            saque.status === 'processado' ? 'bg-blue-100 text-blue-700' :
+                            'bg-red-100 text-red-700'
+                          }`}>
+                            {saque.status}
+                          </span>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          {saque.status === 'pendente' && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleViewDetails(saque);
+                                }}
+                                className="text-blue-600 hover:bg-blue-50"
+                              >
+                                <Eye size={18} />
+                              </Button>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedSaque(saque);
+                                  setShowRejectModal(true);
+                                }}
+                                className="text-red-600 hover:bg-red-50"
+                              >
+                                <ThumbsDown size={18} />
+                              </Button>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleApprove(saque.id);
+                                }}
+                                disabled={actionLoading === saque.id}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                {actionLoading === saque.id ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <ThumbsUp size={16} />
+                                )}
+                              </Button>
+                            </>
+                          )}
+
+                          {saque.status === 'aprovado' && (
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleProcess(saque.id);
+                              }}
+                              disabled={actionLoading === saque.id}
+                              className="bg-blue-600 hover:bg-blue-700 text-white"
                             >
-                              <Eye size={18} />
+                              {actionLoading === saque.id ? (
+                                <Loader2 size={16} className="animate-spin mr-1" />
+                              ) : (
+                                <Send size={16} className="mr-1" />
+                              )}
+                              Processar
                             </Button>
                           )}
-                          <Button variant="ghost" size="icon" className="text-gray-400">
-                            <FileText size={18} />
-                          </Button>
                         </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </CardContent>
-        </Card>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))
+          ) : (
+            <Card className="border-dashed border-2 bg-transparent">
+              <CardContent className="py-12 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+                  <Wallet size={32} />
+                </div>
+                <h3 className="font-bold text-gray-700 mb-2">Nenhum saque encontrado</h3>
+                <p className="text-sm text-gray-500">
+                  {searchTerm 
+                    ? 'Tente ajustar seus filtros ou termos de busca.'
+                    : 'Nenhum saque solicitado até o momento.'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
       </div>
+
+      {/* ======================================== */}
+      {/* MODAL DE DETALHES */}
+      {/* ======================================== */}
+      <Modal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} title="Detalhes do Saque" size="lg">
+        {selectedSaque && (
+          <div className="space-y-6">
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between pb-4 border-b">
+              <div>
+                <h3 className="font-bold text-primary">{selectedSaque.prestadorNome}</h3>
+                <p className="text-sm text-gray-500">Solicitado em {formatDate(selectedSaque.dataSolicitacao)}</p>
+              </div>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                selectedSaque.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
+                selectedSaque.status === 'aprovado' ? 'bg-green-100 text-green-700' :
+                selectedSaque.status === 'processado' ? 'bg-blue-100 text-blue-700' :
+                'bg-red-100 text-red-700'
+              }`}>
+                {selectedSaque.status === 'pendente' ? 'Pendente' :
+                 selectedSaque.status === 'aprovado' ? 'Aprovado' :
+                 selectedSaque.status === 'processado' ? 'Processado' : 'Rejeitado'}
+              </span>
+            </div>
+
+            {/* Valor */}
+            <div className="bg-gray-50 rounded-xl p-4">
+              <p className="text-sm text-gray-500 mb-1">Valor do Saque</p>
+              <p className="text-3xl font-black text-primary">{formatCurrency(selectedSaque.valor)}</p>
+            </div>
+
+            {/* Dados do Prestador */}
+            <div>
+              <h4 className="font-bold text-primary mb-3">Dados do Prestador</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">Email</p>
+                  <p className="font-bold text-primary">{selectedSaque.prestadorEmail || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Telefone</p>
+                  <p className="font-bold text-primary">{selectedSaque.prestadorTelefone || 'N/A'}</p>
+                </div>
+              </div>
+            </div>
+
+            {/* Dados Bancários */}
+            <div>
+              <h4 className="font-bold text-primary mb-3">Dados Bancários</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">Banco</p>
+                  <p className="font-bold text-primary">{selectedSaque.dadosBancarios?.banco || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Conta</p>
+                  <p className="font-bold text-primary">{selectedSaque.dadosBancarios?.conta || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Titular</p>
+                  <p className="font-bold text-primary">{selectedSaque.dadosBancarios?.titular || 'N/A'}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">NIB</p>
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-primary">{selectedSaque.dadosBancarios?.nib || 'N/A'}</p>
+                    {selectedSaque.dadosBancarios?.nib && (
+                      <button
+                        onClick={() => handleCopyToClipboard(selectedSaque.dadosBancarios!.nib!, 'NIB')}
+                        className="text-gray-400 hover:text-accent"
+                      >
+                        {copiado === 'NIB' ? <Check size={14} /> : <Copy size={14} />}
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Observação (se rejeitado) */}
+            {selectedSaque.observacao && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <p className="text-xs text-red-500 mb-1">Motivo da rejeição</p>
+                <p className="text-sm text-red-700">{selectedSaque.observacao}</p>
+              </div>
+            )}
+
+            {/* Datas de processamento */}
+            {selectedSaque.dataProcessamento && (
+              <div className="bg-gray-50 rounded-xl p-4">
+                <p className="text-xs text-gray-500 mb-1">Processado em</p>
+                <p className="font-bold text-primary">{formatDate(selectedSaque.dataProcessamento)}</p>
+                {selectedSaque.processadoPor && (
+                  <p className="text-xs text-gray-400 mt-1">Por: {selectedSaque.processadoPor}</p>
+                )}
+              </div>
+            )}
+
+            {/* Ações */}
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowDetailsModal(false)}
+                className="flex-1"
+              >
+                Fechar
+              </Button>
+              
+              {selectedSaque.status === 'pendente' && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      setSelectedSaque(selectedSaque);
+                      setShowRejectModal(true);
+                    }}
+                    className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    Rejeitar
+                  </Button>
+                  <Button
+                    onClick={() => handleApprove(selectedSaque.id)}
+                    disabled={actionLoading === selectedSaque.id}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {actionLoading === selectedSaque.id ? 'Processando...' : 'Aprovar'}
+                  </Button>
+                </>
+              )}
+
+              {selectedSaque.status === 'aprovado' && (
+                <Button
+                  onClick={() => handleProcess(selectedSaque.id)}
+                  disabled={actionLoading === selectedSaque.id}
+                  className="flex-1 bg-blue-600 hover:bg-blue-700 text-white"
+                >
+                  {actionLoading === selectedSaque.id ? 'Processando...' : 'Marcar como Processado'}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL DE REJEIÇÃO */}
+      {/* ======================================== */}
+      <Modal isOpen={showRejectModal} onClose={() => setShowRejectModal(false)} title="Rejeitar Saque">
+        <div className="space-y-6">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-sm text-red-700">
+              Tem certeza que deseja rejeitar o saque de <span className="font-bold">{selectedSaque ? formatCurrency(selectedSaque.valor) : ''}</span>?
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Motivo da rejeição (opcional)
+            </label>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Ex: Dados bancários incorretos, saldo insuficiente..."
+              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none min-h-[100px]"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowRejectModal(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleReject}
+              disabled={actionLoading === selectedSaque?.id}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            >
+              {actionLoading === selectedSaque?.id ? 'Processando...' : 'Rejeitar Saque'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </AppLayout>
   );
 }
