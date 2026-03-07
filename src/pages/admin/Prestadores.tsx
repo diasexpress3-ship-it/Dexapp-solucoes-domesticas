@@ -38,7 +38,18 @@ import {
   ThumbsDown,
   Loader2,
   Copy,
-  Check
+  Check,
+  UserCog,
+  UserPlus,
+  UserMinus,
+  Briefcase,
+  Wallet,
+  MapPin,
+  DollarSign,
+  Percent,
+  Upload,
+  Download as DownloadIcon,
+  EyeOff
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -46,7 +57,7 @@ import { collection, query, onSnapshot, orderBy, doc, updateDoc, deleteDoc, wher
 import { db } from '../../services/firebase';
 import { formatCurrency, formatDate, exportToCSV } from '../../utils/utils';
 import { motion } from 'framer-motion';
-import { SERVICE_CATEGORIES, getEspecialidadeNome } from '../../constants/categories';
+import { SERVICE_CATEGORIES, getEspecialidadeNome, getCategoriaNome } from '../../constants/categories';
 
 // ============================================
 // INTERFACES
@@ -60,6 +71,8 @@ interface Prestador {
   status: 'activo' | 'inactivo' | 'pendente' | 'pendente_documentos' | 'rejeitado';
   dataCadastro: Date;
   ultimoAcesso?: Date;
+  
+  // Dados profissionais
   especialidade: string;
   categoria: string;
   descricao: string;
@@ -67,12 +80,24 @@ interface Prestador {
   endereco: string;
   cidade: string;
   valorHora: number;
+  
+  // Avaliações
   avaliacaoMedia: number;
   totalAvaliacoes: number;
+  
+  // Documentos
   documentos: {
-    bi?: { nome: string; tipo: string; dataUpload: Date };
-    declaracaoBairro?: { nome: string; tipo: string; dataUpload: Date };
+    bi?: { nome: string; tipo: string; dataUpload: Date; url?: string };
+    declaracaoBairro?: { nome: string; tipo: string; dataUpload: Date; url?: string };
   };
+  
+  // Financeiro
+  saldo?: number;
+  totalGanho?: number;
+  totalServicos?: number;
+  servicosConcluidos?: number;
+  
+  // Histórico
   dataAprovacao?: Date;
   aprovadoPor?: string;
   dataRejeicao?: Date;
@@ -87,6 +112,8 @@ interface PrestadorStats {
   documentosPendentes: number;
   rejeitados: number;
   inactivos: number;
+  totalGanhos: number;
+  mediaAvaliacao: number;
 }
 
 // ============================================
@@ -106,6 +133,8 @@ export default function Prestadores() {
   const [selectedPrestador, setSelectedPrestador] = useState<Prestador | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showRejectModal, setShowRejectModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [rejectReason, setRejectReason] = useState('');
   const [copiado, setCopiado] = useState<string | null>(null);
   
@@ -115,7 +144,9 @@ export default function Prestadores() {
     pendentes: 0,
     documentosPendentes: 0,
     rejeitados: 0,
-    inactivos: 0
+    inactivos: 0,
+    totalGanhos: 0,
+    mediaAvaliacao: 0
   });
 
   const handleLogout = async () => {
@@ -166,6 +197,9 @@ export default function Prestadores() {
       const documentosPendentes = docs.filter(p => p.status === 'pendente_documentos').length;
       const rejeitados = docs.filter(p => p.status === 'rejeitado').length;
       const inactivos = docs.filter(p => p.status === 'inactivo').length;
+      
+      const totalGanhos = docs.reduce((acc, p) => acc + (p.totalGanho || 0), 0);
+      const mediaAvaliacao = docs.reduce((acc, p) => acc + (p.avaliacaoMedia || 0), 0) / (docs.length || 1);
 
       setStats({
         total: docs.length,
@@ -173,7 +207,9 @@ export default function Prestadores() {
         pendentes,
         documentosPendentes,
         rejeitados,
-        inactivos
+        inactivos,
+        totalGanhos,
+        mediaAvaliacao
       });
 
       filterPrestadores(filterStatus, docs);
@@ -204,7 +240,7 @@ export default function Prestadores() {
         p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.telefone.includes(searchTerm) ||
-        p.especialidade.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        getEspecialidadeNome(p.especialidade).toLowerCase().includes(searchTerm.toLowerCase()) ||
         p.cidade.toLowerCase().includes(searchTerm.toLowerCase())
       );
     }
@@ -223,6 +259,11 @@ export default function Prestadores() {
   const handleViewDetails = (prestador: Prestador) => {
     setSelectedPrestador(prestador);
     setShowDetailsModal(true);
+  };
+
+  const handleViewDocuments = (prestador: Prestador) => {
+    setSelectedPrestador(prestador);
+    setShowDocumentModal(true);
   };
 
   const handleApprove = async (id: string) => {
@@ -267,6 +308,24 @@ export default function Prestadores() {
     }
   };
 
+  const handleToggleStatus = async (id: string, currentStatus: string) => {
+    const newStatus = currentStatus === 'activo' ? 'inactivo' : 'activo';
+    if (!window.confirm(`Tem certeza que deseja ${newStatus === 'activo' ? 'ativar' : 'desativar'} este prestador?`)) return;
+    
+    setActionLoading(id);
+    try {
+      await updateDoc(doc(db, 'users', id), {
+        status: newStatus
+      });
+      showToast(`Prestador ${newStatus === 'activo' ? 'ativado' : 'desativado'} com sucesso!`, 'success');
+    } catch (error) {
+      console.error('Erro ao alterar status:', error);
+      showToast('Erro ao alterar status', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   const handleDelete = async (id: string) => {
     if (!window.confirm('Tem certeza que deseja excluir permanentemente este prestador?')) return;
     
@@ -295,12 +354,14 @@ export default function Prestadores() {
       Email: p.email,
       Telefone: p.telefone,
       Especialidade: getEspecialidadeNome(p.especialidade),
-      Categoria: p.categoria,
+      Categoria: getCategoriaNome(p.categoria),
       Cidade: p.cidade,
       Status: p.status,
       Avaliacao: p.avaliacaoMedia.toFixed(1),
       'Total Avaliações': p.totalAvaliacoes,
       'Valor Hora': formatCurrency(p.valorHora),
+      'Total Ganho': formatCurrency(p.totalGanho || 0),
+      'Serviços Concluídos': p.servicosConcluidos || 0,
       'Data Cadastro': formatDate(p.dataCadastro),
       'Documentos': p.documentos?.bi && p.documentos?.declaracaoBairro ? 'Completos' : 'Incompletos'
     }));
@@ -333,9 +394,16 @@ export default function Prestadores() {
     }
   };
 
-  // ============================================
-  // RENDER
-  // ============================================
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[60vh]">
+          <Loader2 size={40} className="animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
@@ -353,10 +421,10 @@ export default function Prestadores() {
             </button>
             <div>
               <h1 className="text-3xl font-black text-primary flex items-center gap-3">
-                <Users size={32} className="text-accent" />
+                <Wrench size={32} className="text-accent" />
                 Gestão de Prestadores
               </h1>
-              <p className="text-gray-500">Gerencie os prestadores da plataforma.</p>
+              <p className="text-gray-500">Gerencie todos os prestadores da plataforma.</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
@@ -400,7 +468,7 @@ export default function Prestadores() {
         {/* ======================================== */}
         {/* STATS CARDS */}
         {/* ======================================== */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-7 gap-4 mb-8">
           <Card className="bg-primary text-white">
             <CardContent className="p-4">
               <p className="text-xs font-bold opacity-60 uppercase">Total</p>
@@ -424,7 +492,7 @@ export default function Prestadores() {
 
           <Card className="bg-orange-600 text-white">
             <CardContent className="p-4">
-              <p className="text-xs font-bold opacity-60 uppercase">Docs Pendentes</p>
+              <p className="text-xs font-bold opacity-60 uppercase">Docs Pend</p>
               <h3 className="text-2xl font-black">{stats.documentosPendentes}</h3>
             </CardContent>
           </Card>
@@ -442,6 +510,13 @@ export default function Prestadores() {
               <h3 className="text-2xl font-black">{stats.inactivos}</h3>
             </CardContent>
           </Card>
+
+          <Card className="bg-accent text-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold opacity-60 uppercase">Total Ganho</p>
+              <h3 className="text-2xl font-black">{formatCurrency(stats.totalGanhos)}</h3>
+            </CardContent>
+          </Card>
         </div>
 
         {/* ======================================== */}
@@ -452,7 +527,7 @@ export default function Prestadores() {
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <Input
-                  placeholder="Pesquisar por nome, email, telefone, especialidade..."
+                  placeholder="Pesquisar por nome, email, telefone, especialidade, cidade..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   leftIcon={<Search size={18} />}
@@ -498,6 +573,14 @@ export default function Prestadores() {
                 >
                   Rejeitados
                 </Button>
+                <Button
+                  variant={filterStatus === 'inactivo' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('inactivo')}
+                  className="border-gray-200 text-gray-700 hover:bg-gray-50"
+                >
+                  Inativos
+                </Button>
               </div>
             </div>
           </CardContent>
@@ -535,7 +618,7 @@ export default function Prestadores() {
                               {getStatusIcon(prestador.status)}
                               {prestador.status === 'activo' ? 'Ativo' :
                                prestador.status === 'pendente' ? 'Pendente' :
-                               prestador.status === 'pendente_documentos' ? 'Docs Pendentes' :
+                               prestador.status === 'pendente_documentos' ? 'Docs Pend' :
                                prestador.status === 'rejeitado' ? 'Rejeitado' : 'Inativo'}
                             </span>
                           </div>
@@ -559,83 +642,147 @@ export default function Prestadores() {
                               <span className="text-xs font-bold text-primary">{prestador.avaliacaoMedia.toFixed(1)}</span>
                               <span className="text-xs text-gray-400">({prestador.totalAvaliacoes})</span>
                             </div>
+                            <span className="text-xs text-gray-400">
+                              {prestador.cidade}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2 text-xs">
+                            <DollarSign size={12} className="text-accent" />
+                            <span className="font-bold text-accent">{formatCurrency(prestador.valorHora)}/hora</span>
+                            {prestador.totalGanho ? (
+                              <>
+                                <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                                <span className="text-gray-600">Total: {formatCurrency(prestador.totalGanho)}</span>
+                              </>
+                            ) : null}
+                          </div>
+                          <div className="flex items-center gap-2 mt-1 text-xs">
+                            <FileText size={12} className="text-gray-400" />
+                            <span className={prestador.documentos?.bi ? 'text-green-600' : 'text-red-600'}>
+                              {prestador.documentos?.bi ? 'BI ✓' : 'BI ✗'}
+                            </span>
+                            <span className={prestador.documentos?.declaracaoBairro ? 'text-green-600' : 'text-red-600'}>
+                              {prestador.documentos?.declaracaoBairro ? 'Declaração ✓' : 'Declaração ✗'}
+                            </span>
                           </div>
                         </div>
                       </div>
 
-                      <div className="flex items-center gap-4">
-                        <div className="text-right">
-                          <p className="text-sm font-bold text-primary">{formatCurrency(prestador.valorHora)}/hora</p>
-                          <p className="text-xs text-gray-500">{prestador.cidade}</p>
-                        </div>
+                      <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewDetails(prestador);
+                          }}
+                          className="text-blue-600 hover:bg-blue-50"
+                        >
+                          <Eye size={18} />
+                        </Button>
                         
-                        <div className="flex items-center gap-2">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleViewDocuments(prestador);
+                          }}
+                          className="text-purple-600 hover:bg-purple-50"
+                        >
+                          <FileText size={18} />
+                        </Button>
+
+                        {(prestador.status === 'pendente' || prestador.status === 'pendente_documentos') && (
+                          <>
+                            <Button
+                              variant="outline"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setSelectedPrestador(prestador);
+                                setShowRejectModal(true);
+                              }}
+                              className="text-red-600 hover:bg-red-50"
+                            >
+                              <ThumbsDown size={18} />
+                            </Button>
+                            <Button
+                              variant="primary"
+                              size="sm"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleApprove(prestador.id);
+                              }}
+                              disabled={actionLoading === prestador.id}
+                              className="bg-green-600 hover:bg-green-700 text-white"
+                            >
+                              {actionLoading === prestador.id ? (
+                                <Loader2 size={16} className="animate-spin" />
+                              ) : (
+                                <ThumbsUp size={16} />
+                              )}
+                            </Button>
+                          </>
+                        )}
+
+                        {prestador.status === 'activo' && (
                           <Button
                             variant="ghost"
                             size="icon"
                             onClick={(e) => {
                               e.stopPropagation();
-                              handleViewDetails(prestador);
+                              handleToggleStatus(prestador.id, prestador.status);
                             }}
-                            className="text-blue-600 hover:bg-blue-50"
+                            disabled={actionLoading === prestador.id}
+                            className="text-orange-600 hover:bg-orange-50"
                           >
-                            <Eye size={18} />
+                            {actionLoading === prestador.id ? (
+                              <Loader2 size={18} className="animate-spin" />
+                            ) : (
+                              <UserMinus size={18} />
+                            )}
                           </Button>
-                          
-                          {(prestador.status === 'pendente' || prestador.status === 'pendente_documentos') && (
-                            <>
-                              <Button
-                                variant="outline"
-                                size="icon"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  setSelectedPrestador(prestador);
-                                  setShowRejectModal(true);
-                                }}
-                                className="text-red-600 hover:bg-red-50"
-                              >
-                                <ThumbsDown size={18} />
-                              </Button>
-                              <Button
-                                variant="primary"
-                                size="sm"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  handleApprove(prestador.id);
-                                }}
-                                disabled={actionLoading === prestador.id}
-                                className="bg-green-600 hover:bg-green-700 text-white"
-                              >
-                                {actionLoading === prestador.id ? (
-                                  <Loader2 size={16} className="animate-spin" />
-                                ) : (
-                                  <ThumbsUp size={16} />
-                                )}
-                              </Button>
-                            </>
-                          )}
+                        )}
 
-                          {prestador.status === 'rejeitado' && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                if (window.confirm('Tem certeza que deseja excluir permanentemente este prestador?')) {
-                                  handleDelete(prestador.id);
-                                }
-                              }}
-                              disabled={actionLoading === prestador.id}
-                              className="text-red-600 hover:bg-red-50"
-                            >
-                              {actionLoading === prestador.id ? (
-                                <Loader2 size={18} className="animate-spin" />
-                              ) : (
-                                <Trash2 size={18} />
-                              )}
-                            </Button>
-                          )}
-                        </div>
+                        {prestador.status === 'inactivo' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleToggleStatus(prestador.id, prestador.status);
+                            }}
+                            disabled={actionLoading === prestador.id}
+                            className="text-green-600 hover:bg-green-50"
+                          >
+                            {actionLoading === prestador.id ? (
+                              <Loader2 size={18} className="animate-spin" />
+                            ) : (
+                              <UserPlus size={18} />
+                            )}
+                          </Button>
+                        )}
+
+                        {prestador.status === 'rejeitado' && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedPrestador(prestador);
+                              setShowDeleteModal(true);
+                            }}
+                            disabled={actionLoading === prestador.id}
+                            className="text-red-600 hover:bg-red-50"
+                          >
+                            {actionLoading === prestador.id ? (
+                              <Loader2 size={18} className="animate-spin" />
+                            ) : (
+                              <Trash2 size={18} />
+                            )}
+                          </Button>
+                        )}
                       </div>
                     </div>
                   </CardContent>
@@ -646,7 +793,7 @@ export default function Prestadores() {
             <Card className="border-dashed border-2 bg-transparent">
               <CardContent className="py-12 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
-                  <Users size={32} />
+                  <Wrench size={32} />
                 </div>
                 <h3 className="font-bold text-gray-700 mb-2">Nenhum prestador encontrado</h3>
                 <p className="text-sm text-gray-500">
@@ -718,7 +865,7 @@ export default function Prestadores() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <p className="text-xs text-gray-500">Categoria</p>
-                  <p className="font-bold text-primary">{selectedPrestador.categoria}</p>
+                  <p className="font-bold text-primary">{getCategoriaNome(selectedPrestador.categoria)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-500">Especialidade</p>
@@ -741,194 +888,7 @@ export default function Prestadores() {
               </div>
             </div>
 
-            {/* Avaliação */}
-            <div className="bg-gray-50 rounded-xl p-4">
-              <div className="flex items-center justify-between">
-                <span className="text-sm text-gray-600">Avaliação Média</span>
-                <div className="flex items-center gap-2">
-                  <div className="flex items-center gap-1 text-yellow-500">
-                    {[1,2,3,4,5].map((star) => (
-                      <Star key={star} size={16} fill={star <= Math.round(selectedPrestador.avaliacaoMedia) ? 'currentColor' : 'none'} />
-                    ))}
-                  </div>
-                  <span className="font-bold text-primary">{selectedPrestador.avaliacaoMedia.toFixed(1)}</span>
-                  <span className="text-xs text-gray-400">({selectedPrestador.totalAvaliacoes} avaliações)</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Documentos */}
-            <div>
-              <h4 className="font-bold text-primary mb-3">Documentos</h4>
-              <div className="grid grid-cols-2 gap-4">
-                <div className="border-2 border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <IdCard size={18} className="text-gray-500" />
-                      <span className="font-bold text-primary">BI</span>
-                    </div>
-                    {selectedPrestador.documentos?.bi ? (
-                      <span className="text-xs text-green-600 flex items-center gap-1">
-                        <CheckCircle2 size={14} />
-                        Carregado
-                      </span>
-                    ) : (
-                      <span className="text-xs text-red-600 flex items-center gap-1">
-                        <XCircle size={14} />
-                        Faltando
-                      </span>
-                    )}
-                  </div>
-                  {selectedPrestador.documentos?.bi && (
-                    <p className="text-xs text-gray-400 mt-2">
-                      {selectedPrestador.documentos.bi.nome} • {formatDate(selectedPrestador.documentos.bi.dataUpload)}
-                    </p>
-                  )}
-                </div>
-
-                <div className="border-2 border-gray-200 rounded-xl p-4">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                      <FileText size={18} className="text-gray-500" />
-                      <span className="font-bold text-primary">Declaração do Bairro</span>
-                    </div>
-                    {selectedPrestador.documentos?.declaracaoBairro ? (
-                      <span className="text-xs text-green-600 flex items-center gap-1">
-                        <CheckCircle2 size={14} />
-                        Carregado
-                      </span>
-                    ) : (
-                      <span className="text-xs text-red-600 flex items-center gap-1">
-                        <XCircle size={14} />
-                        Faltando
-                      </span>
-                    )}
-                  </div>
-                  {selectedPrestador.documentos?.declaracaoBairro && (
-                    <p className="text-xs text-gray-400 mt-2">
-                      {selectedPrestador.documentos.declaracaoBairro.nome} • {formatDate(selectedPrestador.documentos.declaracaoBairro.dataUpload)}
-                    </p>
-                  )}
-                </div>
-              </div>
-            </div>
-
-            {/* Histórico */}
-            {selectedPrestador.dataAprovacao && (
-              <div className="bg-green-50 rounded-xl p-4">
-                <p className="text-xs text-green-600 mb-1">Aprovado em</p>
-                <p className="font-bold text-green-700">{formatDate(selectedPrestador.dataAprovacao)}</p>
-                {selectedPrestador.aprovadoPor && (
-                  <p className="text-xs text-green-600 mt-1">Por: {selectedPrestador.aprovadoPor}</p>
-                )}
-              </div>
-            )}
-
-            {selectedPrestador.dataRejeicao && (
-              <div className="bg-red-50 rounded-xl p-4">
-                <p className="text-xs text-red-600 mb-1">Rejeitado em</p>
-                <p className="font-bold text-red-700">{formatDate(selectedPrestador.dataRejeicao)}</p>
-                {selectedPrestador.rejeitadoPor && (
-                  <p className="text-xs text-red-600 mt-1">Por: {selectedPrestador.rejeitadoPor}</p>
-                )}
-                {selectedPrestador.observacao && (
-                  <p className="text-sm text-red-700 mt-2">{selectedPrestador.observacao}</p>
-                )}
-              </div>
-            )}
-
-            {/* Ações */}
-            <div className="flex gap-3 pt-4 border-t">
-              <Button
-                variant="outline"
-                onClick={() => setShowDetailsModal(false)}
-                className="flex-1"
-              >
-                Fechar
-              </Button>
-              
-              {(selectedPrestador.status === 'pendente' || selectedPrestador.status === 'pendente_documentos') && (
-                <>
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setShowDetailsModal(false);
-                      setShowRejectModal(true);
-                    }}
-                    className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
-                  >
-                    Rejeitar
-                  </Button>
-                  <Button
-                    onClick={() => handleApprove(selectedPrestador.id)}
-                    disabled={actionLoading === selectedPrestador.id}
-                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
-                  >
-                    {actionLoading === selectedPrestador.id ? 'Processando...' : 'Aprovar'}
-                  </Button>
-                </>
-              )}
-
-              {selectedPrestador.status === 'rejeitado' && (
-                <Button
-                  onClick={() => {
-                    if (window.confirm('Tem certeza que deseja excluir permanentemente este prestador?')) {
-                      handleDelete(selectedPrestador.id);
-                      setShowDetailsModal(false);
-                    }
-                  }}
-                  disabled={actionLoading === selectedPrestador.id}
-                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-                >
-                  {actionLoading === selectedPrestador.id ? 'Processando...' : 'Excluir Permanentemente'}
-                </Button>
-              )}
-            </div>
-          </div>
-        )}
-      </Modal>
-
-      {/* ======================================== */}
-      {/* MODAL DE REJEIÇÃO */}
-      {/* ======================================== */}
-      <Modal isOpen={showRejectModal} onClose={() => setShowRejectModal(false)} title="Rejeitar Prestador">
-        <div className="space-y-6">
-          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-            <p className="text-sm text-red-700">
-              Tem certeza que deseja rejeitar o prestador <span className="font-bold">{selectedPrestador?.nome}</span>?
-            </p>
-          </div>
-
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-2">
-              Motivo da rejeição (opcional)
-            </label>
-            <textarea
-              value={rejectReason}
-              onChange={(e) => setRejectReason(e.target.value)}
-              placeholder="Ex: Documentos inválidos, informações inconsistentes..."
-              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none min-h-[100px]"
-            />
-          </div>
-
-          <div className="flex gap-3">
-            <Button
-              variant="outline"
-              onClick={() => setShowRejectModal(false)}
-              className="flex-1"
-            >
-              Cancelar
-            </Button>
-            <Button
-              onClick={handleReject}
-              disabled={actionLoading === selectedPrestador?.id}
-              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
-            >
-              {actionLoading === selectedPrestador?.id ? 'Processando...' : 'Rejeitar Prestador'}
-            </Button>
-          </div>
-        </div>
-      </Modal>
-    </AppLayout>
-  );
-}
+            {/* Financeiro */}
+            <div className="grid grid-cols-3 gap-4">
+              <div className="bg-green-50 p-4 rounded-xl">
+               
