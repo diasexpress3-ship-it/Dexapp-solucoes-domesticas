@@ -29,7 +29,11 @@ import {
   Clock,
   MessageCircle,
   IdCard,
-  Home
+  Home,
+  Smartphone,
+  Eye,
+  EyeOff,
+  Info
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -53,8 +57,8 @@ interface PrestadorForm {
   cidade: string;
   valorHora: number;
   documentos: {
-    bi: File | null;           // Bilhete de Identidade (obrigatório)
-    declaracaoBairro: File | null; // Declaração do Bairro (obrigatório)
+    bi: File | null;           // Bilhete de Identidade (opcional)
+    declaracaoBairro: File | null; // Declaração do Bairro (opcional)
   };
 }
 
@@ -84,7 +88,7 @@ const DOCUMENTOS_REQUERIDOS: DocumentoRequerido[] = [
     label: 'Bilhete de Identidade',
     descricao: 'Frente e verso do seu BI (PDF ou imagem)',
     aceitos: 'PDF, JPG, PNG (max 5MB)',
-    obrigatorio: true,
+    obrigatorio: false, // AGORA É OPCIONAL
     icon: IdCard
   },
   {
@@ -92,7 +96,7 @@ const DOCUMENTOS_REQUERIDOS: DocumentoRequerido[] = [
     label: 'Declaração do Bairro',
     descricao: 'Comprovativo de residência emitido pelo bairro',
     aceitos: 'PDF, JPG, PNG (max 5MB)',
-    obrigatorio: true,
+    obrigatorio: false, // AGORA É OPCIONAL
     icon: Home
   }
 ];
@@ -112,6 +116,10 @@ export default function RegisterPrestador() {
   const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>('');
   const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
   const [uploadedFiles, setUploadedFiles] = useState<Record<string, FileWithPreview>>({});
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const [errors, setErrors] = useState<Record<string, string>>({});
+  const [documentosAlert, setDocumentosAlert] = useState(false);
   
   const [form, setForm] = useState<PrestadorForm>({
     nome: '',
@@ -138,6 +146,9 @@ export default function RegisterPrestador() {
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
+    if (errors[name]) {
+      setErrors(prev => ({ ...prev, [name]: '' }));
+    }
   };
 
   const handleCategoriaSelect = (categoriaId: string) => {
@@ -149,6 +160,9 @@ export default function RegisterPrestador() {
 
   const handleEspecialidadeSelect = (especialidadeId: string) => {
     setForm(prev => ({ ...prev, especialidade: especialidadeId }));
+    if (errors.especialidade) {
+      setErrors(prev => ({ ...prev, especialidade: '' }));
+    }
   };
 
   // ============================================
@@ -197,6 +211,11 @@ export default function RegisterPrestador() {
     }));
 
     showToast(`${DOCUMENTOS_REQUERIDOS.find(d => d.id === tipo)?.label} carregado!`, 'success');
+    
+    // Verificar se ainda faltam documentos
+    const temBi = !!uploadedFiles['bi'] || tipo === 'bi';
+    const temDeclaracao = !!uploadedFiles['declaracaoBairro'] || tipo === 'declaracaoBairro';
+    setDocumentosAlert(!temBi || !temDeclaracao);
   };
 
   const handleRemoveFile = (tipo: keyof PrestadorForm['documentos']) => {
@@ -217,93 +236,111 @@ export default function RegisterPrestador() {
         [tipo]: null
       }
     }));
+
+    // Atualizar alerta
+    const temBi = tipo !== 'bi' ? !!uploadedFiles['bi'] : false;
+    const temDeclaracao = tipo !== 'declaracaoBairro' ? !!uploadedFiles['declaracaoBairro'] : false;
+    setDocumentosAlert(!temBi || !temDeclaracao);
   };
 
   // ============================================
   // VALIDAÇÕES
   // ============================================
   const validateStep1 = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
+    // Nome é obrigatório
     if (!form.nome.trim()) {
-      showToast('Nome é obrigatório', 'error');
-      return false;
+      newErrors.nome = 'Nome é obrigatório';
     }
-    if (!form.email.trim()) {
-      showToast('Email é obrigatório', 'error');
-      return false;
-    }
-    if (!form.email.includes('@')) {
-      showToast('Email inválido', 'error');
-      return false;
-    }
+    
+    // Telefone é obrigatório
     if (!form.telefone.trim()) {
-      showToast('Telefone é obrigatório', 'error');
-      return false;
+      newErrors.telefone = 'Telefone é obrigatório';
+    } else {
+      const telefoneLimpo = form.telefone.replace(/\D/g, '');
+      if (telefoneLimpo.length < 9) {
+        newErrors.telefone = 'Telefone deve ter 9 dígitos';
+      } else if (telefoneLimpo.length > 9) {
+        newErrors.telefone = 'Telefone deve ter apenas 9 dígitos';
+      }
     }
-    if (form.telefone.replace(/\D/g, '').length < 9) {
-      showToast('Telefone deve ter 9 dígitos', 'error');
-      return false;
+    
+    // Email é opcional, mas se preenchido deve ser válido
+    if (form.email && !form.email.includes('@')) {
+      newErrors.email = 'Email inválido';
     }
+    
+    // Senha é obrigatória
     if (!form.password) {
-      showToast('Senha é obrigatória', 'error');
-      return false;
+      newErrors.password = 'Senha é obrigatória';
+    } else if (form.password.length < 6) {
+      newErrors.password = 'Senha deve ter pelo menos 6 caracteres';
     }
-    if (form.password.length < 6) {
-      showToast('Senha deve ter pelo menos 6 caracteres', 'error');
-      return false;
-    }
+    
+    // Confirmar senha deve coincidir
     if (form.password !== form.confirmPassword) {
-      showToast('Senhas não coincidem', 'error');
-      return false;
+      newErrors.confirmPassword = 'Senhas não coincidem';
     }
-    return true;
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   const validateStep2 = (): boolean => {
+    const newErrors: Record<string, string> = {};
+    
     if (!form.categoria) {
-      showToast('Selecione uma categoria', 'error');
-      return false;
+      newErrors.categoria = 'Selecione uma categoria';
     }
     if (!form.especialidade) {
-      showToast('Selecione uma especialidade', 'error');
-      return false;
+      newErrors.especialidade = 'Selecione uma especialidade';
     }
     if (!form.descricao.trim() || form.descricao.length < 20) {
-      showToast('Descreva sua experiência (mínimo 20 caracteres)', 'error');
-      return false;
+      newErrors.descricao = 'Descreva sua experiência (mínimo 20 caracteres)';
     }
     if (!form.experiencia) {
-      showToast('Informe seus anos de experiência', 'error');
-      return false;
+      newErrors.experiencia = 'Informe seus anos de experiência';
     }
     if (!form.endereco.trim()) {
-      showToast('Endereço é obrigatório', 'error');
-      return false;
+      newErrors.endereco = 'Endereço é obrigatório';
     }
-    return true;
-  };
-
-  const validateStep3 = (): boolean => {
-    const documentosObrigatorios = DOCUMENTOS_REQUERIDOS.filter(d => d.obrigatorio);
-    const faltando = documentosObrigatorios.filter(d => !uploadedFiles[d.id]);
-
-    if (faltando.length > 0) {
-      showToast('Carregue todos os documentos obrigatórios', 'error');
-      return false;
-    }
-    return true;
+    
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
   };
 
   // ============================================
   // SUBMISSÃO
   // ============================================
   const handleSubmit = async () => {
+    if (step === 1) {
+      if (validateStep1()) {
+        setStep(2);
+      }
+      return;
+    }
+
+    if (step === 2) {
+      if (validateStep2()) {
+        setStep(3);
+      }
+      return;
+    }
+
+    // PASSO 3: Documentos (opcionais) - pode prosseguir mesmo sem documentos
     setLoading(true);
 
     try {
-      // Preparar dados para registro
+      // Verificar quais documentos foram carregados para o alerta
+      const temBi = !!uploadedFiles['bi'];
+      const temDeclaracao = !!uploadedFiles['declaracaoBairro'];
+      const documentosPendentes = !temBi || !temDeclaracao;
+      
+      // Se email não foi preenchido, usar o telefone como identificador
       const userData = {
         nome: form.nome,
-        email: form.email,
+        email: form.email || `${form.telefone.replace(/\D/g, '')}@prestador.dexapp.co.mz`,
         telefone: form.telefone,
         password: form.password,
         profile: 'prestador',
@@ -314,7 +351,8 @@ export default function RegisterPrestador() {
         endereco: form.endereco,
         cidade: form.cidade,
         valorHora: form.valorHora,
-        status: 'pendente', // Prestador começa como pendente
+        status: documentosPendentes ? 'pendente_documentos' : 'pendente',
+        documentosAlert: documentosPendentes,
         documentos: Object.keys(uploadedFiles).reduce((acc, key) => {
           acc[key] = {
             nome: uploadedFiles[key].name,
@@ -328,7 +366,6 @@ export default function RegisterPrestador() {
       const result = await register(userData);
 
       if (result.success) {
-        // Avançar para passo de confirmação
         setStep(4);
       } else {
         showToast(result.error || 'Erro ao criar conta', 'error');
@@ -353,7 +390,7 @@ export default function RegisterPrestador() {
           {/* ======================================== */}
           <div className="text-center mb-8">
             <Link to="/" className="inline-block mb-4">
-              <div className="w-16 h-16 bg-gradient-to-br from-accent to-orange-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl mx-auto">
+              <div className="w-16 h-16 bg-gradient-to-br from-accent to-orange-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl mx-auto shadow-xl hover:scale-105 transition-transform">
                 D
               </div>
             </Link>
@@ -377,14 +414,14 @@ export default function RegisterPrestador() {
             ].map((i) => (
               <React.Fragment key={i.num}>
                 <div className="flex items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
                     step >= i.num 
                       ? 'bg-accent text-white' 
                       : step === i.num - 1 ? 'bg-accent/20 text-accent' : 'bg-gray-200 text-gray-400'
                   }`}>
-                    {step > i.num ? <CheckCircle2 size={20} /> : i.num}
+                    {step > i.num ? <CheckCircle2 size={16} /> : i.num}
                   </div>
-                  <span className={`ml-2 text-sm font-bold hidden md:block ${
+                  <span className={`ml-2 text-xs font-bold hidden md:block ${
                     step >= i.num ? 'text-accent' : 'text-gray-400'
                   }`}>
                     {i.label}
@@ -415,22 +452,53 @@ export default function RegisterPrestador() {
                   </h2>
 
                   <div className="space-y-4">
+                    {/* Nome (obrigatório) */}
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Nome Completo *
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Nome Completo <span className="text-accent">*</span>
                       </label>
                       <Input
                         name="nome"
                         value={form.nome}
                         onChange={handleInputChange}
                         placeholder="Seu nome completo"
-                        leftIcon={<User size={18} />}
+                        className={errors.nome ? 'border-red-500' : ''}
+                        leftIcon={<User size={16} />}
                       />
+                      {errors.nome && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle size={10} />
+                          {errors.nome}
+                        </p>
+                      )}
                     </div>
 
+                    {/* Telefone (obrigatório) */}
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Email *
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Telefone <span className="text-accent">*</span>
+                      </label>
+                      <Input
+                        name="telefone"
+                        value={form.telefone}
+                        onChange={handleInputChange}
+                        placeholder="84 123 4567"
+                        className={errors.telefone ? 'border-red-500' : ''}
+                        leftIcon={<Smartphone size={16} />}
+                      />
+                      {errors.telefone && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle size={10} />
+                          {errors.telefone}
+                        </p>
+                      )}
+                      <p className="text-xs text-gray-400 mt-1">Digite os 9 dígitos do seu número</p>
+                    </div>
+
+                    {/* Email (opcional) */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Email <span className="text-gray-400 font-normal">(opcional)</span>
                       </label>
                       <Input
                         name="email"
@@ -438,59 +506,94 @@ export default function RegisterPrestador() {
                         value={form.email}
                         onChange={handleInputChange}
                         placeholder="seu@email.com"
-                        leftIcon={<Mail size={18} />}
+                        className={errors.email ? 'border-red-500' : ''}
+                        leftIcon={<Mail size={16} />}
                       />
+                      {errors.email && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle size={10} />
+                          {errors.email}
+                        </p>
+                      )}
                     </div>
 
+                    {/* Senha (obrigatória) */}
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Telefone *
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Senha <span className="text-accent">*</span>
                       </label>
-                      <Input
-                        name="telefone"
-                        value={form.telefone}
-                        onChange={handleInputChange}
-                        placeholder="84 123 4567"
-                        leftIcon={<Phone size={18} />}
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                          Senha *
-                        </label>
+                      <div className="relative">
                         <Input
                           name="password"
-                          type="password"
+                          type={showPassword ? 'text' : 'password'}
                           value={form.password}
                           onChange={handleInputChange}
                           placeholder="••••••"
-                          leftIcon={<Lock size={18} />}
+                          className={`pl-10 ${errors.password ? 'border-red-500' : ''}`}
+                          leftIcon={<Lock size={16} />}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword(!showPassword)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
                       </div>
+                      {errors.password && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle size={10} />
+                          {errors.password}
+                        </p>
+                      )}
+                    </div>
 
-                      <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                          Confirmar Senha *
-                        </label>
+                    {/* Confirmar Senha (obrigatória) */}
+                    <div>
+                      <label className="block text-xs font-bold text-gray-700 mb-1">
+                        Confirmar Senha <span className="text-accent">*</span>
+                      </label>
+                      <div className="relative">
                         <Input
                           name="confirmPassword"
-                          type="password"
+                          type={showConfirmPassword ? 'text' : 'password'}
                           value={form.confirmPassword}
                           onChange={handleInputChange}
                           placeholder="••••••"
-                          leftIcon={<Lock size={18} />}
+                          className={`pl-10 ${errors.confirmPassword ? 'border-red-500' : ''}`}
+                          leftIcon={<Lock size={16} />}
                         />
+                        <button
+                          type="button"
+                          onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                          className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                        >
+                          {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        </button>
                       </div>
+                      {errors.confirmPassword && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle size={10} />
+                          {errors.confirmPassword}
+                        </p>
+                      )}
+                    </div>
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 mt-2">
+                      <p className="text-xs text-blue-700 flex items-start gap-2">
+                        <Info size={14} className="shrink-0 mt-0.5" />
+                        <span>
+                          <span className="font-bold">Email é opcional.</span> Se não fornecer, usaremos seu telefone para comunicações.
+                        </span>
+                      </p>
                     </div>
                   </div>
 
-                  <div className="flex justify-end mt-8">
+                  <div className="flex justify-end mt-6">
                     <Button
-                      onClick={() => setStep(2)}
-                      className="bg-accent hover:bg-accent/90 text-white"
-                      rightIcon={<ArrowRight size={18} />}
+                      onClick={() => handleSubmit()}
+                      className="bg-accent hover:bg-accent/90 text-white py-2.5 text-sm px-6"
+                      rightIcon={<ArrowRight size={16} />}
                     >
                       Continuar
                     </Button>
@@ -514,21 +617,21 @@ export default function RegisterPrestador() {
                   <div className="space-y-6">
                     {/* Categoria */}
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Categoria de Serviço *
+                      <label className="block text-xs font-bold text-gray-700 mb-2">
+                        Categoria de Serviço <span className="text-accent">*</span>
                       </label>
                       <div className="relative">
                         <button
                           type="button"
                           onClick={() => setShowCategorias(!showCategorias)}
-                          className="w-full p-3 text-left border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none flex items-center justify-between"
+                          className="w-full p-3 text-left border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none flex items-center justify-between text-sm"
                         >
                           <span className={form.categoria ? 'text-primary font-bold' : 'text-gray-400'}>
                             {form.categoria 
                               ? SERVICE_CATEGORIES.find(c => c.id === form.categoria)?.nome 
                               : 'Selecione sua categoria'}
                           </span>
-                          {showCategorias ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                          {showCategorias ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
                         </button>
 
                         <AnimatePresence>
@@ -543,7 +646,7 @@ export default function RegisterPrestador() {
                                 <button
                                   key={cat.id}
                                   onClick={() => handleCategoriaSelect(cat.id)}
-                                  className={`w-full p-3 text-left hover:bg-gray-50 transition-colors ${
+                                  className={`w-full p-3 text-left hover:bg-gray-50 transition-colors text-sm ${
                                     form.categoria === cat.id ? 'bg-accent/5 border-l-4 border-accent' : ''
                                   }`}
                                 >
@@ -554,20 +657,26 @@ export default function RegisterPrestador() {
                           )}
                         </AnimatePresence>
                       </div>
+                      {errors.categoria && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle size={10} />
+                          {errors.categoria}
+                        </p>
+                      )}
                     </div>
 
                     {/* Especialidade */}
                     {categoriaSelecionada && (
                       <div>
-                        <label className="block text-sm font-bold text-gray-700 mb-2">
-                          Especialidade *
+                        <label className="block text-xs font-bold text-gray-700 mb-2">
+                          Especialidade <span className="text-accent">*</span>
                         </label>
                         <div className="grid grid-cols-1 gap-2">
                           {especialidades.map((esp) => (
                             <button
                               key={esp.id}
                               onClick={() => handleEspecialidadeSelect(esp.id)}
-                              className={`p-3 border-2 rounded-xl text-left transition-all ${
+                              className={`p-3 border-2 rounded-xl text-left transition-all text-sm ${
                                 form.especialidade === esp.id
                                   ? 'border-accent bg-accent/5'
                                   : 'border-gray-200 hover:border-accent/50'
@@ -591,36 +700,52 @@ export default function RegisterPrestador() {
                             </button>
                           ))}
                         </div>
+                        {errors.especialidade && (
+                          <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                            <AlertCircle size={10} />
+                            {errors.especialidade}
+                          </p>
+                        )}
                       </div>
                     )}
 
                     {/* Descrição */}
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Sobre você e sua experiência *
+                      <label className="block text-xs font-bold text-gray-700 mb-2">
+                        Sobre você e sua experiência <span className="text-accent">*</span>
                       </label>
                       <textarea
                         name="descricao"
                         value={form.descricao}
                         onChange={handleInputChange}
                         placeholder="Descreva sua experiência, formação e serviços que oferece..."
-                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none min-h-[100px]"
+                        className={`w-full p-3 border-2 rounded-xl focus:border-accent focus:outline-none min-h-[100px] text-sm ${
+                          errors.descricao ? 'border-red-500' : 'border-gray-200'
+                        }`}
                       />
                       <p className="text-xs text-gray-400 mt-1">
                         {form.descricao.length} caracteres (mínimo 20)
                       </p>
+                      {errors.descricao && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle size={10} />
+                          {errors.descricao}
+                        </p>
+                      )}
                     </div>
 
                     {/* Anos de Experiência */}
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Anos de Experiência *
+                      <label className="block text-xs font-bold text-gray-700 mb-2">
+                        Anos de Experiência <span className="text-accent">*</span>
                       </label>
                       <select
                         name="experiencia"
                         value={form.experiencia}
                         onChange={handleInputChange}
-                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none"
+                        className={`w-full p-3 border-2 rounded-xl focus:border-accent focus:outline-none text-sm ${
+                          errors.experiencia ? 'border-red-500' : 'border-gray-200'
+                        }`}
                       >
                         <option value="">Selecione</option>
                         <option value="menos-1">Menos de 1 ano</option>
@@ -629,12 +754,18 @@ export default function RegisterPrestador() {
                         <option value="5-10">5 a 10 anos</option>
                         <option value="mais-10">Mais de 10 anos</option>
                       </select>
+                      {errors.experiencia && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle size={10} />
+                          {errors.experiencia}
+                        </p>
+                      )}
                     </div>
 
                     {/* Valor por Hora */}
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Valor por Hora (MT) *
+                      <label className="block text-xs font-bold text-gray-700 mb-2">
+                        Valor por Hora (MT) <span className="text-accent">*</span>
                       </label>
                       <Input
                         name="valorHora"
@@ -642,7 +773,8 @@ export default function RegisterPrestador() {
                         value={form.valorHora}
                         onChange={handleInputChange}
                         placeholder="500"
-                        leftIcon={<Briefcase size={18} />}
+                        leftIcon={<Briefcase size={16} />}
+                        className="text-sm"
                       />
                       <p className="text-xs text-gray-400 mt-1">
                         Defina seu valor por hora de trabalho
@@ -651,28 +783,35 @@ export default function RegisterPrestador() {
 
                     {/* Endereço */}
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Endereço *
+                      <label className="block text-xs font-bold text-gray-700 mb-2">
+                        Endereço <span className="text-accent">*</span>
                       </label>
                       <Input
                         name="endereco"
                         value={form.endereco}
                         onChange={handleInputChange}
                         placeholder="Bairro, Quarteirão, Casa"
-                        leftIcon={<MapPin size={18} />}
+                        leftIcon={<MapPin size={16} />}
+                        className={`text-sm ${errors.endereco ? 'border-red-500' : ''}`}
                       />
+                      {errors.endereco && (
+                        <p className="mt-1 text-xs text-red-600 flex items-center gap-1">
+                          <AlertCircle size={10} />
+                          {errors.endereco}
+                        </p>
+                      )}
                     </div>
 
                     {/* Cidade */}
                     <div>
-                      <label className="block text-sm font-bold text-gray-700 mb-2">
-                        Cidade *
+                      <label className="block text-xs font-bold text-gray-700 mb-2">
+                        Cidade <span className="text-accent">*</span>
                       </label>
                       <select
                         name="cidade"
                         value={form.cidade}
                         onChange={handleInputChange}
-                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none"
+                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none text-sm"
                       >
                         <option value="Maputo">Maputo</option>
                         <option value="Matola">Matola</option>
@@ -692,14 +831,15 @@ export default function RegisterPrestador() {
                     <Button
                       variant="outline"
                       onClick={() => setStep(1)}
-                      leftIcon={<ArrowLeft size={18} />}
+                      leftIcon={<ArrowLeft size={16} />}
+                      className="py-2.5 text-sm"
                     >
                       Voltar
                     </Button>
                     <Button
-                      onClick={() => setStep(3)}
-                      className="bg-accent hover:bg-accent/90 text-white"
-                      rightIcon={<ArrowRight size={18} />}
+                      onClick={() => handleSubmit()}
+                      className="bg-accent hover:bg-accent/90 text-white py-2.5 text-sm px-6"
+                      rightIcon={<ArrowRight size={16} />}
                     >
                       Continuar
                     </Button>
@@ -708,7 +848,7 @@ export default function RegisterPrestador() {
               )}
 
               {/* ======================================== */}
-              {/* PASSO 3: DOCUMENTOS (APENAS BI E DECLARAÇÃO DO BAIRRO) */}
+              {/* PASSO 3: DOCUMENTOS (OPCIONAIS) */}
               {/* ======================================== */}
               {step === 3 && (
                 <motion.div
@@ -717,7 +857,7 @@ export default function RegisterPrestador() {
                   exit={{ opacity: 0, x: -20 }}
                 >
                   <h2 className="text-2xl font-black text-primary mb-6">
-                    <span className="text-accent">Documentos</span> Obrigatórios
+                    <span className="text-accent">Documentos</span> (Opcionais)
                   </h2>
 
                   <div className="space-y-6">
@@ -733,9 +873,9 @@ export default function RegisterPrestador() {
                                 <Icon size={20} />
                               </div>
                               <div>
-                                <h3 className="font-bold text-primary">
+                                <h3 className="font-bold text-primary text-sm">
                                   {doc.label}
-                                  {doc.obrigatorio && <span className="text-accent ml-1">*</span>}
+                                  <span className="text-gray-400 font-normal ml-2">(opcional)</span>
                                 </h3>
                                 <p className="text-xs text-gray-500">{doc.descricao}</p>
                               </div>
@@ -756,7 +896,7 @@ export default function RegisterPrestador() {
                               />
                               <label
                                 htmlFor={`file-${doc.id}`}
-                                className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-xl hover:border-accent transition-colors cursor-pointer"
+                                className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-xl hover:border-accent transition-colors cursor-pointer text-sm"
                               >
                                 <Upload size={18} className="text-gray-400" />
                                 <span className="text-sm text-gray-600">Carregar {doc.label}</span>
@@ -790,16 +930,35 @@ export default function RegisterPrestador() {
                       );
                     })}
 
+                    {/* Alerta de documentos pendentes */}
+                    {(!uploadedFiles['bi'] || !uploadedFiles['declaracaoBairro']) && (
+                      <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle size={20} className="text-yellow-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="text-sm font-bold text-yellow-700 mb-1">
+                              Documentos pendentes
+                            </p>
+                            <p className="text-xs text-yellow-600">
+                              Pode prosseguir sem os documentos, mas seu perfil ficará com status 
+                              <span className="font-bold"> "pendente_documentos"</span> até que os envie.
+                              A central entrará em contato para regularizar.
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
                       <div className="flex items-start gap-3">
-                        <AlertCircle size={20} className="text-blue-600 shrink-0 mt-0.5" />
+                        <Info size={20} className="text-blue-600 shrink-0 mt-0.5" />
                         <div>
                           <p className="text-sm font-bold text-blue-700 mb-1">
-                            Apenas estes documentos são necessários
+                            Documentos são opcionais no registro
                           </p>
                           <p className="text-xs text-blue-600">
-                            Bilhete de Identidade e Declaração do Bairro são suficientes para 
-                            validar seu cadastro. Seus dados estão protegidos.
+                            Pode completar seu cadastro agora e enviar os documentos depois.
+                            Recomendamos enviar para agilizar a aprovação do seu perfil.
                           </p>
                         </div>
                       </div>
@@ -810,27 +969,18 @@ export default function RegisterPrestador() {
                     <Button
                       variant="outline"
                       onClick={() => setStep(2)}
-                      leftIcon={<ArrowLeft size={18} />}
+                      leftIcon={<ArrowLeft size={16} />}
+                      className="py-2.5 text-sm"
                     >
                       Voltar
                     </Button>
                     <Button
-                      onClick={() => {
-                        if (validateStep3()) {
-                          handleSubmit();
-                        }
-                      }}
+                      onClick={handleSubmit}
                       disabled={loading}
-                      className="bg-accent hover:bg-accent/90 text-white min-w-[150px]"
+                      className="bg-accent hover:bg-accent/90 text-white py-2.5 text-sm px-6"
+                      rightIcon={loading ? <Loader2 className="animate-spin" size={16} /> : <CheckCircle2 size={16} />}
                     >
-                      {loading ? (
-                        <>
-                          <Loader2 className="animate-spin mr-2" size={18} />
-                          Registrando...
-                        </>
-                      ) : (
-                        'Finalizar Registro'
-                      )}
+                      {loading ? 'Registrando...' : 'Finalizar Registro'}
                     </Button>
                   </div>
                 </motion.div>
@@ -854,9 +1004,27 @@ export default function RegisterPrestador() {
                   </h2>
 
                   <p className="text-gray-600 mb-8 max-w-md mx-auto">
-                    Seu cadastro foi recebido e está em análise pela nossa central.
-                    Você receberá uma notificação em até 48 horas.
+                    Seu cadastro foi recebido com sucesso!
                   </p>
+
+                  {(!uploadedFiles['bi'] || !uploadedFiles['declaracaoBairro']) && (
+                    <Card className="bg-yellow-50 border-yellow-200 mb-8 text-left">
+                      <CardContent className="p-6">
+                        <div className="flex items-start gap-3">
+                          <AlertCircle size={20} className="text-yellow-600 shrink-0 mt-0.5" />
+                          <div>
+                            <p className="font-bold text-yellow-700 mb-2">
+                              Atenção: Documentos pendentes
+                            </p>
+                            <p className="text-sm text-yellow-600 mb-3">
+                              Seu perfil está com status <span className="font-bold">"pendente_documentos"</span>.
+                              Para ativação completa, envie os documentos através do seu dashboard ou entre em contato com a central.
+                            </p>
+                          </div>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  )}
 
                   <Card className="bg-gray-50 border-none mb-8 text-left">
                     <CardContent className="p-6">
@@ -866,21 +1034,25 @@ export default function RegisterPrestador() {
                           <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-sm shrink-0 mt-0.5">1</div>
                           <div>
                             <p className="font-bold text-primary">Análise de Documentos</p>
-                            <p className="text-xs text-gray-500">Nossa equipa verificará seus documentos.</p>
+                            <p className="text-xs text-gray-500">
+                              {uploadedFiles['bi'] && uploadedFiles['declaracaoBairro'] 
+                                ? 'Documentos recebidos, aguardando verificação.' 
+                                : 'Envie seus documentos para agilizar a aprovação.'}
+                            </p>
                           </div>
                         </li>
                         <li className="flex items-start gap-3">
                           <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-sm shrink-0 mt-0.5">2</div>
                           <div>
-                            <p className="font-bold text-primary">Entrevista (se necessário)</p>
-                            <p className="text-xs text-gray-500">Podemos entrar em contato para uma breve entrevista.</p>
+                            <p className="font-bold text-primary">Verificação de Antecedentes</p>
+                            <p className="text-xs text-gray-500">Nossa equipa verificará suas informações.</p>
                           </div>
                         </li>
                         <li className="flex items-start gap-3">
                           <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-sm shrink-0 mt-0.5">3</div>
                           <div>
                             <p className="font-bold text-primary">Ativação do Perfil</p>
-                            <p className="text-xs text-gray-500">Após aprovação, seu perfil estará ativo no marketplace.</p>
+                            <p className="text-xs text-gray-500">Após aprovação, seu perfil estará ativo.</p>
                           </div>
                         </li>
                       </ul>
