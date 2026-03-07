@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
@@ -26,7 +27,12 @@ import {
   Edit,
   Trash2,
   Award,
-  Wrench
+  Wrench,
+  Home,
+  LogOut,
+  Filter,
+  ChevronDown,
+  ChevronUp
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -36,12 +42,13 @@ interface PrestadorStats {
   totalGanhos: number;
   servicosConcluidos: number;
   servicosEmAndamento: number;
+  servicosPendentes: number;
   avaliacaoMedia: number;
   totalAvaliacoes: number;
 }
 
 export default function PrestadorDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [filteredSolicitacoes, setFilteredSolicitacoes] = useState<Solicitacao[]>([]);
@@ -53,7 +60,8 @@ export default function PrestadorDashboard() {
     totalGanhos: 0,
     servicosConcluidos: 0,
     servicosEmAndamento: 0,
-    avaliacaoMedia: 4.8,
+    servicosPendentes: 0,
+    avaliacaoMedia: 0,
     totalAvaliacoes: 0
   });
 
@@ -72,14 +80,22 @@ export default function PrestadorDashboard() {
       
       // Calcular estatísticas
       const concluidos = docs.filter(s => s.status === 'concluido');
+      const emAndamento = docs.filter(s => ['prestador_atribuido', 'em_andamento'].includes(s.status));
+      const pendentes = docs.filter(s => s.status === 'buscando_prestador');
+      
       const totalGanhos = concluidos.reduce((acc, curr) => acc + (curr.valor80 || 0), 0);
+      
+      // Calcular média de avaliações (simulado)
+      const totalAvaliacoes = user?.totalAvaliacoes || 0;
+      const avaliacaoMedia = user?.avaliacaoMedia || 4.8;
       
       setStats({
         totalGanhos,
         servicosConcluidos: concluidos.length,
-        servicosEmAndamento: docs.filter(s => ['prestador_atribuido', 'em_andamento'].includes(s.status)).length,
-        avaliacaoMedia: user?.avaliacaoMedia || 4.8,
-        totalAvaliacoes: user?.totalAvaliacoes || 0
+        servicosEmAndamento: emAndamento.length,
+        servicosPendentes: pendentes.length,
+        avaliacaoMedia,
+        totalAvaliacoes
       });
       
       filterSolicitacoes(filterStatus, docs);
@@ -101,6 +117,16 @@ export default function PrestadorDashboard() {
   const handleStatusChange = (status: string) => {
     setFilterStatus(status);
     filterSolicitacoes(status);
+  };
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+      showToast('Logout efetuado com sucesso!', 'success');
+    } catch (error) {
+      showToast('Erro ao fazer logout', 'error');
+    }
   };
 
   // ============================================
@@ -240,15 +266,15 @@ export default function PrestadorDashboard() {
             <ul className="text-sm text-left space-y-3 text-gray-600">
               <li className="flex items-start gap-3">
                 <CheckCircle size={18} className="text-green-500 shrink-0" />
-                <span>Análise de documentos e antecedentes.</span>
+                <span>Análise de documentos.</span>
               </li>
               <li className="flex items-start gap-3">
                 <CheckCircle size={18} className="text-green-500 shrink-0" />
-                <span>Entrevista técnica (se necessário).</span>
+                <span>Verificação de antecedentes.</span>
               </li>
               <li className="flex items-start gap-3">
                 <Clock size={18} className="text-yellow-500 shrink-0" />
-                <span>Ativação do perfil no marketplace.</span>
+                <span>Ativação do perfil (até 48h).</span>
               </li>
             </ul>
           </div>
@@ -293,10 +319,28 @@ export default function PrestadorDashboard() {
             <Button
               variant="outline"
               size="sm"
-              onClick={() => window.location.reload()}
-              leftIcon={<RefreshCw size={16} />}
+              onClick={() => navigate('/')}
+              leftIcon={<Home size={16} />}
+              className="border-gray-300 text-gray-600 hover:bg-gray-50"
             >
-              Atualizar
+              Início
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              leftIcon={<LogOut size={16} />}
+              className="border-rose-200 text-rose-600 hover:bg-rose-50"
+            >
+              Sair
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => window.location.reload()}
+              title="Atualizar"
+            >
+              <RefreshCw size={18} />
             </Button>
           </div>
         </div>
@@ -321,7 +365,7 @@ export default function PrestadorDashboard() {
               <div className="flex items-center justify-between mb-2">
                 <Award size={24} className="text-blue-600" />
               </div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Serviços Concluídos</p>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Concluídos</p>
               <h3 className="text-2xl font-black text-primary">{stats.servicosConcluidos}</h3>
             </CardContent>
           </Card>
@@ -339,10 +383,10 @@ export default function PrestadorDashboard() {
           <Card className="border-none shadow-md hover:shadow-lg transition-all">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
-                <Star size={24} className="text-yellow-500" />
+                <AlertCircle size={24} className="text-yellow-600" />
               </div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Avaliação</p>
-              <h3 className="text-2xl font-black text-primary">{stats.avaliacaoMedia.toFixed(1)}</h3>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Disponíveis</p>
+              <h3 className="text-2xl font-black text-primary">{stats.servicosPendentes}</h3>
             </CardContent>
           </Card>
         </div>
@@ -362,6 +406,7 @@ export default function PrestadorDashboard() {
             variant={filterStatus === 'buscando_prestador' ? 'primary' : 'outline'}
             size="sm"
             onClick={() => handleStatusChange('buscando_prestador')}
+            className="border-yellow-200 text-yellow-700 hover:bg-yellow-50"
           >
             Disponíveis
           </Button>
@@ -369,6 +414,7 @@ export default function PrestadorDashboard() {
             variant={filterStatus === 'prestador_atribuido' ? 'primary' : 'outline'}
             size="sm"
             onClick={() => handleStatusChange('prestador_atribuido')}
+            className="border-blue-200 text-blue-700 hover:bg-blue-50"
           >
             Aceitas
           </Button>
@@ -376,6 +422,7 @@ export default function PrestadorDashboard() {
             variant={filterStatus === 'em_andamento' ? 'primary' : 'outline'}
             size="sm"
             onClick={() => handleStatusChange('em_andamento')}
+            className="border-indigo-200 text-indigo-700 hover:bg-indigo-50"
           >
             Em Andamento
           </Button>
@@ -383,6 +430,7 @@ export default function PrestadorDashboard() {
             variant={filterStatus === 'concluido' ? 'primary' : 'outline'}
             size="sm"
             onClick={() => handleStatusChange('concluido')}
+            className="border-green-200 text-green-700 hover:bg-green-50"
           >
             Concluídas
           </Button>
@@ -390,6 +438,7 @@ export default function PrestadorDashboard() {
             variant={filterStatus === 'cancelado' ? 'primary' : 'outline'}
             size="sm"
             onClick={() => handleStatusChange('cancelado')}
+            className="border-red-200 text-red-700 hover:bg-red-50"
           >
             Canceladas
           </Button>
@@ -446,6 +495,18 @@ export default function PrestadorDashboard() {
                           {sol.descricao && (
                             <p className="text-sm text-gray-500">{sol.descricao}</p>
                           )}
+                          {sol.tamanho && (
+                            <div className="mt-2 flex items-center gap-2">
+                              <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                sol.tamanho === 'pequeno' ? 'bg-green-100 text-green-700' :
+                                sol.tamanho === 'medio' ? 'bg-yellow-100 text-yellow-700' :
+                                'bg-red-100 text-red-700'
+                              }`}>
+                                {sol.tamanho === 'pequeno' ? 'Pequeno' : 
+                                 sol.tamanho === 'medio' ? 'Médio' : 'Grande'}
+                              </span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -499,7 +560,7 @@ export default function PrestadorDashboard() {
                                 disabled={actionLoading === sol.id}
                                 className="bg-accent hover:bg-accent/90"
                               >
-                                {actionLoading === sol.id ? 'Processando...' : 'Aceitar'}
+                                {actionLoading === sol.id ? '...' : 'Aceitar'}
                               </Button>
                             </>
                           )}
@@ -544,7 +605,7 @@ export default function PrestadorDashboard() {
                               disabled={actionLoading === sol.id}
                               className="bg-green-600 hover:bg-green-700"
                             >
-                              {actionLoading === sol.id ? 'Processando...' : 'Concluir'}
+                              {actionLoading === sol.id ? '...' : 'Concluir'}
                             </Button>
                           )}
 
