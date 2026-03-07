@@ -1,346 +1,214 @@
 import React, { useState } from 'react';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { SERVICE_CATEGORIES, ESPECIALIDADES_POR_CATEGORIA, getSpecialtiesByCategory } from '../../constants/categories';
+import { SERVICE_CATEGORIES, getSpecialtiesByCategory, ESPECIALIDADES_POR_CATEGORIA } from '../../constants/categories';
 import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
 import { 
   Search, 
-  ArrowRight, 
+  MapPin, 
   Star, 
-  ShieldCheck, 
-  Clock,
-  ChevronDown,
-  ChevronUp,
-  MapPin,
-  Users,
-  Briefcase,
-  Sparkles,
+  Clock, 
+  ChevronRight,
   Filter,
-  X
+  Wrench,
+  Users,
+  Zap,
+  Droplets,
+  Hammer,
+  Building2,
+  Flower2,
+  Paintbrush,
+  Brush
 } from 'lucide-react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { useToast } from '../../contexts/ToastContext';
+import { Link } from 'react-router-dom';
+import { motion } from 'framer-motion';
+
+// Mapeamento de ícones por categoria
+const getIcon = (iconName: string) => {
+  const icons: Record<string, any> = {
+    Brush,
+    Users,
+    Zap,
+    Droplets,
+    Hammer,
+    Building2,
+    Flower2,
+    Paintbrush,
+    Wrench
+  };
+  return icons[iconName] || Wrench;
+};
 
 export default function Services() {
   const [searchTerm, setSearchTerm] = useState('');
-  const [expandedCategory, setExpandedCategory] = useState<string | null>(null);
-  const [selectedFilter, setSelectedFilter] = useState<string>('todos');
-  const [showMobileFilter, setShowMobileFilter] = useState(false);
-  const navigate = useNavigate();
-  const { showToast } = useToast();
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
+  const [selectedEspecialidade, setSelectedEspecialidade] = useState<string | null>(null);
 
-  const filters = [
-    { id: 'todos', label: 'Todos os Serviços', icon: Sparkles },
-    { id: 'populares', label: 'Mais Populares', icon: Star },
-    { id: 'recomendados', label: 'Recomendados', icon: ShieldCheck },
-    { id: 'rapidos', label: 'Atendimento Rápido', icon: Clock }
-  ];
+  // Filtrar categorias baseado na busca
+  const filteredCategories = SERVICE_CATEGORIES.filter(cat =>
+    cat.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+    cat.especialidades.some(esp => esp.nome.toLowerCase().includes(searchTerm.toLowerCase()))
+  );
 
-  const filteredCategories = SERVICE_CATEGORIES.filter(cat => {
-    const matchesSearch = cat.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      getSpecialtiesByCategory(cat.name).some(s => 
-        s.name.toLowerCase().includes(searchTerm.toLowerCase())
-      );
-    
-    if (selectedFilter === 'todos') return matchesSearch;
-    if (selectedFilter === 'populares') return cat.popular && matchesSearch;
-    return matchesSearch;
-  });
+  const handleCategoryClick = (categoryId: string) => {
+    setSelectedCategory(categoryId === selectedCategory ? null : categoryId);
+    setSelectedEspecialidade(null);
+  };
 
-  const handleSolicitar = (categoryName: string, specialtyName?: string) => {
-    showToast(`Redirecionando para solicitação`, 'info');
-    navigate('/register-cliente', { 
-      state: { 
-        categoria: categoryName,
-        especialidade: specialtyName 
-      } 
-    });
+  const handleEspecialidadeClick = (especialidadeId: string) => {
+    setSelectedEspecialidade(especialidadeId);
+    // Aqui você pode navegar para a página de busca com a especialidade selecionada
+    console.log('Especialidade selecionada:', especialidadeId);
   };
 
   return (
     <AppLayout>
-      {/* Header Section com efeito de vidro */}
-      <section className="relative bg-gradient-to-br from-primary via-primary to-blue-900 pt-32 pb-40 text-white overflow-hidden">
-        <div className="absolute inset-0">
-          <div className="absolute top-20 left-10 w-64 h-64 bg-accent/20 rounded-full blur-3xl animate-pulse"></div>
-          <div className="absolute bottom-20 right-10 w-80 h-80 bg-blue-400/20 rounded-full blur-3xl animate-pulse delay-1000"></div>
+      <div className="container mx-auto px-4 py-8">
+        {/* Header */}
+        <div className="text-center mb-12">
+          <h1 className="text-4xl md:text-5xl font-black text-primary mb-4">
+            Nossos <span className="text-accent">Serviços</span>
+          </h1>
+          <p className="text-gray-500 max-w-2xl mx-auto">
+            Encontre o profissional ideal para qualquer necessidade doméstica.
+          </p>
         </div>
-        
-        <div className="container mx-auto px-4 relative z-10">
-          <motion.div 
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="text-center max-w-4xl mx-auto"
-          >
-            <motion.div
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
-              transition={{ delay: 0.2 }}
-              className="inline-block py-2 px-6 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-sm font-black uppercase tracking-widest mb-8"
-            >
-              ✦ Nossos Serviços ✦
-            </motion.div>
 
-            <h1 className="text-5xl md:text-6xl font-black mb-6 leading-tight">
-              Encontre o <span className="text-accent">Profissional</span>
-              <br />Perfeito para Você
-            </h1>
-            
-            <p className="text-xl opacity-90 mb-10 max-w-2xl mx-auto">
-              Mais de 15 categorias e 200 especialidades à sua disposição. Qualidade e segurança em cada serviço.
-            </p>
-
-            {/* Barra de Pesquisa Moderna */}
-            <div className="max-w-2xl mx-auto relative group">
-              <div className="absolute inset-0 bg-gradient-to-r from-accent to-orange-600 rounded-2xl opacity-0 group-hover:opacity-30 transition-opacity blur-lg"></div>
-              <div className="relative flex items-center bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl overflow-hidden">
-                <Search className="absolute left-6 text-white/60" size={24} />
-                <input
-                  type="text"
-                  placeholder="O que você está procurando hoje?"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full bg-transparent text-white placeholder-white/60 pl-16 pr-4 py-6 outline-none text-lg"
-                />
-                {searchTerm && (
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="absolute right-6 text-white/60 hover:text-white transition-colors"
-                  >
-                    <X size={20} />
-                  </button>
-                )}
-              </div>
-            </div>
-          </motion.div>
-        </div>
-      </section>
-
-      {/* Filtros Rápidos */}
-      <section className="bg-white border-b border-gray-100 sticky top-24 z-30 backdrop-blur-md bg-white/80">
-        <div className="container mx-auto px-4 py-4">
-          <div className="flex items-center gap-4 overflow-x-auto pb-2 scrollbar-hide">
-            {filters.map((filter) => (
-              <button
-                key={filter.id}
-                onClick={() => setSelectedFilter(filter.id)}
-                className={`flex items-center gap-2 px-6 py-3 rounded-xl font-bold text-sm whitespace-nowrap transition-all ${
-                  selectedFilter === filter.id
-                    ? 'bg-accent text-white shadow-lg shadow-accent/30'
-                    : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
-              >
-                <filter.icon size={16} />
-                {filter.label}
-              </button>
-            ))}
+        {/* Busca */}
+        <div className="max-w-2xl mx-auto mb-12">
+          <div className="relative">
+            <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            <Input
+              placeholder="Buscar serviços ou especialidades..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-12 py-6 text-lg rounded-2xl border-2 border-gray-200 focus:border-accent"
+            />
           </div>
         </div>
-      </section>
 
-      {/* Grid de Categorias - Estilo imagem anexada */}
-      <section className="py-16 bg-gray-50">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {filteredCategories.map((cat, i) => {
-              const specialties = getSpecialtiesByCategory(cat.name);
-              const isExpanded = expandedCategory === cat.id;
-              const specialtyCount = specialties.length;
-              
-              return (
-                <motion.div
-                  key={cat.id}
-                  initial={{ opacity: 0, y: 20 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: i * 0.05 }}
-                >
-                  <Card className="border-none shadow-lg hover:shadow-2xl transition-all duration-300 overflow-hidden group">
-                    {/* Cabeçalho da Categoria - Estilo imagem */}
-                    <div 
-                      className={`relative cursor-pointer overflow-hidden ${
-                        isExpanded ? 'bg-gradient-to-br from-primary/5 to-accent/5' : ''
-                      }`}
-                      onClick={() => setExpandedCategory(isExpanded ? null : cat.id)}
+        {/* Lista de Categorias */}
+        <div className="space-y-6">
+          {filteredCategories.map((categoria) => {
+            const IconComponent = getIcon(categoria.icon);
+            const isSelected = selectedCategory === categoria.id;
+
+            return (
+              <motion.div
+                key={categoria.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.3 }}
+              >
+                <Card className="overflow-hidden hover:shadow-xl transition-all">
+                  <CardContent className="p-0">
+                    {/* Cabeçalho da Categoria (clicável) */}
+                    <button
+                      onClick={() => handleCategoryClick(categoria.id)}
+                      className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition-colors"
                     >
-                      {/* Gradiente de fundo */}
-                      <div className={`absolute inset-0 bg-gradient-to-br ${cat.color} opacity-0 group-hover:opacity-5 transition-opacity duration-500`} />
-                      
-                      <div className="relative p-8">
-                        <div className="flex items-start gap-5">
-                          {/* Ícone com efeito 3D */}
-                          <div className={`w-20 h-20 rounded-2xl bg-gradient-to-br ${cat.color} flex items-center justify-center text-white shadow-xl transform group-hover:scale-110 group-hover:rotate-3 transition-all duration-300`}>
-                            <cat.icon size={36} />
-                          </div>
-
-                          <div className="flex-1">
-                            <div className="flex items-start justify-between">
-                              <h3 className="text-2xl font-black text-primary group-hover:text-accent transition-colors">
-                                {cat.name}
-                              </h3>
-                              <div className="flex items-center gap-2">
-                                <span className="text-sm font-bold text-gray-400 bg-gray-100 px-3 py-1 rounded-full">
-                                  {specialtyCount} {specialtyCount === 1 ? 'serviço' : 'serviços'}
-                                </span>
-                                {isExpanded ? (
-                                  <ChevronUp className="text-accent" size={24} />
-                                ) : (
-                                  <ChevronDown className="text-accent" size={24} />
-                                )}
-                              </div>
-                            </div>
-
-                            {/* Informações Rápidas - Visíveis mesmo fechado */}
-                            {!isExpanded && (
-                              <div className="flex items-center gap-6 mt-4">
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                                  <span className="font-bold text-gray-600">4.8/5.0</span>
-                                </div>
-                                <div className="flex items-center gap-2 text-sm">
-                                  <Users className="w-4 h-4 text-accent" />
-                                  <span className="font-bold text-gray-600">850+ profissionais</span>
-                                </div>
-                              </div>
-                            )}
-                          </div>
+                      <div className="flex items-center gap-4">
+                        <div className={`w-16 h-16 rounded-2xl bg-gradient-to-br ${categoria.color} flex items-center justify-center text-white shadow-lg`}>
+                          <IconComponent size={32} />
+                        </div>
+                        <div className="text-left">
+                          <h2 className="text-2xl font-black text-primary mb-1">
+                            {categoria.nome}
+                          </h2>
+                          <p className="text-sm text-gray-500">
+                            {categoria.especialidades.length} especialidades disponíveis
+                          </p>
                         </div>
                       </div>
-                    </div>
+                      <ChevronRight
+                        size={24}
+                        className={`text-gray-400 transition-transform ${
+                          isSelected ? 'rotate-90' : ''
+                        }`}
+                      />
+                    </button>
 
-                    {/* Especialidades Expansíveis */}
-                    <AnimatePresence>
-                      {isExpanded && (
-                        <motion.div
-                          initial={{ height: 0, opacity: 0 }}
-                          animate={{ height: 'auto', opacity: 1 }}
-                          exit={{ height: 0, opacity: 0 }}
-                          transition={{ duration: 0.3 }}
-                          className="border-t border-gray-100"
-                        >
-                          <div className="p-8 bg-gradient-to-b from-gray-50/50 to-white">
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                              {specialties.map((specialty, idx) => (
-                                <motion.button
-                                  key={idx}
-                                  initial={{ opacity: 0, x: -10 }}
-                                  animate={{ opacity: 1, x: 0 }}
-                                  transition={{ delay: idx * 0.02 }}
-                                  onClick={() => handleSolicitar(cat.name, specialty.name)}
-                                  className="group relative p-4 bg-white rounded-xl border border-gray-100 hover:border-accent hover:shadow-lg transition-all text-left"
-                                >
-                                  <div className="flex items-start justify-between">
-                                    <div className="flex-1">
-                                      <div className="flex items-center gap-2 mb-2">
-                                        {specialty.icon && (
-                                          <specialty.icon size={16} className="text-accent" />
-                                        )}
-                                        <span className="font-bold text-primary group-hover:text-accent transition-colors">
-                                          {specialty.name}
-                                        </span>
-                                      </div>
-                                      
-                                      {specialty.description && (
-                                        <p className="text-xs text-gray-500 line-clamp-2">
-                                          {specialty.description}
-                                        </p>
-                                      )}
-                                      
-                                      <div className="flex items-center gap-4 mt-3 text-xs">
-                                        <span className="text-gray-400">
-                                          <Clock className="inline w-3 h-3 mr-1" />
-                                          {specialty.estimatedTime || '2-3h'}
-                                        </span>
-                                        {specialty.popular && (
-                                          <span className="px-2 py-0.5 bg-accent/10 text-accent rounded-full font-black text-[9px] uppercase">
-                                            Popular
-                                          </span>
-                                        )}
-                                      </div>
-                                    </div>
-                                    <ArrowRight 
-                                      size={16} 
-                                      className="text-gray-300 group-hover:text-accent group-hover:translate-x-1 transition-all" 
-                                    />
-                                  </div>
-                                </motion.button>
-                              ))}
-                            </div>
-
-                            {/* Ver Todos os Serviços */}
-                            <div className="mt-6 pt-4 border-t border-gray-200">
+                    {/* Especialidades (expansível) */}
+                    {isSelected && (
+                      <motion.div
+                        initial={{ opacity: 0, height: 0 }}
+                        animate={{ opacity: 1, height: 'auto' }}
+                        exit={{ opacity: 0, height: 0 }}
+                        className="border-t border-gray-100 bg-gray-50/50"
+                      >
+                        <div className="p-6">
+                          <h3 className="text-sm font-bold text-gray-400 uppercase mb-4">
+                            Especialidades disponíveis
+                          </h3>
+                          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {categoria.especialidades.map((esp) => (
                               <button
-                                onClick={() => handleSolicitar(cat.name)}
-                                className="w-full flex items-center justify-center gap-2 text-accent font-bold hover:gap-3 transition-all"
+                                key={esp.id}
+                                onClick={() => handleEspecialidadeClick(esp.id)}
+                                className={`p-4 rounded-xl text-left transition-all ${
+                                  selectedEspecialidade === esp.id
+                                    ? 'bg-accent text-white shadow-lg'
+                                    : 'bg-white hover:shadow-md border border-gray-200'
+                                }`}
                               >
-                                Ver todos os serviços de {cat.name.toLowerCase()}
-                                <ArrowRight size={16} />
+                                <h4 className={`font-bold mb-1 ${
+                                  selectedEspecialidade === esp.id ? 'text-white' : 'text-primary'
+                                }`}>
+                                  {esp.nome}
+                                </h4>
+                                <p className={`text-xs ${
+                                  selectedEspecialidade === esp.id ? 'text-white/80' : 'text-gray-500'
+                                }`}>
+                                  {esp.descricao}
+                                </p>
                               </button>
-                            </div>
+                            ))}
                           </div>
-                        </motion.div>
-                      )}
-                    </AnimatePresence>
-                  </Card>
-                </motion.div>
-              );
-            })}
-          </div>
+                        </div>
+                      </motion.div>
+                    )}
+                  </CardContent>
+                </Card>
+              </motion.div>
+            );
+          })}
 
-          {/* Mensagem de Nenhum Resultado */}
           {filteredCategories.length === 0 && (
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="text-center py-20"
-            >
-              <div className="w-24 h-24 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Search size={32} className="text-gray-400" />
-              </div>
-              <h3 className="text-2xl font-black text-primary mb-2">Nenhum serviço encontrado</h3>
-              <p className="text-gray-500 mb-6">Não encontramos resultados para "{searchTerm}"</p>
-              <button
-                onClick={() => {
-                  setSearchTerm('');
-                  setSelectedFilter('todos');
-                }}
-                className="text-accent font-bold hover:underline"
-              >
-                Limpar busca
-              </button>
-            </motion.div>
+            <Card className="bg-gray-50 border-2 border-dashed border-gray-300">
+              <CardContent className="py-12 text-center">
+                <Wrench size={48} className="mx-auto text-gray-400 mb-4" />
+                <h3 className="text-xl font-bold text-gray-600 mb-2">
+                  Nenhum serviço encontrado
+                </h3>
+                <p className="text-gray-500">
+                  Tente buscar com outros termos.
+                </p>
+              </CardContent>
+            </Card>
           )}
         </div>
-      </section>
 
-      {/* Seção de Confiança */}
-      <section className="py-16 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
-            {[
-              { icon: ShieldCheck, text: 'Profissionais Verificados', color: 'text-green-500' },
-              { icon: Clock, text: 'Atendimento Rápido', color: 'text-blue-500' },
-              { icon: Star, text: 'Qualidade Garantida', color: 'text-yellow-500' },
-              { icon: Users, text: '+5000 Clientes', color: 'text-purple-500' }
-            ].map((item, i) => (
-              <motion.div
-                key={i}
-                initial={{ opacity: 0, y: 20 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.1 }}
-                className="text-center"
+        {/* Call to Action */}
+        <Card className="mt-12 bg-gradient-to-br from-primary to-blue-900 text-white border-none">
+          <CardContent className="p-12 text-center">
+            <h2 className="text-3xl font-black mb-4">
+              Não encontrou o que procura?
+            </h2>
+            <p className="text-white/80 mb-8 max-w-2xl mx-auto">
+              Entre em contato conosco e faremos o possível para encontrar o profissional ideal para sua necessidade.
+            </p>
+            <Link to="/contacto">
+              <Button 
+                size="lg" 
+                className="bg-accent hover:bg-accent/90 text-white px-8 py-6 text-lg rounded-2xl"
               >
-                <div className={`inline-flex p-4 rounded-2xl bg-gray-50 ${item.color} mb-3`}>
-                  <item.icon size={24} />
-                </div>
-                <p className="text-sm font-bold text-primary">{item.text}</p>
-              </motion.div>
-            ))}
-          </div>
-        </div>
-      </section>
+                Fale Conosco
+              </Button>
+            </Link>
+          </CardContent>
+        </Card>
+      </div>
     </AppLayout>
   );
 }
