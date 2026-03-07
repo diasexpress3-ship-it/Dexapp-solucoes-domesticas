@@ -1,601 +1,1164 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { doc, onSnapshot, updateDoc, addDoc, collection, serverTimestamp } from 'firebase/firestore';
+import { useAuth } from '../../contexts/AuthContext';
+import { collection, query, where, onSnapshot, orderBy, doc, updateDoc, addDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { Solicitacao } from '../../types';
+import { Pagamento } from '../../types';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
-import { LoadingSpinner } from '../../components/ui/LoadingSpinner';
+import { Input } from '../../components/ui/Input';
 import { Modal } from '../../components/ui/Modal';
-import { translateStatus, formatCurrency, formatDate } from '../../utils/utils';
 import { 
-  MapPin, 
-  Calendar, 
-  Clock, 
-  User as UserIcon, 
-  MessageSquare, 
-  CheckCircle2, 
-  AlertCircle,
+  Wallet, 
+  ArrowUpRight, 
+  ArrowDownRight, 
+  Plus, 
+  History, 
   CreditCard,
-  Star,
-  Phone,
-  Mail,
-  Camera,
-  Image as ImageIcon,
-  ChevronLeft,
-  ChevronRight,
-  X,
   Download,
+  DollarSign,
+  Smartphone,
+  Building,
+  CheckCircle2,
+  Loader2,
+  X,
+  Receipt,
+  TrendingUp,
+  Calendar,
+  Copy,
+  Check,
+  Eye,
+  EyeOff,
+  FileText,
+  Printer,
   Share2,
-  Send
+  Home,
+  LogOut,
+  RefreshCw,
+  AlertCircle,
+  Info,
+  Percent,
+  Clock
 } from 'lucide-react';
+import { formatCurrency, formatDate } from '../../utils/utils';
 import { useToast } from '../../contexts/ToastContext';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
+import { useNavigate } from 'react-router-dom';
 
 // ============================================
 // INTERFACES
 // ============================================
-interface Mensagem {
-  id: string;
-  remetente: 'cliente' | 'prestador' | 'central';
-  texto: string;
-  data: Date;
-  lida: boolean;
+interface Transacao extends Pagamento {
+  tipo: 'entrada' | 'saida';
+  descricao: string;
+  saldoApos: number;
+  categoria?: string;
+  metodoDetalhado?: string;
+  referencia?: string;
+  comprovativo?: string;
 }
+
+interface MetodoPagamento {
+  id: string;
+  nome: string;
+  icon: any;
+  cor: string;
+  taxa: number;
+  limiteMin: number;
+  limiteMax: number;
+  tempoProcessamento: string;
+}
+
+interface Fatura {
+  id: string;
+  numero: string;
+  data: Date;
+  descricao: string;
+  valor: number;
+  status: 'pago' | 'pendente' | 'cancelado';
+  metodo: string;
+  pdfUrl?: string;
+}
+
+// ============================================
+// CONSTANTES
+// ============================================
+const METODOS_PAGAMENTO: MetodoPagamento[] = [
+  { 
+    id: 'mpesa', 
+    nome: 'M-Pesa', 
+    icon: Smartphone, 
+    cor: 'from-green-500 to-green-600', 
+    taxa: 0.015,
+    limiteMin: 10,
+    limiteMax: 50000,
+    tempoProcessamento: 'Imediato'
+  },
+  { 
+    id: 'mkesh', 
+    nome: 'Mkesh', 
+    icon: Smartphone, 
+    cor: 'from-blue-500 to-blue-600', 
+    taxa: 0.01,
+    limiteMin: 10,
+    limiteMax: 50000,
+    tempoProcessamento: 'Imediato'
+  },
+  { 
+    id: 'emola', 
+    nome: 'E-Mola', 
+    icon: Smartphone, 
+    cor: 'from-red-500 to-red-600', 
+    taxa: 0.01,
+    limiteMin: 10,
+    limiteMax: 50000,
+    tempoProcessamento: 'Imediato'
+  },
+  { 
+    id: 'transferencia', 
+    nome: 'Transferência Bancária', 
+    icon: Building, 
+    cor: 'from-purple-500 to-purple-600', 
+    taxa: 0.02,
+    limiteMin: 1000,
+    limiteMax: 500000,
+    tempoProcessamento: '1-2 dias úteis'
+  }
+];
 
 // ============================================
 // COMPONENTE PRINCIPAL
 // ============================================
-export default function AcompanhamentoPage() {
-  const { id } = useParams<{ id: string }>();
-  const [solicitacao, setSolicitacao] = useState<Solicitacao | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isRatingModalOpen, setIsRatingModalOpen] = useState(false);
-  const [isChatModalOpen, setIsChatModalOpen] = useState(false);
-  const [isGalleryModalOpen, setIsGalleryModalOpen] = useState(false);
-  const [imagemSelecionada, setImagemSelecionada] = useState<string | null>(null);
-  const [rating, setRating] = useState(5);
-  const [comment, setComment] = useState('');
-  const [mensagens, setMensagens] = useState<Mensagem[]>([]);
-  const [novaMensagem, setNovaMensagem] = useState('');
+export default function CarteiraPage() {
+  const { user, logout } = useAuth();
   const { showToast } = useToast();
   const navigate = useNavigate();
+  
+  const [pagamentos, setPagamentos] = useState<Pagamento[]>([]);
+  const [transacoes, setTransacoes] = useState<Transacao[]>([]);
+  const [faturas, setFaturas] = useState<Fatura[]>([]);
+  const [saldo, setSaldo] = useState(0);
+  const [saldoBloqueado, setSaldoBloqueado] = useState(0);
+  const [isLoading, setIsLoading] = useState(true);
+  const [copiado, setCopiado] = useState<string | null>(null);
+  
+  // Modais
+  const [showAddFundsModal, setShowAddFundsModal] = useState(false);
+  const [showExtratoModal, setShowExtratoModal] = useState(false);
+  const [showFaturaModal, setShowFaturaModal] = useState(false);
+  const [showDetalhesModal, setShowDetalhesModal] = useState(false);
+  const [selectedTransacao, setSelectedTransacao] = useState<Transacao | null>(null);
+  const [selectedFatura, setSelectedFatura] = useState<Fatura | null>(null);
+  
+  // Formulário de adicionar fundos
+  const [valorAdicionar, setValorAdicionar] = useState('');
+  const [metodoSelecionado, setMetodoSelecionado] = useState('mpesa');
+  const [processing, setProcessing] = useState(false);
+  const [referencia, setReferencia] = useState('');
+  
+  // Filtros
+  const [filtroPeriodo, setFiltroPeriodo] = useState<'todos' | 'mes' | 'trimestre' | 'ano'>('todos');
+  const [filtroTipo, setFiltroTipo] = useState<'todos' | 'entrada' | 'saida'>('todos');
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+      showToast('Logout efetuado com sucesso!', 'success');
+    } catch (error) {
+      showToast('Erro ao fazer logout', 'error');
+    }
+  };
 
   // ============================================
-  // BUSCAR SOLICITAÇÃO
+  // BUSCAR DADOS
   // ============================================
   useEffect(() => {
-    if (!id) return;
+    if (!user) return;
 
-    const unsubscribe = onSnapshot(doc(db, 'solicitacoes', id), (doc) => {
-      if (doc.exists()) {
-        setSolicitacao({ id: doc.id, ...doc.data() } as Solicitacao);
-      } else {
-        showToast('Solicitação não encontrada', 'error');
-        navigate('/cliente/dashboard');
-      }
+    // Buscar pagamentos do cliente
+    const pagamentosQuery = query(
+      collection(db, 'pagamentos'),
+      where('clienteId', '==', user.id),
+      orderBy('data', 'desc')
+    );
+
+    const unsubscribePagamentos = onSnapshot(pagamentosQuery, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Pagamento));
+      setPagamentos(docs);
+      
+      // Calcular saldo (simulado - em produção viria de uma carteira real)
+      const totalGasto = docs.reduce((acc, curr) => acc + curr.valor, 0);
+      const totalEntradas = 10000; // Simulado
+      const saldoAtual = totalEntradas - totalGasto;
+      const saldoBloq = totalGasto * 0.1; // 10% bloqueado (simulado)
+      
+      setSaldo(saldoAtual);
+      setSaldoBloqueado(saldoBloq);
+      
+      // Criar histórico de transações
+      const transacoesData: Transacao[] = [
+        // Entradas simuladas
+        ...Array(3).fill(null).map((_, i) => ({
+          id: `entrada-${i}`,
+          tipo: 'entrada',
+          valor: Math.random() * 5000 + 1000,
+          data: new Date(Date.now() - i * 86400000),
+          descricao: 'Adição de fundos',
+          metodo: 'M-Pesa',
+          status: 'confirmado',
+          saldoApos: saldoAtual - i * 1000,
+          referencia: `REF${Math.random().toString(36).substring(7).toUpperCase()}`
+        })),
+        // Saídas (pagamentos reais)
+        ...docs.map((doc, index) => ({
+          ...doc,
+          tipo: 'saida',
+          descricao: `Pagamento de serviço - ${doc.solicitacaoId?.slice(-6) || 'N/A'}`,
+          saldoApos: saldoAtual - index * 500,
+          metodoDetalhado: doc.metodo || 'M-Pesa',
+          referencia: doc.referencia || `TRX-${Math.random().toString(36).substring(7).toUpperCase()}`
+        }))
+      ].sort((a, b) => b.data.getTime() - a.data.getTime());
+      
+      setTransacoes(transacoesData);
+
+      // Criar faturas
+      const faturasData: Fatura[] = docs
+        .filter(d => d.status === 'confirmado')
+        .map((doc, index) => ({
+          id: doc.id || `fat-${index}`,
+          numero: `FAT-${new Date().getFullYear()}-${String(index + 1).padStart(4, '0')}`,
+          data: doc.data,
+          descricao: `Serviço de ${doc.categoria || 'limpeza'}`,
+          valor: doc.valor,
+          status: 'pago',
+          metodo: doc.metodo || 'M-Pesa',
+          pdfUrl: `#`
+        }));
+      
+      setFaturas(faturasData);
       setIsLoading(false);
     });
 
-    return () => unsubscribe();
-  }, [id]);
-
-  // ============================================
-  // BUSCAR MENSAGENS DO CHAT
-  // ============================================
-  useEffect(() => {
-    if (!id) return;
-
-    // Simular mensagens de exemplo
-    setMensagens([
-      {
-        id: '1',
-        remetente: 'prestador',
-        texto: 'Olá! Chegarei em 30 minutos.',
-        data: new Date(Date.now() - 3600000),
-        lida: true
-      },
-      {
-        id: '2',
-        remetente: 'cliente',
-        texto: 'Ok, estou aguardando.',
-        data: new Date(Date.now() - 1800000),
-        lida: true
-      },
-      {
-        id: '3',
-        remetente: 'prestador',
-        texto: 'Já estou a caminho!',
-        data: new Date(Date.now() - 900000),
-        lida: false
-      }
-    ]);
-  }, [id]);
+    return () => unsubscribePagamentos();
+  }, [user]);
 
   // ============================================
   // HANDLERS
   // ============================================
-  const handleFinalPayment = async () => {
-    if (!solicitacao) return;
-    try {
-      await updateDoc(doc(db, 'solicitacoes', solicitacao.id), {
-        status: 'concluido',
-        dataConclusao: new Date()
-      });
-      showToast('Pagamento final realizado com sucesso!', 'success');
-      setIsRatingModalOpen(true);
-    } catch (error) {
-      showToast('Erro ao processar pagamento', 'error');
-    }
-  };
-
-  const handleRate = async () => {
-    if (!solicitacao) return;
-    try {
-      // Salvar avaliação
-      await addDoc(collection(db, 'avaliacoes'), {
-        solicitacaoId: solicitacao.id,
-        prestadorId: solicitacao.prestadorId,
-        clienteId: solicitacao.clienteId,
-        nota: rating,
-        comentario: comment,
-        data: new Date()
-      });
-
-      // Atualizar média do prestador (simplificado)
-      showToast('Obrigado pela sua avaliação!', 'success');
-      setIsRatingModalOpen(false);
-    } catch (error) {
-      showToast('Erro ao enviar avaliação', 'error');
-    }
-  };
-
-  const handleSendMessage = () => {
-    if (!novaMensagem.trim()) return;
-
-    const novaMsg: Mensagem = {
-      id: Date.now().toString(),
-      remetente: 'cliente',
-      texto: novaMensagem,
-      data: new Date(),
-      lida: false
-    };
-
-    setMensagens([...mensagens, novaMsg]);
-    setNovaMensagem('');
-    showToast('Mensagem enviada!', 'success');
-  };
-
-  const handleCancelService = async () => {
-    if (!solicitacao) return;
+  const handleAddFunds = async () => {
+    const valor = parseFloat(valorAdicionar);
+    const metodo = METODOS_PAGAMENTO.find(m => m.id === metodoSelecionado);
     
-    if (!window.confirm('Tem certeza que deseja cancelar este serviço?')) return;
+    if (!metodo) return;
 
-    try {
-      await updateDoc(doc(db, 'solicitacoes', solicitacao.id), {
-        status: 'cancelado',
-        motivoCancelamento: 'Cancelado pelo cliente',
-        dataCancelamento: new Date()
-      });
-      showToast('Serviço cancelado com sucesso!', 'success');
-    } catch (error) {
-      showToast('Erro ao cancelar serviço', 'error');
-    }
-  };
-
-  const handleContactPrestador = (tipo: 'whatsapp' | 'ligacao') => {
-    if (!solicitacao?.prestadorTelefone) {
-      showToast('Telefone do prestador não disponível', 'error');
+    if (isNaN(valor) || valor < metodo.limiteMin) {
+      showToast(`Valor mínimo é ${metodo.limiteMin} MT`, 'error');
       return;
     }
 
-    if (tipo === 'whatsapp') {
-      window.open(`https://wa.me/${solicitacao.prestadorTelefone.replace(/\D/g, '')}`, '_blank');
-    } else {
-      window.open(`tel:${solicitacao.prestadorTelefone}`);
+    if (valor > metodo.limiteMax) {
+      showToast(`Valor máximo é ${metodo.limiteMax} MT`, 'error');
+      return;
+    }
+
+    setProcessing(true);
+
+    try {
+      // Simular processamento de pagamento
+      await new Promise(resolve => setTimeout(resolve, 2000));
+
+      const valorComTaxa = valor * (1 + metodo.taxa);
+      const referenciaGerada = `ADD-${Date.now().toString().slice(-8)}-${metodo.id.toUpperCase()}`;
+
+      // Registrar transação
+      const novaTransacao = {
+        clienteId: user?.id,
+        valor,
+        valorComTaxa,
+        tipo: 'entrada',
+        metodo: metodo.nome,
+        metodoId: metodo.id,
+        taxa: metodo.taxa,
+        status: 'confirmado',
+        data: new Date(),
+        referencia: referenciaGerada,
+        descricao: 'Adição de fundos à carteira'
+      };
+
+      await addDoc(collection(db, 'transacoes'), novaTransacao);
+      
+      setSaldo(prev => prev + valor);
+      setReferencia(referenciaGerada);
+      
+      showToast('Fundos adicionados com sucesso!', 'success');
+      
+      // Fechar modal após 2 segundos
+      setTimeout(() => {
+        setShowAddFundsModal(false);
+        setValorAdicionar('');
+        setReferencia('');
+      }, 2000);
+      
+    } catch (error) {
+      console.error('Erro ao adicionar fundos:', error);
+      showToast('Erro ao processar pagamento', 'error');
+    } finally {
+      setProcessing(false);
     }
   };
 
-  // ============================================
-  // UTILS
-  // ============================================
-  const statusColors: any = {
-    buscando_prestador: 'bg-yellow-100 text-yellow-700',
-    prestador_atribuido: 'bg-blue-100 text-blue-700',
-    em_andamento: 'bg-indigo-100 text-indigo-700',
-    concluido: 'bg-green-100 text-green-700',
-    cancelado: 'bg-red-100 text-red-700',
+  const handleCopyToClipboard = (texto: string, tipo: string) => {
+    navigator.clipboard.writeText(texto);
+    setCopiado(tipo);
+    setTimeout(() => setCopiado(null), 2000);
+    showToast(`${tipo} copiado!`, 'success');
   };
 
-  const getProgressPercentage = () => {
-    if (!solicitacao) return 0;
-    switch (solicitacao.status) {
-      case 'buscando_prestador': return 25;
-      case 'prestador_atribuido': return 50;
-      case 'em_andamento': return 75;
-      case 'concluido': return 100;
-      default: return 0;
+  const handleDownloadExtrato = () => {
+    // Filtrar transações baseado nos filtros
+    let transacoesFiltradas = [...transacoes];
+    
+    const agora = new Date();
+    if (filtroPeriodo === 'mes') {
+      const mesPassado = new Date(agora.setMonth(agora.getMonth() - 1));
+      transacoesFiltradas = transacoesFiltradas.filter(t => t.data >= mesPassado);
+    } else if (filtroPeriodo === 'trimestre') {
+      const tresMeses = new Date(agora.setMonth(agora.getMonth() - 3));
+      transacoesFiltradas = transacoesFiltradas.filter(t => t.data >= tresMeses);
+    } else if (filtroPeriodo === 'ano') {
+      const anoPassado = new Date(agora.setFullYear(agora.getFullYear() - 1));
+      transacoesFiltradas = transacoesFiltradas.filter(t => t.data >= anoPassado);
     }
+
+    if (filtroTipo !== 'todos') {
+      transacoesFiltradas = transacoesFiltradas.filter(t => t.tipo === filtroTipo);
+    }
+
+    // Gerar extrato em CSV
+    const headers = ['Data', 'Descrição', 'Tipo', 'Método', 'Valor', 'Saldo', 'Referência'];
+    const rows = transacoesFiltradas.map(t => [
+      formatDate(t.data),
+      t.descricao,
+      t.tipo === 'entrada' ? 'Entrada' : 'Saída',
+      t.metodo || 'N/A',
+      t.tipo === 'entrada' ? `+${t.valor}` : `-${t.valor}`,
+      t.saldoApos || 0,
+      t.referencia || ''
+    ]);
+
+    const csv = [headers, ...rows].map(row => row.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `extrato_${formatDate(new Date()).replace(/\//g, '-')}.csv`;
+    a.click();
+    window.URL.revokeObjectURL(url);
+    
+    showToast('Extrato baixado com sucesso!', 'success');
   };
 
-  if (isLoading) return <LoadingSpinner fullScreen />;
-  if (!solicitacao) return null;
+  const handleDownloadFatura = (fatura: Fatura) => {
+    showToast('A gerar fatura...', 'info');
+    setTimeout(() => {
+      showToast('Fatura gerada com sucesso!', 'success');
+    }, 1500);
+  };
+
+  const handleVerDetalhes = (transacao: Transacao) => {
+    setSelectedTransacao(transacao);
+    setShowDetalhesModal(true);
+  };
+
+  const handleVerFatura = (fatura: Fatura) => {
+    setSelectedFatura(fatura);
+    setShowFaturaModal(true);
+  };
+
+  // ============================================
+  // STATS
+  // ============================================
+  const totalEntradas = transacoes.filter(t => t.tipo === 'entrada').reduce((acc, t) => acc + t.valor, 0);
+  const totalSaidas = transacoes.filter(t => t.tipo === 'saida').reduce((acc, t) => acc + t.valor, 0);
+  const ultimaTransacao = transacoes[0];
+  const transacoesFiltradas = transacoes.filter(t => {
+    if (filtroTipo !== 'todos' && t.tipo !== filtroTipo) return false;
+    
+    const agora = new Date();
+    if (filtroPeriodo === 'mes') {
+      const mesPassado = new Date(agora.setMonth(agora.getMonth() - 1));
+      return t.data >= mesPassado;
+    } else if (filtroPeriodo === 'trimestre') {
+      const tresMeses = new Date(agora.setMonth(agora.getMonth() - 3));
+      return t.data >= tresMeses;
+    } else if (filtroPeriodo === 'ano') {
+      const anoPassado = new Date(agora.setFullYear(agora.getFullYear() - 1));
+      return t.data >= anoPassado;
+    }
+    return true;
+  });
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[60vh]">
+          <Loader2 size={40} className="animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
 
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        <div className="max-w-4xl mx-auto">
+        <div className="max-w-6xl mx-auto">
           {/* ======================================== */}
           {/* HEADER */}
           {/* ======================================== */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <button
-                  onClick={() => navigate('/cliente/dashboard')}
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                >
-                  <ChevronLeft size={20} className="text-gray-600" />
-                </button>
-                <h1 className="text-3xl font-black text-primary">Acompanhamento</h1>
-                <span className={`text-xs font-black uppercase px-3 py-1 rounded-full ${statusColors[solicitacao.status]}`}>
-                  {translateStatus(solicitacao.status)}
-                </span>
-              </div>
-              <p className="text-gray-500 ml-12">ID: #{solicitacao.id.slice(-8).toUpperCase()}</p>
-            </div>
-            <div className="flex gap-2">
-              <Button 
-                variant="outline" 
-                leftIcon={<MessageSquare size={18} />}
-                onClick={() => setIsChatModalOpen(true)}
+            <div className="flex items-center gap-4">
+              <button 
+                onClick={() => navigate(-1)}
+                className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                title="Voltar"
               >
-                Chat
+                <ArrowLeft className="w-5 h-5 text-gray-600" />
+              </button>
+              <div>
+                <h1 className="text-3xl font-black text-primary flex items-center gap-3">
+                  <Wallet size={32} className="text-accent" />
+                  Minha Carteira
+                </h1>
+                <p className="text-gray-500">Gerencie seus fundos e acompanhe suas transações.</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/')}
+                leftIcon={<Home size={16} />}
+                className="border-gray-300 text-gray-600 hover:bg-gray-50"
+              >
+                Início
               </Button>
-              {solicitacao.status === 'em_andamento' && (
-                <Button 
-                  onClick={handleFinalPayment} 
-                  leftIcon={<CreditCard size={18} />}
-                  className="bg-accent hover:bg-accent/90 text-white"
-                >
-                  Pagar Restante (20%)
-                </Button>
-              )}
-              {['buscando_prestador', 'prestador_atribuido'].includes(solicitacao.status) && (
-                <Button 
-                  variant="outline" 
-                  onClick={handleCancelService}
-                  className="border-red-200 text-red-600 hover:bg-red-50"
-                >
-                  Cancelar
-                </Button>
-              )}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                leftIcon={<LogOut size={16} />}
+                className="border-rose-200 text-rose-600 hover:bg-rose-50"
+              >
+                Sair
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setShowExtratoModal(true)}
+                leftIcon={<Download size={16} />}
+              >
+                Extrato
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => window.location.reload()}
+                title="Atualizar"
+              >
+                <RefreshCw size={18} />
+              </Button>
             </div>
           </div>
 
           {/* ======================================== */}
-          {/* BARRA DE PROGRESSO */}
+          {/* SALDO E STATS */}
           {/* ======================================== */}
-          <Card className="mb-6">
-            <CardContent className="p-6">
-              <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-bold text-gray-600">Progresso do Serviço</span>
-                <span className="text-sm font-black text-accent">{getProgressPercentage()}%</span>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+            {/* Saldo Card */}
+            <Card className="lg:col-span-1 bg-gradient-to-br from-primary to-blue-900 text-white overflow-hidden relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full -mr-16 -mt-16" />
+              <div className="absolute bottom-0 left-0 w-24 h-24 bg-accent/10 rounded-full -ml-12 -mb-12" />
+              <CardContent className="p-8 relative z-10">
+                <p className="text-xs font-bold uppercase opacity-70 mb-2">Saldo Disponível</p>
+                <h2 className="text-4xl font-black mb-2">{formatCurrency(saldo)}</h2>
+                <div className="flex items-center gap-2 text-sm opacity-70 mb-4">
+                  <Clock size={14} />
+                  <span>Saldo bloqueado: {formatCurrency(saldoBloqueado)}</span>
+                </div>
+                <div className="grid grid-cols-2 gap-4 pt-4 border-t border-white/10">
+                  <div>
+                    <p className="text-[10px] font-bold uppercase opacity-50">Total Entradas</p>
+                    <p className="font-bold text-green-400">{formatCurrency(totalEntradas)}</p>
+                  </div>
+                  <div>
+                    <p className="text-[10px] font-bold uppercase opacity-50">Total Saídas</p>
+                    <p className="font-bold text-accent">{formatCurrency(totalSaidas)}</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Quick Stats */}
+            <div className="lg:col-span-2 grid grid-cols-1 md:grid-cols-3 gap-4">
+              <Card className="hover:shadow-lg transition-all">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-green-50 text-green-600 flex items-center justify-center">
+                      <ArrowDownRight size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Última Transação</p>
+                      <p className="text-lg font-black text-primary">
+                        {ultimaTransacao ? formatCurrency(ultimaTransacao.valor) : 'MT 0,00'}
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">
+                    {ultimaTransacao ? formatDate(ultimaTransacao.data) : 'Nenhuma transação'}
+                  </p>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-all">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-blue-50 text-blue-600 flex items-center justify-center">
+                      <TrendingUp size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Total Entradas</p>
+                      <p className="text-lg font-black text-primary">{formatCurrency(totalEntradas)}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">Desde o início</p>
+                </CardContent>
+              </Card>
+
+              <Card className="hover:shadow-lg transition-all">
+                <CardContent className="p-6">
+                  <div className="flex items-center gap-3 mb-3">
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 text-purple-600 flex items-center justify-center">
+                      <Receipt size={20} />
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-400">Faturas</p>
+                      <p className="text-lg font-black text-primary">{faturas.length}</p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-gray-400">{faturas.length} emitidas</p>
+                </CardContent>
+              </Card>
+            </div>
+          </div>
+
+          {/* ======================================== */}
+          {/* AÇÕES RÁPIDAS */}
+          {/* ======================================== */}
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-8">
+            <Button
+              variant="outline"
+              className="h-20 flex-col items-center justify-center gap-2 hover:border-accent hover:text-accent"
+              onClick={() => setShowAddFundsModal(true)}
+            >
+              <Plus size={24} />
+              <span className="text-xs font-bold">Adicionar Fundos</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="h-20 flex-col items-center justify-center gap-2 hover:border-accent hover:text-accent"
+              onClick={() => setShowExtratoModal(true)}
+            >
+              <Download size={24} />
+              <span className="text-xs font-bold">Extrato</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="h-20 flex-col items-center justify-center gap-2 hover:border-accent hover:text-accent"
+              onClick={() => navigate('/cliente/dashboard')}
+            >
+              <History size={24} />
+              <span className="text-xs font-bold">Histórico</span>
+            </Button>
+
+            <Button
+              variant="outline"
+              className="h-20 flex-col items-center justify-center gap-2 hover:border-accent hover:text-accent"
+              onClick={() => showToast('Funcionalidade em desenvolvimento', 'info')}
+            >
+              <CreditCard size={24} />
+              <span className="text-xs font-bold">Métodos</span>
+            </Button>
+          </div>
+
+          {/* ======================================== */}
+          {/* FILTROS */}
+          {/* ======================================== */}
+          <div className="flex flex-wrap gap-2 mb-6">
+            <Button
+              variant={filtroPeriodo === 'todos' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFiltroPeriodo('todos')}
+            >
+              Todos
+            </Button>
+            <Button
+              variant={filtroPeriodo === 'mes' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFiltroPeriodo('mes')}
+            >
+              Último mês
+            </Button>
+            <Button
+              variant={filtroPeriodo === 'trimestre' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFiltroPeriodo('trimestre')}
+            >
+              Últimos 3 meses
+            </Button>
+            <Button
+              variant={filtroPeriodo === 'ano' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFiltroPeriodo('ano')}
+            >
+              Último ano
+            </Button>
+            <div className="w-px h-8 bg-gray-200 mx-2" />
+            <Button
+              variant={filtroTipo === 'todos' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFiltroTipo('todos')}
+            >
+              Todos
+            </Button>
+            <Button
+              variant={filtroTipo === 'entrada' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFiltroTipo('entrada')}
+              className="border-green-200 text-green-700 hover:bg-green-50"
+            >
+              Entradas
+            </Button>
+            <Button
+              variant={filtroTipo === 'saida' ? 'primary' : 'outline'}
+              size="sm"
+              onClick={() => setFiltroTipo('saida')}
+              className="border-red-200 text-red-700 hover:bg-red-50"
+            >
+              Saídas
+            </Button>
+          </div>
+
+          {/* ======================================== */}
+          {/* HISTÓRICO DE TRANSAÇÕES */}
+          {/* ======================================== */}
+          <Card>
+            <CardHeader className="flex flex-row items-center justify-between border-b border-gray-100">
+              <div className="flex items-center gap-2">
+                <History size={20} className="text-primary" />
+                <h3 className="font-bold text-primary">Histórico de Transações</h3>
               </div>
-              <div className="w-full h-2 bg-gray-100 rounded-full overflow-hidden">
-                <motion.div
-                  initial={{ width: 0 }}
-                  animate={{ width: `${getProgressPercentage()}%` }}
-                  transition={{ duration: 0.5 }}
-                  className="h-full bg-accent"
-                />
+              <Button 
+                variant="ghost" 
+                size="sm"
+                onClick={() => setShowExtratoModal(true)}
+              >
+                Ver Tudo
+              </Button>
+            </CardHeader>
+            <CardContent className="p-0">
+              <div className="divide-y divide-gray-50">
+                {transacoesFiltradas.slice(0, 10).map((transacao, index) => (
+                  <motion.div
+                    key={transacao.id}
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: index * 0.05 }}
+                    className="p-4 flex items-center justify-between hover:bg-gray-50/50 transition-colors cursor-pointer"
+                    onClick={() => handleVerDetalhes(transacao)}
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+                        transacao.tipo === 'entrada' 
+                          ? 'bg-green-50 text-green-600' 
+                          : 'bg-red-50 text-red-600'
+                      }`}>
+                        {transacao.tipo === 'entrada' ? <ArrowDownRight size={20} /> : <ArrowUpRight size={20} />}
+                      </div>
+                      <div>
+                        <p className="text-sm font-bold text-primary">{transacao.descricao}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-gray-400">{formatDate(transacao.data)}</span>
+                          <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                            {transacao.metodo || 'M-Pesa'}
+                          </span>
+                          {transacao.referencia && (
+                            <>
+                              <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                              <span className="text-[10px] text-gray-400">ID: {transacao.referencia.slice(-8)}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className={`text-sm font-black ${
+                        transacao.tipo === 'entrada' ? 'text-green-600' : 'text-primary'
+                      }`}>
+                        {transacao.tipo === 'entrada' ? '+' : '-'}{formatCurrency(transacao.valor)}
+                      </p>
+                      {transacao.saldoApos !== undefined && (
+                        <p className="text-[10px] text-gray-400">Saldo: {formatCurrency(transacao.saldoApos)}</p>
+                      )}
+                    </div>
+                  </motion.div>
+                ))}
+                
+                {transacoesFiltradas.length === 0 && (
+                  <div className="p-12 text-center text-gray-500">
+                    <Wallet size={40} className="mx-auto mb-4 text-gray-300" />
+                    <p className="font-bold text-gray-400 mb-1">Nenhuma transação encontrada</p>
+                    <p className="text-sm">Adicione fundos ou realize serviços para começar.</p>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            <div className="lg:col-span-2 space-y-6">
-              {/* ======================================== */}
-              {/* TIMELINE */}
-              {/* ======================================== */}
-              <Card>
-                <CardHeader>
-                  <h3 className="font-bold text-primary">Status do Serviço</h3>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <div className="space-y-8 relative before:absolute before:left-4 before:top-2 before:bottom-2 before:w-0.5 before:bg-gray-100">
-                    {[
-                      { status: 'buscando_prestador', label: 'Solicitação Enviada', desc: 'Aguardando aceite do prestador.' },
-                      { status: 'prestador_atribuido', label: 'Serviço Aceite', desc: 'O prestador confirmou o agendamento.' },
-                      { status: 'em_andamento', label: 'Em Execução', desc: 'O serviço está sendo realizado.' },
-                      { status: 'concluido', label: 'Concluído', desc: 'Serviço finalizado e pago.' },
-                    ].map((step, idx) => {
-                      const isCompleted = ['concluido', 'cancelado'].includes(solicitacao.status) || 
-                                        (solicitacao.status === 'em_andamento' && idx <= 2) ||
-                                        (solicitacao.status === 'prestador_atribuido' && idx <= 1) ||
-                                        (solicitacao.status === 'buscando_prestador' && idx === 0);
-                      
-                      return (
-                        <div key={step.status} className="flex gap-6 relative z-10">
-                          <div className={`w-8 h-8 rounded-full flex items-center justify-center border-4 border-white shadow-sm ${
-                            isCompleted ? 'bg-green-500 text-white' : 'bg-gray-100 text-gray-400'
-                          }`}>
-                            {isCompleted ? <CheckCircle2 size={16} /> : <div className="w-2 h-2 rounded-full bg-current" />}
-                          </div>
-                          <div>
-                            <p className={`font-bold ${isCompleted ? 'text-primary' : 'text-gray-400'}`}>{step.label}</p>
-                            <p className="text-xs text-gray-500">{step.desc}</p>
-                          </div>
+          {/* ======================================== */}
+          {/* FATURAS RECENTES */}
+          {/* ======================================== */}
+          {faturas.length > 0 && (
+            <div className="mt-8">
+              <h2 className="text-xl font-black text-primary flex items-center gap-2 mb-4">
+                <Receipt size={20} className="text-accent" />
+                Faturas Recentes
+              </h2>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                {faturas.slice(0, 3).map((fatura) => (
+                  <Card key={fatura.id} className="hover:shadow-lg transition-all cursor-pointer"
+                        onClick={() => handleVerFatura(fatura)}>
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="w-10 h-10 rounded-xl bg-accent/10 flex items-center justify-center text-accent">
+                          <FileText size={20} />
                         </div>
-                      );
-                    })}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* ======================================== */}
-              {/* DETALHES DO AGENDAMENTO */}
-              {/* ======================================== */}
-              <Card>
-                <CardHeader>
-                  <h3 className="font-bold text-primary">Detalhes do Agendamento</h3>
-                </CardHeader>
-                <CardContent className="p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-primary">
-                        <Calendar size={20} />
+                        <span className="text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full">
+                          {fatura.status}
+                        </span>
                       </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">Data</p>
-                        <p className="font-bold text-primary">{formatDate(solicitacao.dataAgendada)}</p>
+                      <p className="font-bold text-primary mb-1">{fatura.numero}</p>
+                      <p className="text-sm text-gray-600 mb-2">{fatura.descricao}</p>
+                      <div className="flex items-center justify-between text-sm">
+                        <span className="text-gray-500">{formatDate(fatura.data)}</span>
+                        <span className="font-black text-primary">{formatCurrency(fatura.valor)}</span>
                       </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-primary">
-                        <Clock size={20} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">Hora</p>
-                        <p className="font-bold text-primary">
-                          {solicitacao.dataAgendada 
-                            ? (solicitacao.dataAgendada instanceof Date 
-                                ? solicitacao.dataAgendada.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-                                : new Date(solicitacao.dataAgendada.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }))
-                            : 'N/A'}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-primary">
-                        <MapPin size={20} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">Local</p>
-                        <p className="font-bold text-primary">
-                          {solicitacao.endereco.bairro}
-                          {solicitacao.endereco.quarteirao ? `, Q. ${solicitacao.endereco.quarteirao}` : ''}
-                          {solicitacao.endereco.casa ? `, Casa ${solicitacao.endereco.casa}` : ''}
-                        </p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gray-50 rounded-xl flex items-center justify-center text-primary">
-                        <AlertCircle size={20} />
-                      </div>
-                      <div>
-                        <p className="text-xs font-bold text-gray-400 uppercase">Serviço</p>
-                        <p className="font-bold text-primary">{solicitacao.servico}</p>
-                      </div>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* ======================================== */}
-              {/* GALERIA DE IMAGENS */}
-              {/* ======================================== */}
-              {solicitacao.imagens && solicitacao.imagens.length > 0 && (
-                <Card>
-                  <CardHeader>
-                    <h3 className="font-bold text-primary">Imagens do Serviço</h3>
-                  </CardHeader>
-                  <CardContent className="p-6">
-                    <div className="grid grid-cols-3 gap-4">
-                      {solicitacao.imagens.map((img, index) => (
-                        <button
-                          key={index}
-                          onClick={() => {
-                            setImagemSelecionada(img);
-                            setIsGalleryModalOpen(true);
-                          }}
-                          className="aspect-square rounded-xl overflow-hidden hover:opacity-90 transition-opacity"
-                        >
-                          <img src={img} alt={`Serviço ${index + 1}`} className="w-full h-full object-cover" />
-                        </button>
-                      ))}
-                    </div>
-                  </CardContent>
-                </Card>
-              )}
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
             </div>
-
-            {/* ======================================== */}
-            {/* SIDEBAR - INFORMAÇÕES DO PRESTADOR */}
-            {/* ======================================== */}
-            <div className="space-y-6">
-              <Card>
-                <CardHeader>
-                  <h3 className="font-bold text-primary">Prestador</h3>
-                </CardHeader>
-                <CardContent className="p-6 text-center">
-                  <div className="w-20 h-20 rounded-full bg-gradient-to-br from-primary to-blue-900 mx-auto mb-4 flex items-center justify-center text-white text-2xl font-black">
-                    {solicitacao.prestadorNome?.charAt(0) || 'P'}
-                  </div>
-                  <h4 className="font-bold text-primary text-lg">{solicitacao.prestadorNome}</h4>
-                  <div className="flex items-center justify-center gap-1 text-yellow-500 mb-4">
-                    <Star size={16} fill="currentColor" />
-                    <Star size={16} fill="currentColor" />
-                    <Star size={16} fill="currentColor" />
-                    <Star size={16} fill="currentColor" />
-                    <Star size={16} fill="currentColor" />
-                    <span className="text-sm font-bold text-primary ml-1">4.9</span>
-                  </div>
-                  
-                  <div className="space-y-2 mb-4">
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start"
-                      leftIcon={<Phone size={16} />}
-                      onClick={() => handleContactPrestador('ligacao')}
-                    >
-                      Ligar para Prestador
-                    </Button>
-                    <Button 
-                      variant="outline" 
-                      className="w-full justify-start text-green-600 border-green-200 hover:bg-green-50"
-                      leftIcon={<MessageSquare size={16} />}
-                      onClick={() => handleContactPrestador('whatsapp')}
-                    >
-                      WhatsApp
-                    </Button>
-                  </div>
-
-                  <Button variant="ghost" size="sm" className="w-full">
-                    Ver Perfil Completo
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {/* ======================================== */}
-              {/* RESUMO FINANCEIRO */}
-              {/* ======================================== */}
-              <Card className="bg-gradient-to-br from-primary to-blue-900 text-white">
-                <CardHeader>
-                  <h3 className="font-bold text-white">Resumo Financeiro</h3>
-                </CardHeader>
-                <CardContent className="p-6 space-y-4">
-                  <div className="flex justify-between text-sm">
-                    <span className="opacity-70">Valor Total</span>
-                    <span className="font-bold">{formatCurrency(solicitacao.valorTotal)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="opacity-70">Pago (80%)</span>
-                    <span className="font-bold text-green-400">{formatCurrency(solicitacao.valor80)}</span>
-                  </div>
-                  <div className="flex justify-between text-sm">
-                    <span className="opacity-70">Pendente (20%)</span>
-                    <span className="font-bold text-accent">{formatCurrency(solicitacao.valor20)}</span>
-                  </div>
-                  <hr className="border-white/10" />
-                  <div className="flex justify-between items-center">
-                    <span className="font-bold">Total Pago</span>
-                    <span className="text-xl font-black">
-                      {solicitacao.status === 'concluido' 
-                        ? formatCurrency(solicitacao.valorTotal) 
-                        : formatCurrency(solicitacao.valor80)}
-                    </span>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+          )}
         </div>
       </div>
 
       {/* ======================================== */}
-      {/* MODAL DE AVALIAÇÃO */}
+      {/* MODAL ADICIONAR FUNDOS */}
       {/* ======================================== */}
-      <Modal isOpen={isRatingModalOpen} onClose={() => setIsRatingModalOpen(false)} title="Avalie o Serviço">
-        <div className="text-center space-y-6">
-          <p className="text-gray-500">Como foi sua experiência com {solicitacao.prestadorNome}?</p>
-          <div className="flex justify-center gap-2">
-            {[1, 2, 3, 4, 5].map((star) => (
-              <button 
-                key={star} 
-                onClick={() => setRating(star)}
-                className={`transition-all ${rating >= star ? 'text-yellow-500 scale-110' : 'text-gray-200'}`}
+      <Modal 
+        isOpen={showAddFundsModal} 
+        onClose={() => {
+          setShowAddFundsModal(false);
+          setValorAdicionar('');
+          setReferencia('');
+        }} 
+        title="Adicionar Fundos"
+        size="lg"
+      >
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3">
+            {METODOS_PAGAMENTO.map((metodo) => (
+              <button
+                key={metodo.id}
+                onClick={() => setMetodoSelecionado(metodo.id)}
+                className={`p-4 border-2 rounded-xl text-left transition-all ${
+                  metodoSelecionado === metodo.id
+                    ? `border-accent bg-gradient-to-r ${metodo.cor} text-white`
+                    : 'border-gray-200 hover:border-accent/50'
+                }`}
               >
-                <Star size={40} fill={rating >= star ? 'currentColor' : 'none'} />
+                <metodo.icon size={24} className={metodoSelecionado === metodo.id ? 'text-white' : 'text-gray-600'} />
+                <p className={`font-bold mt-2 ${metodoSelecionado === metodo.id ? 'text-white' : 'text-primary'}`}>
+                  {metodo.nome}
+                </p>
+                <p className={`text-xs mt-1 ${metodoSelecionado === metodo.id ? 'text-white/80' : 'text-gray-400'}`}>
+                  Taxa: {metodo.taxa * 100}%
+                </p>
+                <p className={`text-xs ${metodoSelecionado === metodo.id ? 'text-white/60' : 'text-gray-400'}`}>
+                  {metodo.tempoProcessamento}
+                </p>
               </button>
             ))}
           </div>
-          <textarea
-            className="w-full bg-gray-50 border border-gray-200 rounded-2xl p-4 text-sm outline-none focus:ring-2 focus:ring-primary/20"
-            rows={3}
-            placeholder="Deixe um comentário (opcional)"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-          />
-          <div className="flex gap-3">
-            <Button variant="outline" onClick={() => setIsRatingModalOpen(false)} className="flex-1">
-              Depois
-            </Button>
-            <Button onClick={handleRate} className="flex-1 bg-accent hover:bg-accent/90 text-white">
-              Enviar Avaliação
-            </Button>
-          </div>
-        </div>
-      </Modal>
 
-      {/* ======================================== */}
-      {/* MODAL DE CHAT */}
-      {/* ======================================== */}
-      <Modal isOpen={isChatModalOpen} onClose={() => setIsChatModalOpen(false)} title="Chat com Prestador" size="lg">
-        <div className="h-[400px] flex flex-col">
-          <div className="flex-1 overflow-y-auto space-y-4 mb-4 p-2">
-            {mensagens.map((msg) => (
-              <div
-                key={msg.id}
-                className={`flex ${msg.remetente === 'cliente' ? 'justify-end' : 'justify-start'}`}
-              >
-                <div
-                  className={`max-w-[80%] p-3 rounded-2xl ${
-                    msg.remetente === 'cliente'
-                      ? 'bg-accent text-white rounded-br-none'
-                      : 'bg-gray-100 text-gray-800 rounded-bl-none'
-                  }`}
-                >
-                  <p className="text-sm">{msg.texto}</p>
-                  <p className="text-[10px] mt-1 opacity-70">
-                    {msg.data.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                  </p>
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Valor a Adicionar (MT)
+            </label>
+            <Input
+              type="number"
+              value={valorAdicionar}
+              onChange={(e) => setValorAdicionar(e.target.value)}
+              placeholder="Ex: 1000"
+              min="100"
+              step="100"
+            />
+            {metodoSelecionado && (
+              <p className="text-xs text-gray-400 mt-1">
+                Mín: {METODOS_PAGAMENTO.find(m => m.id === metodoSelecionado)?.limiteMin} MT | 
+                Máx: {METODOS_PAGAMENTO.find(m => m.id === metodoSelecionado)?.limiteMax} MT
+              </p>
+            )}
+          </div>
+
+          {metodoSelecionado === 'transferencia' && (
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <p className="text-sm font-bold text-blue-700 mb-2">Dados para Transferência:</p>
+              <div className="space-y-2 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-blue-600">Banco:</span>
+                  <span className="font-bold text-primary">BIM</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-600">NIB:</span>
+                  <span className="font-bold text-primary">12345678901234567890</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-blue-600">Nome:</span>
+                  <span className="font-bold text-primary">DEXAPP, LDA</span>
                 </div>
               </div>
-            ))}
-          </div>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleCopyToClipboard('12345678901234567890', 'NIB')}
+                className="w-full mt-3"
+                leftIcon={copiado === 'NIB' ? <Check size={16} /> : <Copy size={16} />}
+              >
+                {copiado === 'NIB' ? 'Copiado!' : 'Copiar NIB'}
+              </Button>
+            </div>
+          )}
 
-          <div className="flex gap-2">
-            <input
-              type="text"
-              value={novaMensagem}
-              onChange={(e) => setNovaMensagem(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Digite sua mensagem..."
-              className="flex-1 p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none"
-            />
+          {valorAdicionar && metodoSelecionado && (
+            <div className="bg-gray-50 rounded-xl p-4">
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-gray-600">Valor:</span>
+                <span className="font-bold text-primary">{formatCurrency(parseFloat(valorAdicionar) || 0)}</span>
+              </div>
+              <div className="flex justify-between mb-2">
+                <span className="text-sm text-gray-600">Taxa ({METODOS_PAGAMENTO.find(m => m.id === metodoSelecionado)?.taxa * 100}%):</span>
+                <span className="font-bold text-primary">
+                  {formatCurrency((parseFloat(valorAdicionar) || 0) * (METODOS_PAGAMENTO.find(m => m.id === metodoSelecionado)?.taxa || 0))}
+                </span>
+              </div>
+              <div className="flex justify-between pt-2 border-t border-gray-200">
+                <span className="font-bold text-primary">Total a Pagar:</span>
+                <span className="text-xl font-black text-accent">
+                  {formatCurrency((parseFloat(valorAdicionar) || 0) * (1 + (METODOS_PAGAMENTO.find(m => m.id === metodoSelecionado)?.taxa || 0)))}
+                </span>
+              </div>
+            </div>
+          )}
+
+          {referencia && (
+            <div className="bg-green-50 border border-green-200 rounded-xl p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <CheckCircle2 size={18} className="text-green-600" />
+                <p className="font-bold text-green-700">Pagamento processado!</p>
+              </div>
+              <p className="text-sm text-green-600 mb-2">Referência: {referencia}</p>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => handleCopyToClipboard(referencia, 'Referência')}
+                className="w-full border-green-300 text-green-700 hover:bg-green-100"
+                leftIcon={copiado === 'Referência' ? <Check size={16} /> : <Copy size={16} />}
+              >
+                {copiado === 'Referência' ? 'Copiado!' : 'Copiar Referência'}
+              </Button>
+            </div>
+          )}
+
+          <div className="flex gap-3">
             <Button
-              onClick={handleSendMessage}
-              disabled={!novaMensagem.trim()}
-              className="bg-accent hover:bg-accent/90 text-white"
-              leftIcon={<Send size={18} />}
+              variant="outline"
+              onClick={() => {
+                setShowAddFundsModal(false);
+                setValorAdicionar('');
+                setReferencia('');
+              }}
+              className="flex-1"
             >
-              Enviar
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleAddFunds}
+              disabled={processing || !valorAdicionar}
+              className="flex-1 bg-accent hover:bg-accent/90 text-white"
+            >
+              {processing ? (
+                <>
+                  <Loader2 className="animate-spin mr-2" size={18} />
+                  Processando...
+                </>
+              ) : (
+                'Confirmar Pagamento'
+              )}
             </Button>
           </div>
         </div>
       </Modal>
 
       {/* ======================================== */}
-      {/* MODAL DA GALERIA */}
+      {/* MODAL EXTRATO */}
       {/* ======================================== */}
-      <Modal isOpen={isGalleryModalOpen} onClose={() => setIsGalleryModalOpen(false)} title="Visualizar Imagem" size="full">
-        {imagemSelecionada && (
-          <div className="flex items-center justify-center">
-            <img src={imagemSelecionada} alt="Imagem do serviço" className="max-w-full max-h-[80vh] rounded-lg" />
+      <Modal 
+        isOpen={showExtratoModal} 
+        onClose={() => setShowExtratoModal(false)} 
+        title="Extrato Detalhado"
+        size="full"
+      >
+        <div className="space-y-6">
+          <div className="flex justify-between items-center">
+            <div>
+              <p className="text-sm text-gray-500">
+                Período: {filtroPeriodo === 'todos' ? 'Todo histórico' : 
+                        filtroPeriodo === 'mes' ? 'Último mês' :
+                        filtroPeriodo === 'trimestre' ? 'Últimos 3 meses' : 'Último ano'}
+              </p>
+              <p className="text-xs text-gray-400">Total de {transacoesFiltradas.length} transações</p>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                variant="outline"
+                onClick={handleDownloadExtrato}
+                leftIcon={<Download size={18} />}
+              >
+                Download CSV
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.print()}
+                leftIcon={<Printer size={18} />}
+              >
+                Imprimir
+              </Button>
+            </div>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left border-collapse">
+              <thead>
+                <tr className="bg-gray-50 border-b border-gray-200">
+                  <th className="p-3 text-xs font-bold text-gray-500 uppercase">Data</th>
+                  <th className="p-3 text-xs font-bold text-gray-500 uppercase">Descrição</th>
+                  <th className="p-3 text-xs font-bold text-gray-500 uppercase">Método</th>
+                  <th className="p-3 text-xs font-bold text-gray-500 uppercase">Tipo</th>
+                  <th className="p-3 text-xs font-bold text-gray-500 uppercase">Valor</th>
+                  <th className="p-3 text-xs font-bold text-gray-500 uppercase">Saldo</th>
+                  <th className="p-3 text-xs font-bold text-gray-500 uppercase">Referência</th>
+                  <th className="p-3 text-xs font-bold text-gray-500 uppercase">Ações</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-100">
+                {transacoesFiltradas.map((transacao) => (
+                  <tr key={transacao.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="p-3 text-sm text-primary">{formatDate(transacao.data)}</td>
+                    <td className="p-3 text-sm font-bold text-primary">{transacao.descricao}</td>
+                    <td className="p-3">
+                      <span className="text-xs font-bold px-2 py-1 rounded-full bg-gray-100 text-gray-600">
+                        {transacao.metodo || 'M-Pesa'}
+                      </span>
+                    </td>
+                    <td className="p-3">
+                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                        transacao.tipo === 'entrada' 
+                          ? 'bg-green-100 text-green-700' 
+                          : 'bg-red-100 text-red-700'
+                      }`}>
+                        {transacao.tipo === 'entrada' ? 'Entrada' : 'Saída'}
+                      </span>
+                    </td>
+                    <td className={`p-3 font-black ${
+                      transacao.tipo === 'entrada' ? 'text-green-600' : 'text-primary'
+                    }`}>
+                      {transacao.tipo === 'entrada' ? '+' : '-'}{formatCurrency(transacao.valor)}
+                    </td>
+                    <td className="p-3 font-bold text-primary">{formatCurrency(transacao.saldoApos || 0)}</td>
+                    <td className="p-3">
+                      <code className="text-xs bg-gray-100 px-2 py-1 rounded">
+                        {transacao.referencia?.slice(-8) || 'N/A'}
+                      </code>
+                    </td>
+                    <td className="p-3">
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => handleVerDetalhes(transacao)}
+                        className="text-blue-600 hover:bg-blue-50"
+                      >
+                        <Eye size={16} />
+                      </Button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL DETALHES DA TRANSAÇÃO */}
+      {/* ======================================== */}
+      <Modal isOpen={showDetalhesModal} onClose={() => setShowDetalhesModal(false)} title="Detalhes da Transação">
+        {selectedTransacao && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 pb-4 border-b">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                selectedTransacao.tipo === 'entrada' ? 'bg-green-100 text-green-600' : 'bg-red-100 text-red-600'
+              }`}>
+                {selectedTransacao.tipo === 'entrada' ? <ArrowDownRight size={32} /> : <ArrowUpRight size={32} />}
+              </div>
+              <div>
+                <h3 className="font-bold text-primary text-xl">{selectedTransacao.descricao}</h3>
+                <p className="text-sm text-gray-500">{formatDate(selectedTransacao.data)}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-gray-500">Valor</p>
+                <p className={`text-2xl font-black ${
+                  selectedTransacao.tipo === 'entrada' ? 'text-green-600' : 'text-primary'
+                }`}>
+                  {selectedTransacao.tipo === 'entrada' ? '+' : '-'}{formatCurrency(selectedTransacao.valor)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Saldo após transação</p>
+                <p className="text-2xl font-black text-primary">{formatCurrency(selectedTransacao.saldoApos || 0)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Método</p>
+                <p className="font-bold text-primary">{selectedTransacao.metodo || 'M-Pesa'}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Status</p>
+                <span className="text-xs font-bold px-2 py-1 rounded-full bg-green-100 text-green-700">
+                  {selectedTransacao.status || 'Confirmado'}
+                </span>
+              </div>
+              {selectedTransacao.referencia && (
+                <div className="col-span-2">
+                  <p className="text-xs text-gray-500">Referência</p>
+                  <div className="flex items-center gap-2">
+                    <code className="text-sm bg-gray-100 px-2 py-1 rounded flex-1">
+                      {selectedTransacao.referencia}
+                    </code>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleCopyToClipboard(selectedTransacao.referencia!, 'Referência')}
+                      className="text-gray-400 hover:text-accent"
+                    >
+                      {copiado === 'Referência' ? <Check size={16} /> : <Copy size={16} />}
+                    </Button>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL FATURA */}
+      {/* ======================================== */}
+      <Modal isOpen={showFaturaModal} onClose={() => setShowFaturaModal(false)} title="Detalhes da Fatura" size="lg">
+        {selectedFatura && (
+          <div className="space-y-6">
+            <div className="bg-gradient-to-r from-primary to-blue-900 text-white p-6 rounded-xl">
+              <div className="flex items-center justify-between mb-4">
+                <div>
+                  <h2 className="text-2xl font-black">DEXAPP</h2>
+                  <p className="text-xs opacity-80">Soluções Domésticas</p>
+                </div>
+                <div className="text-right">
+                  <p className="text-sm font-bold">FATURA</p>
+                  <p className="text-xs opacity-80">{selectedFatura.numero}</p>
+                </div>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <div>
+                  <p className="opacity-80">Data de emissão</p>
+                  <p className="font-bold">{formatDate(selectedFatura.data)}</p>
+                </div>
+                <div className="text-right">
+                  <p className="opacity-80">Status</p>
+                  <p className="font-bold text-green-400">PAGO</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div>
+                <p className="text-xs text-gray-500">Cliente</p>
+                <p className="font-bold text-primary">{user?.nome}</p>
+                <p className="text-sm text-gray-500">{user?.email}</p>
+              </div>
+
+              <div className="border-t border-b border-gray-100 py-4">
+                <p className="font-bold text-primary mb-2">{selectedFatura.descricao}</p>
+                <p className="text-xs text-gray-500">Método de pagamento: {selectedFatura.metodo}</p>
+              </div>
+
+              <div className="flex items-center justify-between">
+                <p className="text-lg font-black text-primary">Total</p>
+                <p className="text-3xl font-black text-accent">{formatCurrency(selectedFatura.valor)}</p>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowFaturaModal(false)}
+                className="flex-1"
+              >
+                Fechar
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => handleDownloadFatura(selectedFatura)}
+                className="flex-1"
+                leftIcon={<Download size={16} />}
+              >
+                Download PDF
+              </Button>
+              <Button
+                variant="outline"
+                onClick={() => window.print()}
+                className="flex-1"
+                leftIcon={<Printer size={16} />}
+              >
+                Imprimir
+              </Button>
+            </div>
           </div>
         )}
       </Modal>
