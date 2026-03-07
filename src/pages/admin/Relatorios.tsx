@@ -29,7 +29,24 @@ import {
 import { exportToPDF } from '../../utils/utils';
 import { useToast } from '../../contexts/ToastContext';
 
-const dataServicos = [
+// ============================================
+// INTERFACES E TIPOS
+// ============================================
+interface ServicoData {
+  name: string;
+  value: number;
+}
+
+interface MensalData {
+  name: string;
+  solicitacoes: number;
+  concluidas: number;
+}
+
+// ============================================
+// CONSTANTES
+// ============================================
+const dataServicos: ServicoData[] = [
   { name: 'Limpeza', value: 45 },
   { name: 'Reparos', value: 25 },
   { name: 'Cozinha', value: 15 },
@@ -37,7 +54,7 @@ const dataServicos = [
   { name: 'Outros', value: 5 },
 ];
 
-const dataMensal = [
+const dataMensal: MensalData[] = [
   { name: 'Jan', solicitacoes: 120, concluidas: 100 },
   { name: 'Fev', solicitacoes: 150, concluidas: 130 },
   { name: 'Mar', solicitacoes: 180, concluidas: 160 },
@@ -46,18 +63,60 @@ const dataMensal = [
   { name: 'Jun', solicitacoes: 300, concluidas: 280 },
 ];
 
-const COLORS = ['#0A1D56', '#FF7A00', '#4F46E5', '#10B981', '#F59E0B'];
+const COLORS: string[] = ['#0A1D56', '#FF7A00', '#4F46E5', '#10B981', '#F59E0B'];
 
+// ============================================
+// COMPONENTE PRINCIPAL
+// ============================================
 export default function Relatorios() {
   const navigate = useNavigate();
   const { showToast } = useToast();
-  const [dateRange, setDateRange] = useState('Este Mês');
-  const [isGenerating, setIsGenerating] = useState(false);
+  const [dateRange, setDateRange] = useState<string>('Este Mês');
+  const [isGenerating, setIsGenerating] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
 
+  // ============================================
+  // HANDLER PARA MUDANÇA DE PERÍODO
+  // ============================================
+  const handlePeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const newPeriod = e.target.value;
+    setDateRange(newPeriod);
+    
+    // Mostrar toast de confirmação
+    if (showToast) {
+      showToast(`Período alterado para: ${newPeriod}`, 'success');
+    }
+    
+    // Aqui você pode adicionar lógica para buscar dados do novo período
+    console.log('Período alterado:', newPeriod);
+  };
+
+  // ============================================
+  // HANDLER PARA FILTRAR
+  // ============================================
+  const handleFilter = () => {
+    setIsLoading(true);
+    
+    // Simular carregamento
+    setTimeout(() => {
+      setIsLoading(false);
+      if (showToast) {
+        showToast('Dados filtrados com sucesso!', 'success');
+      }
+    }, 500);
+  };
+
+  // ============================================
+  // HANDLER PARA EXPORTAR PDF
+  // ============================================
   const handleExportPDF = () => {
     setIsGenerating(true);
-    showToast('A gerar relatório PDF...', 'info');
     
+    if (showToast) {
+      showToast('A gerar relatório PDF...', 'info');
+    }
+    
+    // Simular processamento
     setTimeout(() => {
       try {
         const pdfData = dataMensal.map(item => [
@@ -75,24 +134,26 @@ export default function Relatorios() {
           'relatorio_dexapp'
         );
         
-        showToast('PDF gerado com sucesso!', 'success');
+        if (showToast) {
+          showToast('PDF gerado com sucesso!', 'success');
+        }
       } catch (error) {
-        showToast('Erro ao gerar PDF', 'error');
+        console.error('Erro ao gerar PDF:', error);
+        if (showToast) {
+          showToast('Erro ao gerar PDF', 'error');
+        }
       } finally {
         setIsGenerating(false);
       }
     }, 1000);
   };
 
-  const handlePeriodChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    setDateRange(e.target.value);
-    showToast(`Período alterado para: ${e.target.value}`, 'success');
-  };
-
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        {/* Breadcrumb Navigation */}
+        {/* ======================================== */}
+        {/* BREADCRUMB NAVIGATION */}
+        {/* ======================================== */}
         <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
           <button 
             onClick={() => navigate('/')} 
@@ -111,7 +172,9 @@ export default function Relatorios() {
           <span className="text-primary font-bold">Relatórios</span>
         </div>
 
-        {/* Header */}
+        {/* ======================================== */}
+        {/* HEADER */}
+        {/* ======================================== */}
         <div className="flex items-center gap-4 mb-8">
           <button 
             onClick={() => navigate(-1)}
@@ -129,7 +192,9 @@ export default function Relatorios() {
           </div>
         </div>
 
-        {/* Controles de período e exportação */}
+        {/* ======================================== */}
+        {/* CONTROLES DE PERÍODO E EXPORTAÇÃO */}
+        {/* ======================================== */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div className="flex gap-2">
             <select 
@@ -145,9 +210,11 @@ export default function Relatorios() {
             <Button 
               variant="outline" 
               leftIcon={<Filter size={18} />}
+              onClick={handleFilter}
+              isLoading={isLoading}
               className="rounded-xl"
             >
-              Filtrar
+              {isLoading ? 'Filtrando...' : 'Filtrar'}
             </Button>
           </div>
           <Button 
@@ -160,6 +227,9 @@ export default function Relatorios() {
           </Button>
         </div>
 
+        {/* ======================================== */}
+        {/* GRÁFICOS */}
+        {/* ======================================== */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
           {/* Service Distribution */}
           <Card>
@@ -180,16 +250,26 @@ export default function Relatorios() {
                     outerRadius={120}
                     paddingAngle={5}
                     dataKey="value"
-                    label
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
                   >
                     {dataServicos.map((entry, index) => (
                       <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip 
-                    contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                    formatter={(value: number) => [`${value} serviços`, 'Quantidade']}
+                    contentStyle={{
+                      borderRadius: '16px',
+                      border: 'none',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                      padding: '8px 12px'
+                    }}
                   />
-                  <Legend verticalAlign="bottom" height={36}/>
+                  <Legend 
+                    verticalAlign="bottom" 
+                    height={36}
+                    formatter={(value) => <span className="text-sm text-gray-600">{value}</span>}
+                  />
                 </PieChart>
               </ResponsiveContainer>
             </CardContent>
@@ -207,25 +287,64 @@ export default function Relatorios() {
               <ResponsiveContainer width="100%" height="100%">
                 <BarChart data={dataMensal}>
                   <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f0f0f0" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
-                  <YAxis axisLine={false} tickLine={false} tick={{fontSize: 12, fill: '#9ca3af'}} />
-                  <Tooltip 
-                    contentStyle={{borderRadius: '16px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)'}}
+                  <XAxis 
+                    dataKey="name" 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 12, fill: '#9ca3af'}} 
                   />
-                  <Legend verticalAlign="top" align="right" height={36}/>
-                  <Bar dataKey="solicitacoes" name="Solicitações" fill="#0A1D56" radius={[4, 4, 0, 0]} />
-                  <Bar dataKey="concluidas" name="Concluídas" fill="#FF7A00" radius={[4, 4, 0, 0]} />
+                  <YAxis 
+                    axisLine={false} 
+                    tickLine={false} 
+                    tick={{fontSize: 12, fill: '#9ca3af'}} 
+                  />
+                  <Tooltip 
+                    formatter={(value: number) => [value.toLocaleString(), 'Quantidade']}
+                    contentStyle={{
+                      borderRadius: '16px',
+                      border: 'none',
+                      boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1)',
+                      padding: '8px 12px'
+                    }}
+                  />
+                  <Legend 
+                    verticalAlign="top" 
+                    align="right" 
+                    height={36}
+                    formatter={(value) => <span className="text-sm text-gray-600">{value}</span>}
+                  />
+                  <Bar 
+                    dataKey="solicitacoes" 
+                    name="Solicitações" 
+                    fill="#0A1D56" 
+                    radius={[4, 4, 0, 0]} 
+                  />
+                  <Bar 
+                    dataKey="concluidas" 
+                    name="Concluídas" 
+                    fill="#FF7A00" 
+                    radius={[4, 4, 0, 0]} 
+                  />
                 </BarChart>
               </ResponsiveContainer>
             </CardContent>
           </Card>
         </div>
 
-        {/* Summary Table */}
+        {/* ======================================== */}
+        {/* TABELA RESUMO */}
+        {/* ======================================== */}
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <h3 className="font-bold text-primary">Resumo de Atividades</h3>
-            <Button variant="ghost" size="sm" leftIcon={<Filter size={16} />}>Filtrar</Button>
+            <Button 
+              variant="ghost" 
+              size="sm" 
+              leftIcon={<Filter size={16} />}
+              onClick={handleFilter}
+            >
+              Filtrar
+            </Button>
           </CardHeader>
           <CardContent className="p-0">
             <div className="overflow-x-auto">
@@ -240,29 +359,32 @@ export default function Relatorios() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-50">
-                  {dataMensal.reverse().map((item, idx) => (
-                    <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
-                      <td className="p-4 font-bold text-primary">{item.name}</td>
-                      <td className="p-4 text-sm text-gray-600">{item.solicitacoes}</td>
-                      <td className="p-4 text-sm text-gray-600">{item.concluidas}</td>
-                      <td className="p-4">
-                        <div className="flex items-center gap-2">
-                          <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                            <div 
-                              className="h-full bg-accent" 
-                              style={{ width: `${(item.concluidas / item.solicitacoes) * 100}%` }}
-                            />
+                  {dataMensal.slice().reverse().map((item, idx) => {
+                    const taxa = Math.round((item.concluidas / item.solicitacoes) * 100);
+                    return (
+                      <tr key={idx} className="hover:bg-gray-50/50 transition-colors">
+                        <td className="p-4 font-bold text-primary">{item.name}</td>
+                        <td className="p-4 text-sm text-gray-600">{item.solicitacoes.toLocaleString()}</td>
+                        <td className="p-4 text-sm text-gray-600">{item.concluidas.toLocaleString()}</td>
+                        <td className="p-4">
+                          <div className="flex items-center gap-2">
+                            <div className="flex-1 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                              <div 
+                                className="h-full bg-accent transition-all duration-300" 
+                                style={{ width: `${taxa}%` }}
+                              />
+                            </div>
+                            <span className="text-xs font-bold text-primary min-w-[40px]">
+                              {taxa}%
+                            </span>
                           </div>
-                          <span className="text-xs font-bold text-primary">
-                            {Math.round((item.concluidas / item.solicitacoes) * 100)}%
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-4 font-black text-primary text-sm">
-                        MT {(item.concluidas * 1200).toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
+                        </td>
+                        <td className="p-4 font-black text-primary text-sm">
+                          MT {(item.concluidas * 1200).toLocaleString()}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
