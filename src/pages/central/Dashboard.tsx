@@ -41,12 +41,17 @@ import {
   LogOut,
   ChevronDown,
   ChevronUp,
-  Info
+  Info,
+  FileText,
+  IdCard,
+  Upload,
+  Download as DownloadIcon
 } from 'lucide-react';
 import { formatCurrency, formatDate, translateStatus, exportToCSV } from '../../utils/utils';
 import { useToast } from '../../contexts/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
+import { Modal } from '../../components/ui/Modal';
 
 interface CentralStats {
   totalSolicitacoes: number;
@@ -57,6 +62,7 @@ interface CentralStats {
   aguardandoOrcamento: number;
   totalPrestadores: number;
   prestadoresPendentes: number;
+  prestadoresPendentesDocumentos: number;
   prestadoresAtivos: number;
   totalClientes: number;
   valorTotalMovimentado: number;
@@ -70,9 +76,10 @@ interface PrestadorPendente {
   especialidade: string;
   dataCadastro: Date;
   status: string;
+  documentosAlert?: boolean;
   documentos: {
-    bi?: { nome: string, tipo: string };
-    declaracaoBairro?: { nome: string, tipo: string };
+    bi?: { nome: string, tipo: string, dataUpload: Date };
+    declaracaoBairro?: { nome: string, tipo: string, dataUpload: Date };
   };
 }
 
@@ -82,11 +89,14 @@ export default function CentralDashboard() {
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [filteredSolicitacoes, setFilteredSolicitacoes] = useState<Solicitacao[]>([]);
   const [prestadoresPendentes, setPrestadoresPendentes] = useState<PrestadorPendente[]>([]);
+  const [prestadoresPendentesDocumentos, setPrestadoresPendentesDocumentos] = useState<PrestadorPendente[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('todas');
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const { showToast } = useToast();
+  const [selectedPrestador, setSelectedPrestador] = useState<PrestadorPendente | null>(null);
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [stats, setStats] = useState<CentralStats>({
     totalSolicitacoes: 0,
     pendentes: 0,
@@ -96,6 +106,7 @@ export default function CentralDashboard() {
     aguardandoOrcamento: 0,
     totalPrestadores: 0,
     prestadoresPendentes: 0,
+    prestadoresPendentesDocumentos: 0,
     prestadoresAtivos: 0,
     totalClientes: 0,
     valorTotalMovimentado: 0
@@ -141,13 +152,13 @@ export default function CentralDashboard() {
       setIsLoading(false);
     });
 
-    // Buscar prestadores pendentes
-    const prestadoresQuery = query(
+    // Buscar prestadores pendentes (status = 'pendente')
+    const prestadoresPendentesQuery = query(
       collection(db, 'users'),
       where('profile', '==', 'prestador'),
       where('status', '==', 'pendente')
     );
-    const unsubscribePrestadores = onSnapshot(prestadoresQuery, (snapshot) => {
+    const unsubscribePrestadoresPendentes = onSnapshot(prestadoresPendentesQuery, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
         id: doc.id,
         ...doc.data()
@@ -157,6 +168,25 @@ export default function CentralDashboard() {
       setStats(prev => ({
         ...prev,
         prestadoresPendentes: docs.length
+      }));
+    });
+
+    // Buscar prestadores com documentos pendentes (status = 'pendente_documentos')
+    const prestadoresDocumentosQuery = query(
+      collection(db, 'users'),
+      where('profile', '==', 'prestador'),
+      where('status', '==', 'pendente_documentos')
+    );
+    const unsubscribePrestadoresDocumentos = onSnapshot(prestadoresDocumentosQuery, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      } as PrestadorPendente));
+      setPrestadoresPendentesDocumentos(docs);
+      
+      setStats(prev => ({
+        ...prev,
+        prestadoresPendentesDocumentos: docs.length
       }));
     });
 
@@ -170,7 +200,7 @@ export default function CentralDashboard() {
       setStats(prev => ({
         ...prev,
         prestadoresAtivos: snapshot.docs.length,
-        totalPrestadores: snapshot.docs.length + prestadoresPendentes.length
+        totalPrestadores: snapshot.docs.length + prestadoresPendentes.length + prestadoresPendentesDocumentos.length
       }));
     });
 
@@ -188,7 +218,8 @@ export default function CentralDashboard() {
 
     return () => {
       unsubscribeSolicitacoes();
-      unsubscribePrestadores();
+      unsubscribePrestadoresPendentes();
+      unsubscribePrestadoresDocumentos();
       unsubscribePrestadoresAtivos();
       unsubscribeClientes();
     };
@@ -261,7 +292,6 @@ export default function CentralDashboard() {
   };
 
   const handleAssignPrestador = async (id: string) => {
-    // Aqui você pode abrir um modal para selecionar prestador
     showToast('Funcionalidade em desenvolvimento', 'info');
   };
 
@@ -285,6 +315,11 @@ export default function CentralDashboard() {
   // FUNÇÕES CRUD - PRESTADORES
   // ============================================
 
+  const handleViewDocuments = (prestador: PrestadorPendente) => {
+    setSelectedPrestador(prestador);
+    setShowDocumentModal(true);
+  };
+
   const handleApprovePrestador = async (id: string) => {
     setActionLoading(id);
     try {
@@ -297,6 +332,19 @@ export default function CentralDashboard() {
     } catch (error) {
       console.error('Erro ao aprovar prestador:', error);
       showToast('Erro ao aprovar prestador', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
+  const handleRequestDocuments = async (id: string) => {
+    setActionLoading(id);
+    try {
+      // Aqui você pode implementar o envio de notificação para o prestador
+      showToast('Notificação enviada ao prestador para enviar documentos', 'success');
+    } catch (error) {
+      console.error('Erro ao notificar prestador:', error);
+      showToast('Erro ao notificar prestador', 'error');
     } finally {
       setActionLoading(null);
     }
@@ -466,7 +514,104 @@ export default function CentralDashboard() {
         </div>
 
         {/* ======================================== */}
-        {/* PRESTADORES PENDENTES */}
+        {/* PRESTADORES PENDENTES (DOCUMENTOS) */}
+        {/* ======================================== */}
+        {prestadoresPendentesDocumentos.length > 0 && (
+          <div className="mb-8">
+            <h2 className="text-xl font-black text-primary flex items-center gap-2 mb-4">
+              <FileText size={20} className="text-accent" />
+              Prestadores com Documentos Pendentes ({prestadoresPendentesDocumentos.length})
+            </h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              {prestadoresPendentesDocumentos.map((prestador) => (
+                <motion.div
+                  key={prestador.id}
+                  initial={{ opacity: 0, y: 20 }}
+                  animate={{ opacity: 1, y: 0 }}
+                >
+                  <Card className="border-l-4 border-l-orange-400 hover:shadow-lg transition-all">
+                    <CardContent className="p-4">
+                      <div className="flex items-start justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-full bg-orange-50 flex items-center justify-center text-orange-600">
+                            <UserIcon size={20} />
+                          </div>
+                          <div>
+                            <h4 className="font-bold text-primary">{prestador.nome}</h4>
+                            <p className="text-xs text-gray-500">{prestador.especialidade}</p>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-bold bg-orange-100 text-orange-700 px-2 py-1 rounded-full">
+                          Docs Pendentes
+                        </span>
+                      </div>
+                      
+                      <div className="space-y-1 text-xs text-gray-500 mb-4">
+                        <div className="flex items-center gap-2">
+                          <Mail size={12} />
+                          <span>{prestador.email}</span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Phone size={12} />
+                          <span>{prestador.telefone}</span>
+                        </div>
+                        <div className="flex items-center gap-2 mt-2">
+                          {prestador.documentos?.bi ? (
+                            <span className="text-green-600 flex items-center gap-1">
+                              <CheckCircle2 size={12} />
+                              BI
+                            </span>
+                          ) : (
+                            <span className="text-red-600 flex items-center gap-1">
+                              <XCircle size={12} />
+                              BI
+                            </span>
+                          )}
+                          {prestador.documentos?.declaracaoBairro ? (
+                            <span className="text-green-600 flex items-center gap-1">
+                              <CheckCircle2 size={12} />
+                              Declaração
+                            </span>
+                          ) : (
+                            <span className="text-red-600 flex items-center gap-1">
+                              <XCircle size={12} />
+                              Declaração
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleViewDocuments(prestador)}
+                          className="flex-1 border-blue-200 text-blue-600 hover:bg-blue-50"
+                          leftIcon={<Eye size={14} />}
+                        >
+                          Ver Docs
+                        </Button>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          onClick={() => handleRequestDocuments(prestador.id)}
+                          disabled={actionLoading === prestador.id}
+                          className="flex-1 border-orange-200 text-orange-600 hover:bg-orange-50"
+                          leftIcon={<Upload size={14} />}
+                        >
+                          Notificar
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                </motion.div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* ======================================== */}
+        {/* PRESTADORES PENDENTES (AGUARDANDO APROVAÇÃO) */}
         {/* ======================================== */}
         {prestadoresPendentes.length > 0 && (
           <div className="mb-8">
@@ -529,7 +674,7 @@ export default function CentralDashboard() {
                           disabled={actionLoading === prestador.id}
                           className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
                         >
-                          <UserX size={16} className="mr-1" />
+                          <UserX size={14} className="mr-1" />
                           Rejeitar
                         </Button>
                         <Button
@@ -539,7 +684,7 @@ export default function CentralDashboard() {
                           disabled={actionLoading === prestador.id}
                           className="flex-1 bg-green-600 hover:bg-green-700"
                         >
-                          <UserCheck size={16} className="mr-1" />
+                          <UserCheck size={14} className="mr-1" />
                           Aprovar
                         </Button>
                       </div>
@@ -816,6 +961,100 @@ export default function CentralDashboard() {
           )}
         </div>
       </div>
+
+      {/* Modal de Visualização de Documentos */}
+      <Modal isOpen={showDocumentModal} onClose={() => setShowDocumentModal(false)} title="Documentos do Prestador">
+        {selectedPrestador && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 pb-4 border-b">
+              <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center text-xl font-black">
+                {selectedPrestador.nome.charAt(0)}
+              </div>
+              <div>
+                <h3 className="font-bold text-primary">{selectedPrestador.nome}</h3>
+                <p className="text-sm text-gray-500">{selectedPrestador.especialidade}</p>
+              </div>
+            </div>
+
+            <div className="space-y-4">
+              {/* Documento BI */}
+              <div className="border-2 border-gray-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <IdCard size={20} className="text-gray-600" />
+                    <div>
+                      <h4 className="font-bold text-primary">Bilhete de Identidade</h4>
+                      {selectedPrestador.documentos?.bi ? (
+                        <p className="text-xs text-green-600">Carregado em {formatDate(selectedPrestador.documentos.bi.dataUpload)}</p>
+                      ) : (
+                        <p className="text-xs text-red-600">Não carregado</p>
+                      )}
+                    </div>
+                  </div>
+                  {selectedPrestador.documentos?.bi && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => showToast('Download iniciado', 'success')}
+                      leftIcon={<DownloadIcon size={14} />}
+                    >
+                      Download
+                    </Button>
+                  )}
+                </div>
+              </div>
+
+              {/* Documento Declaração do Bairro */}
+              <div className="border-2 border-gray-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <Home size={20} className="text-gray-600" />
+                    <div>
+                      <h4 className="font-bold text-primary">Declaração do Bairro</h4>
+                      {selectedPrestador.documentos?.declaracaoBairro ? (
+                        <p className="text-xs text-green-600">Carregado em {formatDate(selectedPrestador.documentos.declaracaoBairro.dataUpload)}</p>
+                      ) : (
+                        <p className="text-xs text-red-600">Não carregado</p>
+                      )}
+                    </div>
+                  </div>
+                  {selectedPrestador.documentos?.declaracaoBairro && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => showToast('Download iniciado', 'success')}
+                      leftIcon={<DownloadIcon size={14} />}
+                    >
+                      Download
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowDocumentModal(false)}
+                className="flex-1"
+              >
+                Fechar
+              </Button>
+              {(!selectedPrestador.documentos?.bi || !selectedPrestador.documentos?.declaracaoBairro) && (
+                <Button
+                  onClick={() => {
+                    handleRequestDocuments(selectedPrestador.id);
+                    setShowDocumentModal(false);
+                  }}
+                  className="flex-1 bg-accent hover:bg-accent/90 text-white"
+                >
+                  Notificar Prestador
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
     </AppLayout>
   );
 }
