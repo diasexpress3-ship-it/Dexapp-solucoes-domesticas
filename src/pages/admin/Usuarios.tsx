@@ -42,7 +42,10 @@ import {
   UserPlus,
   UserMinus,
   Briefcase,
-  Wallet
+  Wallet,
+  MapPin,
+  DollarSign,
+  Percent
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -50,6 +53,7 @@ import { collection, query, onSnapshot, orderBy, doc, updateDoc, deleteDoc, wher
 import { db } from '../../services/firebase';
 import { formatCurrency, formatDate, exportToCSV } from '../../utils/utils';
 import { motion } from 'framer-motion';
+import { SERVICE_CATEGORIES, getEspecialidadeNome } from '../../constants/categories';
 
 // ============================================
 // INTERFACES
@@ -63,18 +67,42 @@ interface Usuario {
   status: 'activo' | 'inactivo' | 'pendente' | 'pendente_documentos' | 'rejeitado';
   dataCadastro: Date;
   ultimoAcesso?: Date;
+  criadoPor?: string;
+  criadoPorNome?: string;
+  
   // Cliente
   endereco?: string;
   cidade?: string;
+  
   // Prestador
   especialidade?: string;
   categoria?: string;
+  descricao?: string;
+  experiencia?: string;
+  valorHora?: number;
   avaliacaoMedia?: number;
   totalAvaliacoes?: number;
-  valorHora?: number;
+  documentos?: {
+    bi?: { nome: string; dataUpload: Date };
+    declaracaoBairro?: { nome: string; dataUpload: Date };
+  };
+  
   // Central/Admin
   nivel?: string;
   departamento?: string;
+  permissoes?: {
+    usuarios?: boolean;
+    prestadores?: boolean;
+    solicitacoes?: boolean;
+    pagamentos?: boolean;
+    relatorios?: boolean;
+    configuracoes?: boolean;
+  };
+  
+  // Financeiro (prestador)
+  saldo?: number;
+  totalGanho?: number;
+  saquesRealizados?: number;
 }
 
 interface UsuarioStats {
@@ -86,6 +114,8 @@ interface UsuarioStats {
   ativos: number;
   pendentes: number;
   inativos: number;
+  rejeitados: number;
+  pendentesDocumentos: number;
 }
 
 // ============================================
@@ -106,7 +136,9 @@ export default function Usuarios() {
   const [selectedUsuario, setSelectedUsuario] = useState<Usuario | null>(null);
   const [showDetailsModal, setShowDetailsModal] = useState(false);
   const [showEditModal, setShowEditModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [editForm, setEditForm] = useState<Partial<Usuario>>({});
+  const [copiado, setCopiado] = useState<string | null>(null);
   
   const [stats, setStats] = useState<UsuarioStats>({
     total: 0,
@@ -116,7 +148,9 @@ export default function Usuarios() {
     admin: 0,
     ativos: 0,
     pendentes: 0,
-    inativos: 0
+    inativos: 0,
+    rejeitados: 0,
+    pendentesDocumentos: 0
   });
 
   const handleLogout = async () => {
@@ -154,8 +188,10 @@ export default function Usuarios() {
       const central = docs.filter(u => u.profile === 'central').length;
       const admin = docs.filter(u => u.profile === 'admin').length;
       const ativos = docs.filter(u => u.status === 'activo').length;
-      const pendentes = docs.filter(u => ['pendente', 'pendente_documentos'].includes(u.status)).length;
+      const pendentes = docs.filter(u => u.status === 'pendente').length;
+      const pendentesDocumentos = docs.filter(u => u.status === 'pendente_documentos').length;
       const inativos = docs.filter(u => u.status === 'inactivo').length;
+      const rejeitados = docs.filter(u => u.status === 'rejeitado').length;
 
       setStats({
         total: docs.length,
@@ -165,7 +201,9 @@ export default function Usuarios() {
         admin,
         ativos,
         pendentes,
-        inativos
+        inativos,
+        rejeitados,
+        pendentesDocumentos
       });
 
       filterUsuarios(filterProfile, filterStatus, docs);
@@ -205,7 +243,9 @@ export default function Usuarios() {
         u.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
         u.telefone.includes(searchTerm) ||
-        u.profile.toLowerCase().includes(searchTerm.toLowerCase())
+        u.profile.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        (u.cidade && u.cidade.toLowerCase().includes(searchTerm.toLowerCase())) ||
+        (u.especialidade && u.especialidade.toLowerCase().includes(searchTerm.toLowerCase()))
       );
     }
 
@@ -243,11 +283,17 @@ export default function Usuarios() {
       }),
       ...(usuario.profile === 'prestador' && {
         especialidade: usuario.especialidade,
-        valorHora: usuario.valorHora
+        valorHora: usuario.valorHora,
+        experiencia: usuario.experiencia
       }),
       ...(usuario.profile === 'central' && {
         nivel: usuario.nivel,
         departamento: usuario.departamento
+      }),
+      ...(usuario.profile === 'admin' && {
+        nivel: usuario.nivel,
+        departamento: usuario.departamento,
+        permissoes: usuario.permissoes
       })
     });
     setShowEditModal(true);
@@ -320,15 +366,19 @@ export default function Usuarios() {
       'Último Acesso': u.ultimoAcesso ? formatDate(u.ultimoAcesso) : 'Nunca',
       Cidade: u.cidade || 'N/A',
       ...(u.profile === 'prestador' && {
-        Especialidade: u.especialidade || 'N/A',
-        Avaliação: u.avaliacaoMedia?.toFixed(1) || 'N/A'
+        Especialidade: getEspecialidadeNome(u.especialidade || ''),
+        Avaliação: u.avaliacaoMedia?.toFixed(1) || 'N/A',
+        'Valor/Hora': u.valorHora ? formatCurrency(u.valorHora) : 'N/A',
+        'Total Ganho': u.totalGanho ? formatCurrency(u.totalGanho) : 'N/A'
+      }),
+      ...(u.profile === 'admin' && {
+        Nível: u.nivel || 'N/A',
+        Departamento: u.departamento || 'N/A'
       })
     }));
     exportToCSV(data, `usuarios_${new Date().toISOString().split('T')[0]}`);
     showToast('Lista exportada com sucesso!', 'success');
   };
-
-  const [copiado, setCopiado] = useState<string | null>(null);
 
   // ============================================
   // HELPERS
@@ -357,16 +407,34 @@ export default function Usuarios() {
     switch (status) {
       case 'activo': return 'bg-green-100 text-green-700';
       case 'inactivo': return 'bg-gray-100 text-gray-700';
-      case 'pendente':
-      case 'pendente_documentos': return 'bg-yellow-100 text-yellow-700';
+      case 'pendente': return 'bg-yellow-100 text-yellow-700';
+      case 'pendente_documentos': return 'bg-orange-100 text-orange-700';
       case 'rejeitado': return 'bg-red-100 text-red-700';
       default: return 'bg-gray-100 text-gray-700';
     }
   };
 
-  // ============================================
-  // RENDER
-  // ============================================
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'activo': return <CheckCircle2 size={12} className="mr-1" />;
+      case 'inactivo': return <XCircle size={12} className="mr-1" />;
+      case 'pendente': return <Clock size={12} className="mr-1" />;
+      case 'pendente_documentos': return <FileText size={12} className="mr-1" />;
+      case 'rejeitado': return <XCircle size={12} className="mr-1" />;
+      default: return null;
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <AppLayout>
+        <div className="container mx-auto px-4 py-8 flex items-center justify-center min-h-[60vh]">
+          <Loader2 size={40} className="animate-spin text-accent" />
+        </div>
+      </AppLayout>
+    );
+  }
+
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
@@ -425,13 +493,22 @@ export default function Usuarios() {
             >
               <RefreshCw size={18} />
             </Button>
+            <Button
+              variant="primary"
+              size="sm"
+              onClick={() => navigate('/admin/usuarios/novo')}
+              leftIcon={<UserPlus size={16} />}
+              className="bg-accent hover:bg-accent/90 text-white"
+            >
+              Novo Usuário
+            </Button>
           </div>
         </div>
 
         {/* ======================================== */}
         {/* STATS CARDS */}
         {/* ======================================== */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-8 gap-4 mb-8">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 xl:grid-cols-10 gap-4 mb-8">
           <Card className="bg-primary text-white">
             <CardContent className="p-4">
               <p className="text-xs font-bold opacity-60 uppercase">Total</p>
@@ -481,6 +558,20 @@ export default function Usuarios() {
             </CardContent>
           </Card>
 
+          <Card className="bg-orange-600 text-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold opacity-60 uppercase">Docs Pend</p>
+              <h3 className="text-2xl font-black">{stats.pendentesDocumentos}</h3>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-red-600 text-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold opacity-60 uppercase">Rejeitados</p>
+              <h3 className="text-2xl font-black">{stats.rejeitados}</h3>
+            </CardContent>
+          </Card>
+
           <Card className="bg-gray-600 text-white">
             <CardContent className="p-4">
               <p className="text-xs font-bold opacity-60 uppercase">Inativos</p>
@@ -497,7 +588,7 @@ export default function Usuarios() {
             <div className="flex flex-col lg:flex-row gap-4">
               <div className="flex-1">
                 <Input
-                  placeholder="Pesquisar por nome, email, telefone..."
+                  placeholder="Pesquisar por nome, email, telefone, cidade, especialidade..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
                   leftIcon={<Search size={18} />}
@@ -524,8 +615,9 @@ export default function Usuarios() {
                   <option value="todos">Todos status</option>
                   <option value="activo">Ativos</option>
                   <option value="pendentes">Pendentes</option>
-                  <option value="inactivo">Inativos</option>
+                  <option value="pendente_documentos">Docs Pendentes</option>
                   <option value="rejeitado">Rejeitados</option>
+                  <option value="inactivo">Inativos</option>
                 </select>
               </div>
             </div>
@@ -568,7 +660,8 @@ export default function Usuarios() {
                                usuario.profile === 'prestador' ? 'Prestador' :
                                usuario.profile === 'central' ? 'Central' : 'Admin'}
                             </span>
-                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full ${getStatusColor(usuario.status)}`}>
+                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex items-center ${getStatusColor(usuario.status)}`}>
+                              {getStatusIcon(usuario.status)}
                               {usuario.status === 'activo' ? 'Ativo' :
                                usuario.status === 'inactivo' ? 'Inativo' :
                                usuario.status === 'pendente' ? 'Pendente' :
@@ -585,6 +678,15 @@ export default function Usuarios() {
                               <Phone size={12} />
                               {usuario.telefone}
                             </span>
+                            {usuario.cidade && (
+                              <>
+                                <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                                <span className="flex items-center gap-1">
+                                  <MapPin size={12} />
+                                  {usuario.cidade}
+                                </span>
+                              </>
+                            )}
                           </div>
                           <div className="flex items-center gap-2 mt-2 text-xs">
                             <Calendar size={12} className="text-gray-400" />
@@ -597,6 +699,28 @@ export default function Usuarios() {
                               </>
                             )}
                           </div>
+                          {usuario.profile === 'prestador' && usuario.valorHora && (
+                            <div className="flex items-center gap-2 mt-2 text-xs">
+                              <DollarSign size={12} className="text-accent" />
+                              <span className="font-bold text-accent">{formatCurrency(usuario.valorHora)}/hora</span>
+                              {usuario.avaliacaoMedia ? (
+                                <>
+                                  <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                                  <Star size={12} className="text-yellow-500" />
+                                  <span className="text-yellow-700">{usuario.avaliacaoMedia.toFixed(1)} ({usuario.totalAvaliacoes})</span>
+                                </>
+                              ) : null}
+                            </div>
+                          )}
+                          {usuario.profile === 'admin' && usuario.nivel && (
+                            <div className="flex items-center gap-2 mt-2 text-xs">
+                              <Shield size={12} className="text-purple-500" />
+                              <span className="text-purple-700 capitalize">{usuario.nivel}</span>
+                              <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                              <Building size={12} className="text-gray-500" />
+                              <span className="text-gray-700">{usuario.departamento}</span>
+                            </div>
+                          )}
                         </div>
                       </div>
 
@@ -649,9 +773,8 @@ export default function Usuarios() {
                           size="icon"
                           onClick={(e) => {
                             e.stopPropagation();
-                            if (window.confirm('Tem certeza que deseja excluir permanentemente este usuário?')) {
-                              handleDelete(usuario.id);
-                            }
+                            setSelectedUsuario(usuario);
+                            setShowDeleteModal(true);
                           }}
                           disabled={actionLoading === usuario.id}
                           className="text-red-600 hover:bg-red-50"
@@ -680,6 +803,13 @@ export default function Usuarios() {
                     ? 'Tente ajustar seus filtros ou termos de busca.'
                     : 'Nenhum usuário cadastrado até o momento.'}
                 </p>
+                <Button
+                  onClick={() => navigate('/admin/usuarios/novo')}
+                  className="mt-4 bg-accent hover:bg-accent/90 text-white"
+                  leftIcon={<UserPlus size={16} />}
+                >
+                  Criar Novo Usuário
+                </Button>
               </CardContent>
             </Card>
           )}
@@ -718,7 +848,8 @@ export default function Usuarios() {
                    selectedUsuario.profile === 'prestador' ? 'Prestador' :
                    selectedUsuario.profile === 'central' ? 'Central' : 'Admin'}
                 </span>
-                <span className={`text-xs font-bold px-3 py-1 rounded-full ${getStatusColor(selectedUsuario.status)}`}>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full flex items-center ${getStatusColor(selectedUsuario.status)}`}>
+                  {getStatusIcon(selectedUsuario.status)}
                   {selectedUsuario.status === 'activo' ? 'Ativo' :
                    selectedUsuario.status === 'inactivo' ? 'Inativo' :
                    selectedUsuario.status === 'pendente' ? 'Pendente' :
@@ -741,6 +872,12 @@ export default function Usuarios() {
                 <div>
                   <p className="text-xs text-gray-500">Último Acesso</p>
                   <p className="font-bold text-primary">{formatDate(selectedUsuario.ultimoAcesso)}</p>
+                </div>
+              )}
+              {selectedUsuario.criadoPor && (
+                <div>
+                  <p className="text-xs text-gray-500">Criado por</p>
+                  <p className="font-bold text-primary">{selectedUsuario.criadoPorNome || selectedUsuario.criadoPor}</p>
                 </div>
               )}
             </div>
@@ -767,12 +904,16 @@ export default function Usuarios() {
                 <h4 className="font-bold text-primary mb-3">Dados do Prestador</h4>
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-xs text-gray-500">Especialidade</p>
-                    <p className="font-bold text-primary">{selectedUsuario.especialidade || 'N/A'}</p>
-                  </div>
-                  <div>
                     <p className="text-xs text-gray-500">Categoria</p>
                     <p className="font-bold text-primary">{selectedUsuario.categoria || 'N/A'}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Especialidade</p>
+                    <p className="font-bold text-primary">{getEspecialidadeNome(selectedUsuario.especialidade || '')}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Experiência</p>
+                    <p className="font-bold text-primary">{selectedUsuario.experiencia || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Valor Hora</p>
@@ -782,7 +923,19 @@ export default function Usuarios() {
                     <p className="text-xs text-gray-500">Avaliação</p>
                     <p className="font-bold text-primary">{selectedUsuario.avaliacaoMedia?.toFixed(1) || 'N/A'} ({selectedUsuario.totalAvaliacoes || 0})</p>
                   </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Total Ganho</p>
+                    <p className="font-bold text-primary">{selectedUsuario.totalGanho ? formatCurrency(selectedUsuario.totalGanho) : 'N/A'}</p>
+                  </div>
                 </div>
+                {selectedUsuario.descricao && (
+                  <div className="mt-3">
+                    <p className="text-xs text-gray-500 mb-1">Descrição</p>
+                    <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">
+                      {selectedUsuario.descricao}
+                    </p>
+                  </div>
+                )}
               </div>
             )}
 
@@ -792,13 +945,30 @@ export default function Usuarios() {
                 <div className="grid grid-cols-2 gap-4">
                   <div>
                     <p className="text-xs text-gray-500">Nível</p>
-                    <p className="font-bold text-primary">{selectedUsuario.nivel || 'N/A'}</p>
+                    <p className="font-bold text-primary capitalize">{selectedUsuario.nivel || 'N/A'}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Departamento</p>
                     <p className="font-bold text-primary">{selectedUsuario.departamento || 'N/A'}</p>
                   </div>
                 </div>
+                {selectedUsuario.profile === 'admin' && selectedUsuario.permissoes && (
+                  <div className="mt-3">
+                    <p className="text-xs text-gray-500 mb-2">Permissões</p>
+                    <div className="grid grid-cols-2 gap-2">
+                      {Object.entries(selectedUsuario.permissoes).map(([key, value]) => (
+                        <div key={key} className="flex items-center gap-2">
+                          {value ? (
+                            <CheckCircle2 size={14} className="text-green-500" />
+                          ) : (
+                            <XCircle size={14} className="text-red-500" />
+                          )}
+                          <span className="text-xs capitalize">{key}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
 
@@ -926,17 +1096,25 @@ export default function Usuarios() {
                       placeholder="500"
                     />
                   </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-700 mb-2">Experiência</label>
+                    <Input
+                      value={editForm.experiencia || ''}
+                      onChange={(e) => setEditForm({ ...editForm, experiencia: e.target.value })}
+                      placeholder="Ex: 5 anos"
+                    />
+                  </div>
                 </>
               )}
 
-              {selectedUsuario.profile === 'central' && (
+              {(selectedUsuario.profile === 'central' || selectedUsuario.profile === 'admin') && (
                 <>
                   <div>
                     <label className="block text-xs font-bold text-gray-700 mb-2">Nível</label>
                     <Input
                       value={editForm.nivel || ''}
                       onChange={(e) => setEditForm({ ...editForm, nivel: e.target.value })}
-                      placeholder="Operador, Supervisor, etc"
+                      placeholder="Operador, Supervisor, Master"
                     />
                   </div>
                   <div>
@@ -944,7 +1122,7 @@ export default function Usuarios() {
                     <Input
                       value={editForm.departamento || ''}
                       onChange={(e) => setEditForm({ ...editForm, departamento: e.target.value })}
-                      placeholder="Atendimento, Financeiro, etc"
+                      placeholder="Atendimento, Financeiro"
                     />
                   </div>
                 </>
@@ -969,6 +1147,45 @@ export default function Usuarios() {
             </div>
           </div>
         )}
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL DE EXCLUSÃO */}
+      {/* ======================================== */}
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Excluir Usuário">
+        <div className="space-y-6">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-sm text-red-700">
+              Tem certeza que deseja excluir permanentemente o usuário{' '}
+              <span className="font-bold">{selectedUsuario?.nome}</span>?
+            </p>
+            <p className="text-xs text-red-600 mt-2">
+              Esta ação não pode ser desfeita. Todos os dados associados serão removidos.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteModal(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedUsuario) {
+                  handleDelete(selectedUsuario.id);
+                  setShowDeleteModal(false);
+                }
+              }}
+              disabled={actionLoading === selectedUsuario?.id}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            >
+              {actionLoading === selectedUsuario?.id ? 'Excluindo...' : 'Excluir Permanentemente'}
+            </Button>
+          </div>
+        </div>
       </Modal>
     </AppLayout>
   );
