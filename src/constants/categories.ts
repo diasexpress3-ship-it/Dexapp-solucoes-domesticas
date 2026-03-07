@@ -185,9 +185,15 @@ export const ESPECIALIDADES_POR_CATEGORIA = SERVICE_CATEGORIES.reduce((acc, cat)
 export const calcularPrecoEstimado = (
   especialidadeId: string,
   tamanho: 'pequeno' | 'medio' | 'grande'
-): { total: number; inicial70: number; final30: number } => {
+): { 
+  total: number; 
+  inicial70: number; 
+  final30: number;
+  prestador60: number;
+  plataforma40: number;
+} => {
   const especialidade = getAllEspecialidades().find(e => e.id === especialidadeId);
-  if (!especialidade) return { total: 0, inicial70: 0, final30: 0 };
+  if (!especialidade) return { total: 0, inicial70: 0, final30: 0, prestador60: 0, plataforma40: 0 };
 
   const multiplicador = {
     pequeno: 1,
@@ -198,14 +204,22 @@ export const calcularPrecoEstimado = (
   const total = especialidade.precoBase * multiplicador[tamanho];
   const inicial70 = Math.round(total * 0.7);
   const final30 = Math.round(total * 0.3);
+  const prestador60 = Math.round(total * 0.6); // 60% para o prestador
+  const plataforma40 = Math.round(total * 0.4); // 40% para a plataforma
 
-  return { total, inicial70, final30 };
+  return { total, inicial70, final30, prestador60, plataforma40 };
 };
 
 export const calcularPrecoTotalMultiplas = (
   especialidadesIds: string[],
   tamanho: 'pequeno' | 'medio' | 'grande'
-): { total: number; inicial70: number; final30: number } => {
+): { 
+  total: number; 
+  inicial70: number; 
+  final30: number;
+  prestador60: number;
+  plataforma40: number;
+} => {
   let total = 0;
   especialidadesIds.forEach(espId => {
     const { total: preco } = calcularPrecoEstimado(espId, tamanho);
@@ -215,7 +229,9 @@ export const calcularPrecoTotalMultiplas = (
   return {
     total,
     inicial70: Math.round(total * 0.7),
-    final30: Math.round(total * 0.3)
+    final30: Math.round(total * 0.3),
+    prestador60: Math.round(total * 0.6),
+    plataforma40: Math.round(total * 0.4)
   };
 };
 
