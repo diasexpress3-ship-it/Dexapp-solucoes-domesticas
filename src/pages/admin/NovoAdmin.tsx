@@ -50,9 +50,9 @@ interface NovoAdminForm {
 }
 
 // ============================================
-// COMPONENTE PRINCIPAL
+// COMPONENTE PRINCIPAL (EXPORTADO COMO NOMEADO)
 // ============================================
-export default function NovoAdmin() {
+export function NovoAdmin() {
   const navigate = useNavigate();
   const { user, logout, register } = useAuth();
   const { showToast } = useToast();
@@ -615,3 +615,6 @@ export default function NovoAdmin() {
     </AppLayout>
   );
 }
+
+// Também exportar como default para compatibilidade
+export default NovoAdmin;
