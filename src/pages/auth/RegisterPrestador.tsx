@@ -1,724 +1,969 @@
 import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { createUserWithEmailAndPassword } from 'firebase/auth';
-import { doc, setDoc, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../../services/firebase';
 import { AppLayout } from '../../components/layout/AppLayout';
+import { Card, CardContent } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { Card, CardContent, CardHeader } from '../../components/ui/Card';
-import { useToast } from '../../contexts/ToastContext';
 import { 
-  Mail, Lock, User, Phone, Briefcase, FileText, 
-  ChevronRight, ChevronLeft, Upload, X, Loader2,
-  Camera, CheckCircle, ShieldCheck, AlertCircle,
-  MessageCircle, Headphones
+  User, 
+  Mail, 
+  Phone, 
+  Lock, 
+  ArrowRight, 
+  ArrowLeft,
+  Camera,
+  Upload,
+  X,
+  Loader2,
+  CheckCircle2,
+  AlertCircle,
+  FileText,
+  Image,
+  Wrench,
+  ChevronDown,
+  ChevronUp,
+  Building,
+  MapPin,
+  Briefcase,
+  Star,
+  Clock,
+  MessageCircle
 } from 'lucide-react';
-import { SERVICE_CATEGORIES, ESPECIALIDADES_POR_CATEGORIA } from '../../constants/categories';
+import { useAuth } from '../../contexts/AuthContext';
+import { useToast } from '../../contexts/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
+import { SERVICE_CATEGORIES, getEspecialidadesByCategoria, Especialidade } from '../../constants/categories';
 
+// ============================================
+// INTERFACES
+// ============================================
+interface PrestadorForm {
+  nome: string;
+  email: string;
+  telefone: string;
+  password: string;
+  confirmPassword: string;
+  categoria: string;
+  especialidade: string;
+  descricao: string;
+  experiencia: string;
+  endereco: string;
+  cidade: string;
+  valorHora: number;
+  documentos: {
+    bi: File | null;
+    declaracaoRendimento: File | null;
+    declaracaoBairro: File | null;
+    certificado?: File | null;
+  };
+}
+
+interface FileWithPreview {
+  file: File;
+  preview: string;
+  name: string;
+  size: number;
+  type: string;
+}
+
+interface DocumentoRequerido {
+  id: keyof PrestadorForm['documentos'];
+  label: string;
+  descricao: string;
+  aceitos: string;
+  obrigatorio: boolean;
+  icon: any;
+}
+
+// ============================================
+// CONSTANTES
+// ============================================
+const DOCUMENTOS_REQUERIDOS: DocumentoRequerido[] = [
+  {
+    id: 'bi',
+    label: 'Bilhete de Identidade',
+    descricao: 'Frente e verso do seu BI',
+    aceitos: 'PDF, JPG, PNG (max 5MB)',
+    obrigatorio: true,
+    icon: FileText
+  },
+  {
+    id: 'declaracaoRendimento',
+    label: 'Declaração de Rendimento',
+    descricao: 'Comprovativo de rendimento ou atividade',
+    aceitos: 'PDF, JPG, PNG (max 5MB)',
+    obrigatorio: true,
+    icon: FileText
+  },
+  {
+    id: 'declaracaoBairro',
+    label: 'Declaração do Bairro',
+    descricao: 'Comprovativo de residência emitido pelo bairro',
+    aceitos: 'PDF, JPG, PNG (max 5MB)',
+    obrigatorio: true,
+    icon: FileText
+  },
+  {
+    id: 'certificado',
+    label: 'Certificado/Diploma (opcional)',
+    descricao: 'Comprovativo de formação na área',
+    aceitos: 'PDF, JPG, PNG (max 5MB)',
+    obrigatorio: false,
+    icon: FileText
+  }
+];
+
+// ============================================
+// COMPONENTE PRINCIPAL
+// ============================================
 export default function RegisterPrestador() {
-  const [step, setStep] = useState(1);
-  const [formData, setFormData] = useState({
+  const navigate = useNavigate();
+  const { register } = useAuth();
+  const { showToast } = useToast();
+  
+  // Estados
+  const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
+  const [loading, setLoading] = useState(false);
+  const [showCategorias, setShowCategorias] = useState(false);
+  const [categoriaSelecionada, setCategoriaSelecionada] = useState<string>('');
+  const [especialidades, setEspecialidades] = useState<Especialidade[]>([]);
+  const [uploadedFiles, setUploadedFiles] = useState<Record<string, FileWithPreview>>({});
+  
+  const [form, setForm] = useState<PrestadorForm>({
     nome: '',
     email: '',
     telefone: '',
     password: '',
     confirmPassword: '',
     categoria: '',
-    especialidades: [] as string[],
-    biografia: '',
-  });
-  
-  // Estados para upload de documentos
-  const [isUploading, setIsUploading] = useState({
-    bi: false,
-    declaracao: false,
-    certificado: false,
-    profile: false
-  });
-  
-  const [documentos, setDocumentos] = useState({
-    biUrl: '',
-    declaracaoUrl: '',
-    certificadoUrl: '',
-    profileUrl: ''
+    especialidade: '',
+    descricao: '',
+    experiencia: '',
+    endereco: '',
+    cidade: 'Maputo',
+    valorHora: 500,
+    documentos: {
+      bi: null,
+      declaracaoRendimento: null,
+      declaracaoBairro: null,
+      certificado: null
+    }
   });
 
-  const [isLoading, setIsLoading] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const navigate = useNavigate();
-  const { showToast } = useToast();
-
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
+  // ============================================
+  // HANDLERS DE FORMULÁRIO
+  // ============================================
+  const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
+    const { name, value } = e.target;
+    setForm(prev => ({ ...prev, [name]: value }));
   };
 
-  const toggleEspecialidade = (esp: string) => {
-    setFormData(prev => ({
-      ...prev,
-      especialidades: prev.especialidades.includes(esp)
-        ? prev.especialidades.filter(e => e !== esp)
-        : [...prev.especialidades, esp]
-    }));
+  const handleCategoriaSelect = (categoriaId: string) => {
+    setCategoriaSelecionada(categoriaId);
+    setForm(prev => ({ ...prev, categoria: categoriaId, especialidade: '' }));
+    setEspecialidades(getEspecialidadesByCategoria(categoriaId));
+    setShowCategorias(false);
   };
 
-  // Função de upload para ImgBB
-  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>, tipo: 'bi' | 'declaracao' | 'certificado' | 'profile') => {
+  const handleEspecialidadeSelect = (especialidadeId: string) => {
+    setForm(prev => ({ ...prev, especialidade: especialidadeId }));
+  };
+
+  // ============================================
+  // HANDLERS DE UPLOAD DE DOCUMENTOS
+  // ============================================
+  const handleFileUpload = (tipo: keyof PrestadorForm['documentos'], e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    // Verificações de segurança
-    if (!file.name || !file.type) {
-      showToast('Arquivo inválido', 'error');
+    // Validar tipo
+    const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png'];
+    if (!tiposPermitidos.includes(file.type)) {
+      showToast('Formato não permitido. Use PDF, JPG ou PNG', 'error');
       return;
     }
 
-    // Verificar tamanho (máximo 5MB)
+    // Validar tamanho (5MB)
     if (file.size > 5 * 1024 * 1024) {
       showToast('Arquivo muito grande. Máximo 5MB', 'error');
       return;
     }
 
-    // Verificar formato
-    const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg', 'application/pdf'];
-    if (!allowedTypes.includes(file.type)) {
-      showToast('Formato não permitido. Use JPG, PNG ou PDF', 'error');
-      return;
+    // Criar preview para imagens
+    let preview = '';
+    if (file.type.startsWith('image/')) {
+      preview = URL.createObjectURL(file);
     }
 
-    setIsUploading(prev => ({ ...prev, [tipo]: true }));
-    
-    const data = new FormData();
-    data.append('image', file);
+    setUploadedFiles(prev => ({
+      ...prev,
+      [tipo]: {
+        file,
+        preview,
+        name: file.name,
+        size: file.size,
+        type: file.type
+      }
+    }));
 
-    const apiKey = import.meta.env.VITE_PUBLIC_IMGBB_KEY;
-    if (!apiKey) {
-      showToast('Chave da API ImgBB não configurada', 'error');
-      setIsUploading(prev => ({ ...prev, [tipo]: false }));
-      return;
-    }
-    
-    try {
-      const response = await fetch(`https://api.imgbb.com/1/upload?key=${apiKey}`, {
-        method: 'POST',
-        body: data,
-      });
-      
-      if (!response.ok) {
-        throw new Error('Erro na resposta do servidor');
+    setForm(prev => ({
+      ...prev,
+      documentos: {
+        ...prev.documentos,
+        [tipo]: file
       }
-      
-      const result = await response.json();
-      
-      if (result.success && result.data && result.data.url) {
-        setDocumentos(prev => ({ ...prev, [`${tipo}Url`]: result.data.url }));
-        showToast('Documento carregado com sucesso!', 'success');
-      } else {
-        throw new Error('Falha no upload - resposta inválida');
-      }
-    } catch (error) {
-      console.error("Erro no upload:", error);
-      showToast('Erro ao carregar documento. Tente novamente.', 'error');
-    } finally {
-      setIsUploading(prev => ({ ...prev, [tipo]: false }));
-    }
+    }));
+
+    showToast(`${DOCUMENTOS_REQUERIDOS.find(d => d.id === tipo)?.label} carregado!`, 'success');
   };
 
+  const handleRemoveFile = (tipo: keyof PrestadorForm['documentos']) => {
+    if (uploadedFiles[tipo]?.preview) {
+      URL.revokeObjectURL(uploadedFiles[tipo].preview);
+    }
+
+    setUploadedFiles(prev => {
+      const newFiles = { ...prev };
+      delete newFiles[tipo];
+      return newFiles;
+    });
+
+    setForm(prev => ({
+      ...prev,
+      documentos: {
+        ...prev.documentos,
+        [tipo]: null
+      }
+    }));
+  };
+
+  // ============================================
+  // VALIDAÇÕES
+  // ============================================
   const validateStep1 = (): boolean => {
-    if (!formData.nome?.trim()) {
-      showToast('Nome completo é obrigatório', 'error');
+    if (!form.nome.trim()) {
+      showToast('Nome é obrigatório', 'error');
       return false;
     }
-    if (!formData.telefone?.trim()) {
-      showToast('Contacto telefónico é obrigatório', 'error');
+    if (!form.email.trim()) {
+      showToast('Email é obrigatório', 'error');
       return false;
     }
-    if (!formData.password) {
+    if (!form.email.includes('@')) {
+      showToast('Email inválido', 'error');
+      return false;
+    }
+    if (!form.telefone.trim()) {
+      showToast('Telefone é obrigatório', 'error');
+      return false;
+    }
+    if (form.telefone.replace(/\D/g, '').length < 9) {
+      showToast('Telefone deve ter 9 dígitos', 'error');
+      return false;
+    }
+    if (!form.password) {
       showToast('Senha é obrigatória', 'error');
       return false;
     }
-    if (formData.password.length < 6) {
-      showToast('A senha deve ter pelo menos 6 caracteres', 'error');
+    if (form.password.length < 6) {
+      showToast('Senha deve ter pelo menos 6 caracteres', 'error');
       return false;
     }
-    if (formData.password !== formData.confirmPassword) {
-      showToast('As senhas não coincidem', 'error');
+    if (form.password !== form.confirmPassword) {
+      showToast('Senhas não coincidem', 'error');
       return false;
     }
-    // Email é opcional
     return true;
   };
 
   const validateStep2 = (): boolean => {
-    if (!formData.categoria) {
+    if (!form.categoria) {
       showToast('Selecione uma categoria', 'error');
       return false;
     }
-    if (formData.especialidades.length === 0) {
-      showToast('Selecione pelo menos uma especialidade', 'error');
+    if (!form.especialidade) {
+      showToast('Selecione uma especialidade', 'error');
+      return false;
+    }
+    if (!form.descricao.trim() || form.descricao.length < 20) {
+      showToast('Descreva sua experiência (mínimo 20 caracteres)', 'error');
+      return false;
+    }
+    if (!form.experiencia) {
+      showToast('Informe seus anos de experiência', 'error');
+      return false;
+    }
+    if (!form.endereco.trim()) {
+      showToast('Endereço é obrigatório', 'error');
       return false;
     }
     return true;
   };
 
   const validateStep3 = (): boolean => {
-    if (!documentos.biUrl) {
-      showToast('Por favor, carregue o Bilhete de Identidade', 'error');
-      return false;
-    }
-    if (!documentos.declaracaoUrl) {
-      showToast('Por favor, carregue a Declaração do Bairro', 'error');
+    const documentosObrigatorios = DOCUMENTOS_REQUERIDOS.filter(d => d.obrigatorio);
+    const faltando = documentosObrigatorios.filter(d => !uploadedFiles[d.id]);
+
+    if (faltando.length > 0) {
+      showToast(`Carregue todos os documentos obrigatórios`, 'error');
       return false;
     }
     return true;
   };
 
-  const handleNext = () => {
-    if (step === 1 && validateStep1()) {
-      setStep(2);
-    } else if (step === 2 && validateStep2()) {
-      setStep(3);
-    }
-  };
+  // ============================================
+  // SUBMISSÃO
+  // ============================================
+  const handleSubmit = async () => {
+    setLoading(true);
 
-  const handleBack = () => {
-    setStep(step - 1);
-  };
-
-  const handleRegister = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateStep3()) return;
-
-    setIsLoading(true);
-    
     try {
-      // Gerar email temporário se não foi fornecido
-      const emailParaAuth = formData.email?.trim() || `${formData.telefone.replace(/\s+/g, '')}@prestador.temp.dex.co.mz`;
-      
-      // Criar usuário no Firebase Auth
-      const userCredential = await createUserWithEmailAndPassword(auth, emailParaAuth, formData.password);
-      const user = userCredential.user;
-
-      if (!user || !user.uid) {
-        throw new Error('Erro ao criar usuário');
-      }
-
-      // Salvar no Firestore com as URLs dos documentos
-      await setDoc(doc(db, 'users', user.uid), {
-        id: user.uid,
-        nome: formData.nome.trim(),
-        email: formData.email?.trim() || null,
-        telefone: formData.telefone.trim(),
+      // Preparar dados para registro
+      const userData = {
+        nome: form.nome,
+        email: form.email,
+        telefone: form.telefone,
+        password: form.password,
         profile: 'prestador',
-        status: 'pendente',
-        dataCadastro: serverTimestamp(),
-        ultimoAcesso: null,
-        prestadorData: {
-          categoria: formData.categoria,
-          especialidades: formData.especialidades,
-          biografia: formData.biografia,
-          biUrl: documentos.biUrl,
-          declaracaoUrl: documentos.declaracaoUrl,
-          certificadoUrl: documentos.certificadoUrl || null,
-          profileUrl: documentos.profileUrl || null,
-          rating: 5.0,
-          trabalhos: 0,
-          disponivel: true,
-          agenda: []
-        }
-      });
+        especialidade: form.especialidade,
+        categoria: form.categoria,
+        descricao: form.descricao,
+        experiencia: form.experiencia,
+        endereco: form.endereco,
+        cidade: form.cidade,
+        valorHora: form.valorHora,
+        status: 'pendente', // Prestador começa como pendente
+        documentos: Object.keys(uploadedFiles).reduce((acc, key) => {
+          acc[key] = {
+            nome: uploadedFiles[key].name,
+            tipo: uploadedFiles[key].type,
+            dataUpload: new Date()
+          };
+          return acc;
+        }, {} as any)
+      };
 
-      // Mostrar modal de sucesso
-      setShowSuccessModal(true);
-      
-    } catch (error: any) {
-      console.error('Registration error:', error);
-      let errorMessage = 'Erro ao criar conta';
-      
-      if (error.code === 'auth/email-already-in-use') {
-        errorMessage = 'Este email já está em uso';
-      } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'A senha é muito fraca';
-      } else if (error.code === 'auth/invalid-email') {
-        errorMessage = 'Email inválido';
-      } else if (error.message) {
-        errorMessage = error.message;
+      const result = await register(userData);
+
+      if (result.success) {
+        // Avançar para passo de confirmação
+        setStep(4);
+      } else {
+        showToast(result.error || 'Erro ao criar conta', 'error');
       }
-      
-      showToast(errorMessage, 'error');
+    } catch (error) {
+      console.error('Erro no registro:', error);
+      showToast('Erro ao criar conta', 'error');
     } finally {
-      setIsLoading(false);
+      setLoading(false);
     }
   };
 
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <AppLayout>
-      <div className="min-h-screen flex items-center justify-center p-4 bg-gray-50 py-12">
-        <Card className="w-full max-w-2xl">
-          <CardHeader className="text-center">
-            <Link to="/" className="inline-flex items-center gap-2 mb-6">
-              <div className="w-10 h-10 bg-gradient-to-br from-primary to-blue-900 rounded-xl flex items-center justify-center text-white font-bold text-xl">D</div>
-              <span className="text-2xl font-black text-primary">DEXAPP</span>
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="container mx-auto px-4 max-w-3xl">
+          {/* ======================================== */}
+          {/* HEADER */}
+          {/* ======================================== */}
+          <div className="text-center mb-8">
+            <Link to="/" className="inline-block mb-4">
+              <div className="w-16 h-16 bg-gradient-to-br from-accent to-orange-600 rounded-2xl flex items-center justify-center text-white font-black text-2xl mx-auto">
+                D
+              </div>
             </Link>
-            <h1 className="text-2xl font-bold text-primary">Seja um Prestador</h1>
-            <p className="text-gray-500 text-sm">Passo {step} de 3</p>
-            
-            {/* Progress Bar */}
-            <div className="w-full h-2 bg-gray-100 rounded-full mt-4 overflow-hidden">
-              <div 
-                className="h-full bg-accent transition-all duration-300" 
-                style={{ width: `${(step / 3) * 100}%` }}
-              />
-            </div>
-          </CardHeader>
-          
-          <CardContent>
-            <form onSubmit={handleRegister} className="space-y-6">
-              {/* Passo 1: Dados Pessoais */}
+            <h1 className="text-3xl md:text-4xl font-black text-primary mb-2">
+              Registro de <span className="text-accent">Prestador</span>
+            </h1>
+            <p className="text-gray-500">
+              Preencha seus dados para começar a oferecer serviços
+            </p>
+          </div>
+
+          {/* ======================================== */}
+          {/* PROGRESSO */}
+          {/* ======================================== */}
+          <div className="flex items-center justify-between mb-8">
+            {[
+              { num: 1, label: 'Dados Básicos' },
+              { num: 2, label: 'Profissão' },
+              { num: 3, label: 'Documentos' },
+              { num: 4, label: 'Confirmação' }
+            ].map((i) => (
+              <React.Fragment key={i.num}>
+                <div className="flex items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold ${
+                    step >= i.num 
+                      ? 'bg-accent text-white' 
+                      : step === i.num - 1 ? 'bg-accent/20 text-accent' : 'bg-gray-200 text-gray-400'
+                  }`}>
+                    {step > i.num ? <CheckCircle2 size={20} /> : i.num}
+                  </div>
+                  <span className={`ml-2 text-sm font-bold hidden md:block ${
+                    step >= i.num ? 'text-accent' : 'text-gray-400'
+                  }`}>
+                    {i.label}
+                  </span>
+                </div>
+                {i.num < 4 && (
+                  <div className={`flex-1 h-1 mx-4 ${
+                    step > i.num ? 'bg-accent' : 'bg-gray-200'
+                  }`} />
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+
+          <Card className="shadow-xl">
+            <CardContent className="p-6 md:p-8">
+              {/* ======================================== */}
+              {/* PASSO 1: DADOS BÁSICOS */}
+              {/* ======================================== */}
               {step === 1 && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4"
                 >
-                  <h3 className="font-bold text-lg text-primary flex items-center gap-2">
-                    <User size={20} className="text-accent" />
-                    Dados Pessoais
-                  </h3>
-                  
-                  <Input
-                    label="Nome Completo *"
-                    name="nome"
-                    placeholder="Ex: João Silva"
-                    value={formData.nome}
-                    onChange={handleChange}
-                    required
-                  />
-                  
-                  <Input
-                    label="Contacto Telefónico *"
-                    name="telefone"
-                    placeholder="Ex: 84 000 0000"
-                    value={formData.telefone}
-                    onChange={handleChange}
-                    required
-                  />
-                  
-                  <Input
-                    label="Email (opcional)"
-                    name="email"
-                    type="email"
-                    placeholder="seu@email.com"
-                    value={formData.email}
-                    onChange={handleChange}
-                  />
-                  
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <Input
-                      label="Senha *"
-                      name="password"
-                      type="password"
-                      placeholder="••••••••"
-                      value={formData.password}
-                      onChange={handleChange}
-                      required
-                    />
-                    <Input
-                      label="Confirmar Senha *"
-                      name="confirmPassword"
-                      type="password"
-                      placeholder="••••••••"
-                      value={formData.confirmPassword}
-                      onChange={handleChange}
-                      required
-                    />
+                  <h2 className="text-2xl font-black text-primary mb-6">
+                    Dados <span className="text-accent">Pessoais</span>
+                  </h2>
+
+                  <div className="space-y-4">
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        Nome Completo *
+                      </label>
+                      <Input
+                        name="nome"
+                        value={form.nome}
+                        onChange={handleInputChange}
+                        placeholder="Seu nome completo"
+                        leftIcon={<User size={18} />}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        Email *
+                      </label>
+                      <Input
+                        name="email"
+                        type="email"
+                        value={form.email}
+                        onChange={handleInputChange}
+                        placeholder="seu@email.com"
+                        leftIcon={<Mail size={18} />}
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        Telefone *
+                      </label>
+                      <Input
+                        name="telefone"
+                        value={form.telefone}
+                        onChange={handleInputChange}
+                        placeholder="84 123 4567"
+                        leftIcon={<Phone size={18} />}
+                      />
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          Senha *
+                        </label>
+                        <Input
+                          name="password"
+                          type="password"
+                          value={form.password}
+                          onChange={handleInputChange}
+                          placeholder="••••••"
+                          leftIcon={<Lock size={18} />}
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          Confirmar Senha *
+                        </label>
+                        <Input
+                          name="confirmPassword"
+                          type="password"
+                          value={form.confirmPassword}
+                          onChange={handleInputChange}
+                          placeholder="••••••"
+                          leftIcon={<Lock size={18} />}
+                        />
+                      </div>
+                    </div>
                   </div>
-                  
-                  <div className="flex justify-end">
-                    <Button type="button" onClick={handleNext} rightIcon={<ChevronRight size={18} />}>
-                      Próximo
+
+                  <div className="flex justify-end mt-8">
+                    <Button
+                      onClick={() => setStep(2)}
+                      className="bg-accent hover:bg-accent/90 text-white"
+                      rightIcon={<ArrowRight size={18} />}
+                    >
+                      Continuar
                     </Button>
                   </div>
                 </motion.div>
               )}
 
-              {/* Passo 2: Categoria e Especialidades */}
+              {/* ======================================== */}
+              {/* PASSO 2: PROFISSÃO */}
+              {/* ======================================== */}
               {step === 2 && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4"
                 >
-                  <h3 className="font-bold text-lg text-primary flex items-center gap-2">
-                    <Briefcase size={20} className="text-accent" />
-                    Categoria e Especialidades
-                  </h3>
-                  
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-gray-700 ml-1">Categoria Principal *</label>
-                    <select
-                      name="categoria"
-                      value={formData.categoria}
-                      onChange={handleChange}
-                      className="w-full h-12 bg-white border border-gray-200 rounded-xl px-4 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                      required
-                    >
-                      <option value="">Selecione uma categoria</option>
-                      {SERVICE_CATEGORIES.map(cat => (
-                        <option key={cat.id} value={cat.name}>{cat.name}</option>
-                      ))}
-                    </select>
-                  </div>
+                  <h2 className="text-2xl font-black text-primary mb-6">
+                    Dados <span className="text-accent">Profissionais</span>
+                  </h2>
 
-                  {formData.categoria && (
-                    <motion.div
-                      initial={{ opacity: 0, y: 10 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="space-y-3"
-                    >
-                      <label className="text-sm font-semibold text-gray-700 ml-1">Especialidades *</label>
-                      <div className="flex flex-wrap gap-2">
-                        {ESPECIALIDADES_POR_CATEGORIA[formData.categoria]?.map(esp => (
-                          <button
-                            key={esp}
-                            type="button"
-                            onClick={() => toggleEspecialidade(esp)}
-                            className={`px-4 py-2 rounded-full text-xs font-bold transition-all border ${
-                              formData.especialidades.includes(esp)
-                                ? 'bg-primary border-primary text-white'
-                                : 'bg-white border-gray-200 text-gray-600 hover:border-primary/50'
-                            }`}
-                          >
-                            {esp}
-                          </button>
-                        ))}
+                  <div className="space-y-6">
+                    {/* Categoria */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        Categoria de Serviço *
+                      </label>
+                      <div className="relative">
+                        <button
+                          type="button"
+                          onClick={() => setShowCategorias(!showCategorias)}
+                          className="w-full p-3 text-left border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none flex items-center justify-between"
+                        >
+                          <span className={form.categoria ? 'text-primary font-bold' : 'text-gray-400'}>
+                            {form.categoria 
+                              ? SERVICE_CATEGORIES.find(c => c.id === form.categoria)?.nome 
+                              : 'Selecione sua categoria'}
+                          </span>
+                          {showCategorias ? <ChevronUp size={20} /> : <ChevronDown size={20} />}
+                        </button>
+
+                        <AnimatePresence>
+                          {showCategorias && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -10 }}
+                              animate={{ opacity: 1, y: 0 }}
+                              exit={{ opacity: 0, y: -10 }}
+                              className="absolute z-50 mt-2 w-full bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-60 overflow-y-auto"
+                            >
+                              {SERVICE_CATEGORIES.map((cat) => (
+                                <button
+                                  key={cat.id}
+                                  onClick={() => handleCategoriaSelect(cat.id)}
+                                  className={`w-full p-3 text-left hover:bg-gray-50 transition-colors ${
+                                    form.categoria === cat.id ? 'bg-accent/5 border-l-4 border-accent' : ''
+                                  }`}
+                                >
+                                  <span className="font-bold text-primary">{cat.nome}</span>
+                                </button>
+                              ))}
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
                       </div>
-                    </motion.div>
-                  )}
+                    </div>
 
-                  <div className="space-y-1.5">
-                    <label className="text-sm font-semibold text-gray-700 ml-1">Biografia / Experiência</label>
-                    <textarea
-                      name="biografia"
-                      value={formData.biografia}
-                      onChange={handleChange}
-                      rows={3}
-                      className="w-full bg-white border border-gray-200 rounded-xl p-4 text-sm focus:ring-2 focus:ring-primary/20 focus:border-primary outline-none"
-                      placeholder="Conte um pouco sobre sua experiência profissional..."
-                    />
+                    {/* Especialidade */}
+                    {categoriaSelecionada && (
+                      <div>
+                        <label className="block text-sm font-bold text-gray-700 mb-2">
+                          Especialidade *
+                        </label>
+                        <div className="grid grid-cols-1 gap-2">
+                          {especialidades.map((esp) => (
+                            <button
+                              key={esp.id}
+                              onClick={() => handleEspecialidadeSelect(esp.id)}
+                              className={`p-3 border-2 rounded-xl text-left transition-all ${
+                                form.especialidade === esp.id
+                                  ? 'border-accent bg-accent/5'
+                                  : 'border-gray-200 hover:border-accent/50'
+                              }`}
+                            >
+                              <h3 className="font-bold text-primary">{esp.nome}</h3>
+                              <p className="text-xs text-gray-500">{esp.descricao}</p>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Descrição */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        Sobre você e sua experiência *
+                      </label>
+                      <textarea
+                        name="descricao"
+                        value={form.descricao}
+                        onChange={handleInputChange}
+                        placeholder="Descreva sua experiência, formação e serviços que oferece..."
+                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none min-h-[100px]"
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        {form.descricao.length} caracteres (mínimo 20)
+                      </p>
+                    </div>
+
+                    {/* Anos de Experiência */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        Anos de Experiência *
+                      </label>
+                      <select
+                        name="experiencia"
+                        value={form.experiencia}
+                        onChange={handleInputChange}
+                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none"
+                      >
+                        <option value="">Selecione</option>
+                        <option value="menos-1">Menos de 1 ano</option>
+                        <option value="1-3">1 a 3 anos</option>
+                        <option value="3-5">3 a 5 anos</option>
+                        <option value="5-10">5 a 10 anos</option>
+                        <option value="mais-10">Mais de 10 anos</option>
+                      </select>
+                    </div>
+
+                    {/* Valor por Hora */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        Valor por Hora (MT) *
+                      </label>
+                      <Input
+                        name="valorHora"
+                        type="number"
+                        value={form.valorHora}
+                        onChange={handleInputChange}
+                        placeholder="500"
+                        leftIcon={<Briefcase size={18} />}
+                      />
+                      <p className="text-xs text-gray-400 mt-1">
+                        Defina seu valor por hora de trabalho
+                      </p>
+                    </div>
+
+                    {/* Endereço */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        Endereço *
+                      </label>
+                      <Input
+                        name="endereco"
+                        value={form.endereco}
+                        onChange={handleInputChange}
+                        placeholder="Bairro, Quarteirão, Casa"
+                        leftIcon={<MapPin size={18} />}
+                      />
+                    </div>
+
+                    {/* Cidade */}
+                    <div>
+                      <label className="block text-sm font-bold text-gray-700 mb-2">
+                        Cidade *
+                      </label>
+                      <select
+                        name="cidade"
+                        value={form.cidade}
+                        onChange={handleInputChange}
+                        className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none"
+                      >
+                        <option value="Maputo">Maputo</option>
+                        <option value="Matola">Matola</option>
+                        <option value="Beira">Beira</option>
+                        <option value="Nampula">Nampula</option>
+                        <option value="Quelimane">Quelimane</option>
+                        <option value="Tete">Tete</option>
+                        <option value="Xai-Xai">Xai-Xai</option>
+                        <option value="Inhambane">Inhambane</option>
+                        <option value="Chimoio">Chimoio</option>
+                        <option value="Pemba">Pemba</option>
+                      </select>
+                    </div>
                   </div>
 
-                  <div className="flex justify-between">
-                    <Button type="button" variant="outline" onClick={handleBack} leftIcon={<ChevronLeft size={18} />}>
+                  <div className="flex justify-between mt-8">
+                    <Button
+                      variant="outline"
+                      onClick={() => setStep(1)}
+                      leftIcon={<ArrowLeft size={18} />}
+                    >
                       Voltar
                     </Button>
-                    <Button type="button" onClick={handleNext} rightIcon={<ChevronRight size={18} />}>
-                      Próximo
+                    <Button
+                      onClick={() => setStep(3)}
+                      className="bg-accent hover:bg-accent/90 text-white"
+                      rightIcon={<ArrowRight size={18} />}
+                    >
+                      Continuar
                     </Button>
                   </div>
                 </motion.div>
               )}
 
-              {/* Passo 3: Documentos */}
+              {/* ======================================== */}
+              {/* PASSO 3: DOCUMENTOS */}
+              {/* ======================================== */}
               {step === 3 && (
                 <motion.div
                   initial={{ opacity: 0, x: 20 }}
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -20 }}
-                  className="space-y-4"
                 >
-                  <h3 className="font-bold text-lg text-primary flex items-center gap-2">
-                    <FileText size={20} className="text-accent" />
-                    Documentos
-                  </h3>
+                  <h2 className="text-2xl font-black text-primary mb-6">
+                    <span className="text-accent">Documentos</span> Obrigatórios
+                  </h2>
 
-                  <p className="text-sm text-gray-500 mb-4">
-                    Carregue seus documentos para validação. Formatos aceitos: JPG, PNG, PDF (máx. 5MB cada)
-                  </p>
+                  <div className="space-y-6">
+                    {DOCUMENTOS_REQUERIDOS.map((doc) => {
+                      const uploaded = uploadedFiles[doc.id];
+                      const Icon = doc.icon;
 
-                  {/* Bilhete de Identidade */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 ml-1">
-                      Bilhete de Identidade * <span className="text-xs text-gray-400">(Frente e Verso)</span>
-                    </label>
-                    <label className="relative block w-full aspect-[4/3] border-2 border-dashed border-gray-200 rounded-xl hover:border-accent/30 transition-colors cursor-pointer group overflow-hidden">
-                      <input 
-                        type="file" 
-                        accept=".jpg,.jpeg,.png,.pdf" 
-                        className="hidden" 
-                        onChange={(e) => handleFileUpload(e, 'bi')}
-                      />
-                      {documentos.biUrl ? (
-                        <>
-                          {documentos.biUrl.includes('.pdf') ? (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-50">
-                              <FileText className="w-10 h-10 text-green-500 mb-2" />
-                              <p className="text-sm font-bold text-green-600">PDF Carregado</p>
+                      return (
+                        <div key={doc.id} className="border-2 border-gray-200 rounded-xl p-4">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center text-gray-600">
+                                <Icon size={20} />
+                              </div>
+                              <div>
+                                <h3 className="font-bold text-primary">
+                                  {doc.label}
+                                  {doc.obrigatorio && <span className="text-accent ml-1">*</span>}
+                                </h3>
+                                <p className="text-xs text-gray-500">{doc.descricao}</p>
+                              </div>
+                            </div>
+                            {uploaded && (
+                              <CheckCircle2 size={20} className="text-green-500" />
+                            )}
+                          </div>
+
+                          {!uploaded ? (
+                            <div className="mt-3">
+                              <input
+                                type="file"
+                                id={`file-${doc.id}`}
+                                accept=".pdf,.jpg,.jpeg,.png"
+                                onChange={(e) => handleFileUpload(doc.id, e)}
+                                className="hidden"
+                              />
+                              <label
+                                htmlFor={`file-${doc.id}`}
+                                className="flex items-center justify-center gap-2 p-3 border-2 border-dashed border-gray-300 rounded-xl hover:border-accent transition-colors cursor-pointer"
+                              >
+                                <Upload size={18} className="text-gray-400" />
+                                <span className="text-sm text-gray-600">Carregar {doc.label}</span>
+                                <span className="text-xs text-gray-400 ml-2">{doc.aceitos}</span>
+                              </label>
                             </div>
                           ) : (
-                            <img src={documentos.biUrl} alt="BI" className="absolute inset-0 w-full h-full object-cover" />
-                          )}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setDocumentos(prev => ({ ...prev, biUrl: '' }));
-                            }}
-                            className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-lg hover:bg-gray-100"
-                          >
-                            <X size={16} />
-                          </button>
-                        </>
-                      ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          {isUploading.bi ? (
-                            <Loader2 className="w-8 h-8 text-accent animate-spin" />
-                          ) : (
-                            <>
-                              <Upload className="w-8 h-8 text-gray-300 mb-2 group-hover:text-accent transition-colors" />
-                              <p className="text-xs font-bold text-gray-400">Clique para enviar</p>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </label>
-                  </div>
-
-                  {/* Declaração do Bairro */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 ml-1">Declaração do Bairro *</label>
-                    <label className="relative block w-full aspect-[4/3] border-2 border-dashed border-gray-200 rounded-xl hover:border-accent/30 transition-colors cursor-pointer group overflow-hidden">
-                      <input 
-                        type="file" 
-                        accept=".jpg,.jpeg,.png,.pdf" 
-                        className="hidden" 
-                        onChange={(e) => handleFileUpload(e, 'declaracao')}
-                      />
-                      {documentos.declaracaoUrl ? (
-                        <>
-                          {documentos.declaracaoUrl.includes('.pdf') ? (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-50">
-                              <FileText className="w-10 h-10 text-green-500 mb-2" />
-                              <p className="text-sm font-bold text-green-600">PDF Carregado</p>
-                            </div>
-                          ) : (
-                            <img src={documentos.declaracaoUrl} alt="Declaração" className="absolute inset-0 w-full h-full object-cover" />
-                          )}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setDocumentos(prev => ({ ...prev, declaracaoUrl: '' }));
-                            }}
-                            className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-lg hover:bg-gray-100"
-                          >
-                            <X size={16} />
-                          </button>
-                        </>
-                      ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          {isUploading.declaracao ? (
-                            <Loader2 className="w-8 h-8 text-accent animate-spin" />
-                          ) : (
-                            <>
-                              <Upload className="w-8 h-8 text-gray-300 mb-2 group-hover:text-accent transition-colors" />
-                              <p className="text-xs font-bold text-gray-400">Clique para enviar</p>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </label>
-                  </div>
-
-                  {/* Certificado (opcional) */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 ml-1">
-                      Certificado Profissional <span className="text-xs text-gray-400">(opcional)</span>
-                    </label>
-                    <label className="relative block w-full aspect-[4/3] border-2 border-dashed border-gray-200 rounded-xl hover:border-accent/30 transition-colors cursor-pointer group overflow-hidden">
-                      <input 
-                        type="file" 
-                        accept=".jpg,.jpeg,.png,.pdf" 
-                        className="hidden" 
-                        onChange={(e) => handleFileUpload(e, 'certificado')}
-                      />
-                      {documentos.certificadoUrl ? (
-                        <>
-                          {documentos.certificadoUrl.includes('.pdf') ? (
-                            <div className="absolute inset-0 flex flex-col items-center justify-center bg-green-50">
-                              <FileText className="w-10 h-10 text-green-500 mb-2" />
-                              <p className="text-sm font-bold text-green-600">PDF Carregado</p>
-                            </div>
-                          ) : (
-                            <img src={documentos.certificadoUrl} alt="Certificado" className="absolute inset-0 w-full h-full object-cover" />
-                          )}
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setDocumentos(prev => ({ ...prev, certificadoUrl: '' }));
-                            }}
-                            className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-lg hover:bg-gray-100"
-                          >
-                            <X size={16} />
-                          </button>
-                        </>
-                      ) : (
-                        <div className="absolute inset-0 flex flex-col items-center justify-center">
-                          {isUploading.certificado ? (
-                            <Loader2 className="w-8 h-8 text-accent animate-spin" />
-                          ) : (
-                            <>
-                              <Upload className="w-8 h-8 text-gray-300 mb-2 group-hover:text-accent transition-colors" />
-                              <p className="text-xs font-bold text-gray-400">Clique para enviar</p>
-                            </>
-                          )}
-                        </div>
-                      )}
-                    </label>
-                  </div>
-
-                  {/* Foto de Perfil (opcional) */}
-                  <div className="space-y-2">
-                    <label className="text-sm font-semibold text-gray-700 ml-1">
-                      Foto de Perfil <span className="text-xs text-gray-400">(opcional)</span>
-                    </label>
-                    <label className="relative block w-full h-32 border-2 border-dashed border-gray-200 rounded-xl hover:border-accent/30 transition-colors cursor-pointer group overflow-hidden">
-                      <input 
-                        type="file" 
-                        accept=".jpg,.jpeg,.png" 
-                        className="hidden" 
-                        onChange={(e) => handleFileUpload(e, 'profile')}
-                      />
-                      {documentos.profileUrl ? (
-                        <>
-                          <img src={documentos.profileUrl} alt="Perfil" className="absolute inset-0 w-full h-full object-cover" />
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setDocumentos(prev => ({ ...prev, profileUrl: '' }));
-                            }}
-                            className="absolute top-2 right-2 p-1 bg-white rounded-full shadow-lg hover:bg-gray-100"
-                          >
-                            <X size={16} />
-                          </button>
-                        </>
-                      ) : (
-                        <div className="absolute inset-0 flex items-center justify-center">
-                          {isUploading.profile ? (
-                            <Loader2 className="w-6 h-6 text-accent animate-spin" />
-                          ) : (
-                            <div className="flex items-center gap-2">
-                              <Camera className="w-5 h-5 text-gray-300" />
-                              <p className="text-sm text-gray-400">Adicionar foto</p>
+                            <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-xl flex items-center justify-between">
+                              <div className="flex items-center gap-2 overflow-hidden">
+                                {uploaded.type.startsWith('image/') && uploaded.preview ? (
+                                  <img src={uploaded.preview} alt={doc.label} className="w-10 h-10 object-cover rounded" />
+                                ) : (
+                                  <FileText size={20} className="text-green-600" />
+                                )}
+                                <div className="overflow-hidden">
+                                  <p className="text-sm font-bold text-green-700 truncate">{uploaded.name}</p>
+                                  <p className="text-xs text-green-600">
+                                    {(uploaded.size / 1024).toFixed(1)} KB
+                                  </p>
+                                </div>
+                              </div>
+                              <button
+                                onClick={() => handleRemoveFile(doc.id)}
+                                className="text-green-600 hover:text-green-800"
+                              >
+                                <X size={18} />
+                              </button>
                             </div>
                           )}
                         </div>
-                      )}
-                    </label>
+                      );
+                    })}
+
+                    <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+                      <div className="flex items-start gap-3">
+                        <AlertCircle size={20} className="text-blue-600 shrink-0 mt-0.5" />
+                        <div>
+                          <p className="text-sm font-bold text-blue-700 mb-1">
+                            Por que precisamos destes documentos?
+                          </p>
+                          <p className="text-xs text-blue-600">
+                            A verificação de documentos garante mais segurança para você e para os clientes.
+                            Seus dados estão protegidos e só serão usados para validação.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
                   </div>
 
-                  {/* Aviso */}
-                  <div className="p-4 bg-blue-50 rounded-xl border border-blue-100 flex gap-3">
-                    <ShieldCheck className="w-5 h-5 text-blue-500 shrink-0 mt-0.5" />
-                    <p className="text-xs text-blue-600 font-medium leading-relaxed">
-                      Seus documentos serão analisados pela central. A validação pode levar até 24 horas. 
-                      Você receberá uma notificação quando sua conta for ativada.
-                    </p>
-                  </div>
-
-                  <div className="flex justify-between">
-                    <Button type="button" variant="outline" onClick={handleBack} leftIcon={<ChevronLeft size={18} />}>
+                  <div className="flex justify-between mt-8">
+                    <Button
+                      variant="outline"
+                      onClick={() => setStep(2)}
+                      leftIcon={<ArrowLeft size={18} />}
+                    >
                       Voltar
                     </Button>
-                    <Button type="submit" isLoading={isLoading}>
-                      {isLoading ? 'Enviando...' : 'Enviar para Validação'}
+                    <Button
+                      onClick={() => {
+                        if (validateStep3()) {
+                          handleSubmit();
+                        }
+                      }}
+                      disabled={loading}
+                      className="bg-accent hover:bg-accent/90 text-white min-w-[150px]"
+                    >
+                      {loading ? (
+                        <>
+                          <Loader2 className="animate-spin mr-2" size={18} />
+                          Registrando...
+                        </>
+                      ) : (
+                        'Finalizar Registro'
+                      )}
                     </Button>
                   </div>
                 </motion.div>
               )}
-            </form>
 
-            <div className="mt-6 text-center">
-              <p className="text-sm text-gray-500">
-                Já tem uma conta?{' '}
-                <Link to="/login" className="text-accent font-bold hover:underline">
-                  Entrar
-                </Link>
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+              {/* ======================================== */}
+              {/* PASSO 4: CONFIRMAÇÃO */}
+              {/* ======================================== */}
+              {step === 4 && (
+                <motion.div
+                  initial={{ opacity: 0, scale: 0.9 }}
+                  animate={{ opacity: 1, scale: 1 }}
+                  className="text-center py-8"
+                >
+                  <div className="w-20 h-20 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <CheckCircle2 size={40} className="text-green-600" />
+                  </div>
+
+                  <h2 className="text-3xl font-black text-primary mb-3">
+                    Registro <span className="text-accent">Enviado!</span>
+                  </h2>
+
+                  <p className="text-gray-600 mb-8 max-w-md mx-auto">
+                    Seu cadastro foi recebido e está em análise pela nossa central.
+                    Você receberá uma notificação em até 48 horas.
+                  </p>
+
+                  <Card className="bg-gray-50 border-none mb-8 text-left">
+                    <CardContent className="p-6">
+                      <h3 className="font-bold text-primary mb-4">Próximos Passos:</h3>
+                      <ul className="space-y-3">
+                        <li className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-sm shrink-0 mt-0.5">1</div>
+                          <div>
+                            <p className="font-bold text-primary">Análise de Documentos</p>
+                            <p className="text-xs text-gray-500">Nossa equipa verificará seus documentos.</p>
+                          </div>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-sm shrink-0 mt-0.5">2</div>
+                          <div>
+                            <p className="font-bold text-primary">Entrevista (se necessário)</p>
+                            <p className="text-xs text-gray-500">Podemos entrar em contato para uma breve entrevista.</p>
+                          </div>
+                        </li>
+                        <li className="flex items-start gap-3">
+                          <div className="w-6 h-6 rounded-full bg-accent/10 flex items-center justify-center text-accent font-bold text-sm shrink-0 mt-0.5">3</div>
+                          <div>
+                            <p className="font-bold text-primary">Ativação do Perfil</p>
+                            <p className="text-xs text-gray-500">Após aprovação, seu perfil estará ativo no marketplace.</p>
+                          </div>
+                        </li>
+                      </ul>
+                    </CardContent>
+                  </Card>
+
+                  <Card className="bg-accent/5 border-accent/20 mb-8">
+                    <CardContent className="p-6">
+                      <h3 className="font-bold text-primary mb-4 flex items-center gap-2">
+                        <MessageCircle size={18} className="text-accent" />
+                        Contatos da Central
+                      </h3>
+                      <div className="space-y-3">
+                        <a
+                          href="https://wa.me/258871425316"
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex items-center gap-3 p-3 bg-white rounded-xl hover:shadow-md transition-all"
+                        >
+                          <div className="w-10 h-10 bg-green-500 rounded-full flex items-center justify-center text-white">
+                            <MessageCircle size={20} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-gray-500">WhatsApp</p>
+                            <p className="font-bold text-primary">+258 87 142 5316</p>
+                          </div>
+                        </a>
+
+                        <a
+                          href="mailto:central@dexapp.co.mz"
+                          className="flex items-center gap-3 p-3 bg-white rounded-xl hover:shadow-md transition-all"
+                        >
+                          <div className="w-10 h-10 bg-blue-500 rounded-full flex items-center justify-center text-white">
+                            <Mail size={20} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-gray-500">Email</p>
+                            <p className="font-bold text-primary">central@dexapp.co.mz</p>
+                          </div>
+                        </a>
+
+                        <a
+                          href="tel:+258871425316"
+                          className="flex items-center gap-3 p-3 bg-white rounded-xl hover:shadow-md transition-all"
+                        >
+                          <div className="w-10 h-10 bg-purple-500 rounded-full flex items-center justify-center text-white">
+                            <Phone size={20} />
+                          </div>
+                          <div>
+                            <p className="text-xs font-bold text-gray-500">Telefone</p>
+                            <p className="font-bold text-primary">+258 87 142 5316</p>
+                          </div>
+                        </a>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <div className="flex gap-3">
+                    <Button
+                      variant="outline"
+                      onClick={() => navigate('/')}
+                      className="flex-1"
+                    >
+                      Ir para Início
+                    </Button>
+                    <Button
+                      onClick={() => navigate('/login')}
+                      className="flex-1 bg-accent hover:bg-accent/90 text-white"
+                    >
+                      Ir para Login
+                    </Button>
+                  </div>
+                </motion.div>
+              )}
+            </CardContent>
+          </Card>
+        </div>
       </div>
-
-      {/* Modal de Sucesso */}
-      <AnimatePresence>
-        {showSuccessModal && (
-          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              exit={{ opacity: 0, scale: 0.9 }}
-              className="bg-white rounded-3xl shadow-2xl max-w-md w-full p-8"
-            >
-              <div className="text-center space-y-6">
-                <div className="w-20 h-20 bg-emerald-100 rounded-full flex items-center justify-center mx-auto">
-                  <CheckCircle className="w-10 h-10 text-emerald-600" />
-                </div>
-
-                <div className="space-y-2">
-                  <h3 className="text-2xl font-black text-primary">Registo Enviado!</h3>
-                  <p className="text-gray-600">
-                    Seu pedido foi recebido e será analisado pela central.
-                  </p>
-                  <p className="font-bold text-accent">
-                    Sua conta será ativada em até 24 horas.
-                  </p>
-                </div>
-
-                <div className="bg-gray-50 p-6 rounded-2xl space-y-3">
-                  <p className="font-bold text-primary">Caso não receba retorno:</p>
-                  
-                  <a
-                    href="https://wa.me/258871425316"
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-center gap-3 p-3 bg-green-50 text-green-700 rounded-xl hover:bg-green-100 transition-colors"
-                  >
-                    <MessageCircle className="w-5 h-5" />
-                    <span className="font-bold">WhatsApp: +258 87 142 5316</span>
-                  </a>
-
-                  <a
-                    href="mailto:central@dex.co.mz"
-                    className="flex items-center gap-3 p-3 bg-blue-50 text-blue-700 rounded-xl hover:bg-blue-100 transition-colors"
-                  >
-                    <Mail className="w-5 h-5" />
-                    <span className="font-bold">central@dex.co.mz</span>
-                  </a>
-
-                  <a
-                    href="tel:+258841425316"
-                    className="flex items-center gap-3 p-3 bg-purple-50 text-purple-700 rounded-xl hover:bg-purple-100 transition-colors"
-                  >
-                    <Headphones className="w-5 h-5" />
-                    <span className="font-bold">+258 84 142 5316</span>
-                  </a>
-                </div>
-
-                <Button onClick={() => { setShowSuccessModal(false); navigate('/'); }} fullWidth>
-                  Voltar para o Início
-                </Button>
-              </div>
-            </motion.div>
-          </div>
-        )}
-      </AnimatePresence>
     </AppLayout>
   );
 }
