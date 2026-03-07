@@ -4,9 +4,10 @@ import { useAuth } from '../../contexts/AuthContext';
 import { collection, query, where, orderBy, onSnapshot, doc, updateDoc, deleteDoc, addDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
 import { Solicitacao } from '../../types';
-import { Card, CardContent } from '../../components/ui/Card';
+import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Modal } from '../../components/ui/Modal';
+import { Input } from '../../components/ui/Input';
 import { formatCurrency, formatDate, translateStatus } from '../../utils/utils';
 import { 
   Briefcase, 
@@ -36,7 +37,30 @@ import {
   DollarSign,
   TrendingUp,
   Wallet,
-  Send
+  Send,
+  ChevronDown,
+  ChevronUp,
+  Copy,
+  Check,
+  Loader2,
+  Bell,
+  Settings,
+  HelpCircle,
+  CreditCard,
+  Percent,
+  Calendar as CalendarIcon,
+  Users,
+  Building,
+  Mail,
+  Printer,
+  Download,
+  Share2,
+  ThumbsUp,
+  ThumbsDown,
+  UserCheck,
+  UserX,
+  UserPlus,
+  UserMinus
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { motion } from 'framer-motion';
@@ -46,19 +70,31 @@ interface PrestadorStats {
   servicosConcluidos: number;
   servicosEmAndamento: number;
   servicosPendentes: number;
+  servicosCancelados: number;
   avaliacaoMedia: number;
   totalAvaliacoes: number;
   ganhosTotais: number;
   ganhosDisponiveis: number;
   ganhosPendentes: number;
+  ganhosProcessados: number;
 }
 
 interface SaqueRequest {
   id: string;
   valor: number;
-  status: 'pendente' | 'aprovado' | 'rejeitado';
+  status: 'pendente' | 'aprovado' | 'rejeitado' | 'processado';
   dataSolicitacao: Date;
   dataProcessamento?: Date;
+  observacao?: string;
+}
+
+interface Notificacao {
+  id: string;
+  titulo: string;
+  mensagem: string;
+  tipo: 'info' | 'sucesso' | 'aviso' | 'erro';
+  lida: boolean;
+  data: Date;
 }
 
 export default function PrestadorDashboard() {
@@ -73,21 +109,43 @@ export default function PrestadorDashboard() {
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [showSaqueModal, setShowSaqueModal] = useState(false);
+  const [showDetalhesModal, setShowDetalhesModal] = useState(false);
+  const [showNotificacoesModal, setShowNotificacoesModal] = useState(false);
+  const [showPerfilModal, setShowPerfilModal] = useState(false);
+  const [selectedSolicitacao, setSelectedSolicitacao] = useState<Solicitacao | null>(null);
   const [valorSaque, setValorSaque] = useState<number>(0);
   const [saques, setSaques] = useState<SaqueRequest[]>([]);
   const [processingSaque, setProcessingSaque] = useState(false);
+  const [copiado, setCopiado] = useState<string | null>(null);
+  const [notificacoes, setNotificacoes] = useState<Notificacao[]>([]);
+  const [notificacoesNaoLidas, setNotificacoesNaoLidas] = useState(0);
   
   const [stats, setStats] = useState<PrestadorStats>({
     servicosConcluidos: 0,
     servicosEmAndamento: 0,
     servicosPendentes: 0,
+    servicosCancelados: 0,
     avaliacaoMedia: 0,
     totalAvaliacoes: 0,
     ganhosTotais: 0,
     ganhosDisponiveis: 0,
-    ganhosPendentes: 0
+    ganhosPendentes: 0,
+    ganhosProcessados: 0
   });
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+      showToast('Logout efetuado com sucesso!', 'success');
+    } catch (error) {
+      showToast('Erro ao fazer logout', 'error');
+    }
+  };
+
+  // ============================================
+  // BUSCAR DADOS
+  // ============================================
   useEffect(() => {
     if (!user) return;
 
@@ -106,18 +164,19 @@ export default function PrestadorDashboard() {
       const concluidos = docs.filter(s => s.status === 'concluido');
       const emAndamento = docs.filter(s => ['prestador_atribuido', 'em_andamento'].includes(s.status));
       const pendentes = docs.filter(s => s.status === 'buscando_prestador');
+      const cancelados = docs.filter(s => s.status === 'cancelado');
       const aguardandoPagamento = docs.filter(s => s.status === 'aguardando_pagamento_final');
       
       // Calcular ganhos (60% do valor pago pelo cliente)
       const ganhosTotais = concluidos.reduce((acc, curr) => {
-        // prestadorRecebe60 = valorTotal * 0.6
         const valorPrestador = curr.valorTotal ? Math.round(curr.valorTotal * 0.6) : 0;
         return acc + valorPrestador;
       }, 0);
       
-      // Ganhos disponíveis (serviços concluídos há mais de 7 dias - simulação)
+      // Ganhos disponíveis (serviços concluídos)
       const ganhosDisponiveis = ganhosTotais * 0.8; // 80% disponível (simulação)
-      const ganhosPendentes = ganhosTotais - ganhosDisponiveis;
+      const ganhosPendentes = ganhosTotais * 0.2; // 20% pendente
+      const ganhosProcessados = saques.filter(s => s.status === 'processado').reduce((acc, s) => acc + s.valor, 0);
       
       // Calcular média de avaliações
       const totalAvaliacoes = user?.totalAvaliacoes || 0;
@@ -127,11 +186,13 @@ export default function PrestadorDashboard() {
         servicosConcluidos: concluidos.length,
         servicosEmAndamento: emAndamento.length + aguardandoPagamento.length,
         servicosPendentes: pendentes.length,
+        servicosCancelados: cancelados.length,
         avaliacaoMedia,
         totalAvaliacoes,
         ganhosTotais,
         ganhosDisponiveis,
-        ganhosPendentes
+        ganhosPendentes,
+        ganhosProcessados
       });
       
       filterSolicitacoes(filterStatus, docs);
@@ -148,18 +209,40 @@ export default function PrestadorDashboard() {
     const unsubscribeSaques = onSnapshot(saquesQuery, (snapshot) => {
       const docs = snapshot.docs.map(doc => ({
         id: doc.id,
-        ...doc.data()
+        ...doc.data(),
+        dataSolicitacao: doc.data().dataSolicitacao?.toDate?.() || new Date(doc.data().dataSolicitacao),
+        dataProcessamento: doc.data().dataProcessamento?.toDate?.() || null
       } as SaqueRequest));
       setSaques(docs);
+    });
+
+    // Buscar notificações
+    const notificacoesQuery = query(
+      collection(db, 'notificacoes'),
+      where('prestadorId', '==', user.id),
+      orderBy('data', 'desc')
+    );
+
+    const unsubscribeNotificacoes = onSnapshot(notificacoesQuery, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        data: doc.data().data?.toDate?.() || new Date(doc.data().data)
+      } as Notificacao));
+      setNotificacoes(docs);
+      setNotificacoesNaoLidas(docs.filter(n => !n.lida).length);
     });
 
     return () => {
       unsubscribe();
       unsubscribeSaques();
+      unsubscribeNotificacoes();
     };
   }, [user]);
 
-  // Filtrar solicitações por status
+  // ============================================
+  // FILTRAR SOLICITAÇÕES
+  // ============================================
   const filterSolicitacoes = (status: string, docs = solicitacoes) => {
     if (status === 'todas') {
       setFilteredSolicitacoes(docs);
@@ -171,16 +254,6 @@ export default function PrestadorDashboard() {
   const handleStatusChange = (status: string) => {
     setFilterStatus(status);
     filterSolicitacoes(status);
-  };
-
-  const handleLogout = async () => {
-    try {
-      await logout();
-      navigate('/');
-      showToast('Logout efetuado com sucesso!', 'success');
-    } catch (error) {
-      showToast('Erro ao fazer logout', 'error');
-    }
   };
 
   // ============================================
@@ -197,6 +270,11 @@ export default function PrestadorDashboard() {
       return;
     }
 
+    if (valorSaque < 500) {
+      showToast('Valor mínimo para saque é 500 MT', 'error');
+      return;
+    }
+
     setProcessingSaque(true);
 
     try {
@@ -208,8 +286,9 @@ export default function PrestadorDashboard() {
         dataSolicitacao: new Date(),
         metodoPagamento: 'Transferência Bancária',
         dadosBancarios: {
-          banco: 'A confirmar',
-          conta: 'A confirmar'
+          banco: 'BIM',
+          conta: '123456789',
+          titular: user?.nome
         }
       });
 
@@ -335,8 +414,9 @@ export default function PrestadorDashboard() {
     }, 500);
   };
 
-  const handleViewDetails = (id: string) => {
-    navigate(`/prestador/agenda?id=${id}`);
+  const handleViewDetails = (solicitacao: Solicitacao) => {
+    setSelectedSolicitacao(solicitacao);
+    setShowDetalhesModal(true);
   };
 
   const handleEditService = (id: string) => {
@@ -345,6 +425,68 @@ export default function PrestadorDashboard() {
 
   const handleUploadDocuments = () => {
     setShowDocumentModal(true);
+  };
+
+  const handleCopyToClipboard = (texto: string, tipo: string) => {
+    navigator.clipboard.writeText(texto);
+    setCopiado(tipo);
+    setTimeout(() => setCopiado(null), 2000);
+    showToast(`${tipo} copiado!`, 'success');
+  };
+
+  const handleMarcarNotificacaoLida = async (id: string) => {
+    try {
+      await updateDoc(doc(db, 'notificacoes', id), { lida: true });
+    } catch (error) {
+      console.error('Erro ao marcar notificação como lida:', error);
+    }
+  };
+
+  const handleMarcarTodasLidas = async () => {
+    const promises = notificacoes.filter(n => !n.lida).map(n => 
+      updateDoc(doc(db, 'notificacoes', n.id), { lida: true })
+    );
+    await Promise.all(promises);
+    showToast('Todas as notificações marcadas como lidas', 'success');
+  };
+
+  // ============================================
+  // HELPERS
+  // ============================================
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'concluido': return 'bg-green-100 text-green-700';
+      case 'aguardando_pagamento_final': return 'bg-purple-100 text-purple-700';
+      case 'buscando_prestador': return 'bg-yellow-100 text-yellow-700';
+      case 'prestador_atribuido': return 'bg-blue-100 text-blue-700';
+      case 'em_andamento': return 'bg-indigo-100 text-indigo-700';
+      case 'cancelado': return 'bg-red-100 text-red-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'concluido': return <CheckCircle size={14} className="mr-1" />;
+      case 'aguardando_pagamento_final': return <Clock size={14} className="mr-1" />;
+      case 'buscando_prestador': return <AlertCircle size={14} className="mr-1" />;
+      case 'prestador_atribuido': return <UserCheck size={14} className="mr-1" />;
+      case 'em_andamento': return <Wrench size={14} className="mr-1" />;
+      case 'cancelado': return <XCircle size={14} className="mr-1" />;
+      default: return null;
+    }
+  };
+
+  const getStatusTexto = (status: string) => {
+    switch (status) {
+      case 'concluido': return 'Concluído';
+      case 'aguardando_pagamento_final': return 'Aguardando Pagamento';
+      case 'buscando_prestador': return 'Disponível';
+      case 'prestador_atribuido': return 'Aceito';
+      case 'em_andamento': return 'Em Andamento';
+      case 'cancelado': return 'Cancelado';
+      default: return status;
+    }
   };
 
   if (user?.status === 'pendente') {
@@ -420,7 +562,6 @@ export default function PrestadorDashboard() {
             </CardContent>
           </Card>
 
-          {/* HEADER */}
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
             <div className="flex items-center gap-4">
               <div className="w-16 h-16 rounded-full bg-gradient-to-br from-accent to-orange-600 flex items-center justify-center text-white text-2xl font-black shadow-lg">
@@ -434,11 +575,6 @@ export default function PrestadorDashboard() {
                   <span className="text-sm font-bold text-accent bg-accent/10 px-3 py-1 rounded-full">
                     {user?.especialidade || 'Profissional'}
                   </span>
-                  <div className="flex items-center gap-1 text-yellow-500">
-                    <Star size={16} fill="currentColor" />
-                    <span className="text-sm font-bold text-primary">{stats.avaliacaoMedia.toFixed(1)}</span>
-                    <span className="text-xs text-gray-400">({stats.totalAvaliacoes})</span>
-                  </div>
                   <span className="text-xs font-bold uppercase px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">
                     Pendente Documentos
                   </span>
@@ -480,11 +616,12 @@ export default function PrestadorDashboard() {
     );
   }
 
-  // Dashboard normal para prestador ativo (COM GANHOS)
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
+        {/* ======================================== */}
         {/* HEADER */}
+        {/* ======================================== */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-accent to-orange-600 flex items-center justify-center text-white text-2xl font-black shadow-lg">
@@ -528,11 +665,34 @@ export default function PrestadorDashboard() {
             >
               Sair
             </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowNotificacoesModal(true)}
+              className="relative"
+            >
+              <Bell size={18} />
+              {notificacoesNaoLidas > 0 && (
+                <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+                  {notificacoesNaoLidas}
+                </span>
+              )}
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => setShowPerfilModal(true)}
+              title="Perfil"
+            >
+              <User size={18} />
+            </Button>
           </div>
         </div>
 
-        {/* CARD DE GANHOS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+        {/* ======================================== */}
+        {/* CARDS DE GANHOS */}
+        {/* ======================================== */}
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="bg-gradient-to-br from-primary to-blue-900 text-white shadow-lg">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
@@ -550,7 +710,7 @@ export default function PrestadorDashboard() {
               <div className="flex items-center justify-between mb-2">
                 <DollarSign size={24} className="opacity-80" />
               </div>
-              <p className="text-xs font-bold opacity-60 uppercase tracking-wider">Disponível para Saque</p>
+              <p className="text-xs font-bold opacity-60 uppercase tracking-wider">Disponível</p>
               <h3 className="text-3xl font-black mb-1">{formatCurrency(stats.ganhosDisponiveis)}</h3>
               <Button
                 variant="outline"
@@ -574,10 +734,23 @@ export default function PrestadorDashboard() {
               <p className="text-xs opacity-60 mt-2">Aguardando liberação</p>
             </CardContent>
           </Card>
+
+          <Card className="bg-gradient-to-br from-purple-600 to-purple-700 text-white shadow-lg">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <Award size={24} className="opacity-80" />
+              </div>
+              <p className="text-xs font-bold opacity-60 uppercase tracking-wider">Processados</p>
+              <h3 className="text-3xl font-black">{formatCurrency(stats.ganhosProcessados)}</h3>
+              <p className="text-xs opacity-60 mt-2">Total sacado</p>
+            </CardContent>
+          </Card>
         </div>
 
+        {/* ======================================== */}
         {/* STATS DE SERVIÇOS */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 mb-8">
+        {/* ======================================== */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           <Card className="border-none shadow-md">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
@@ -607,9 +780,21 @@ export default function PrestadorDashboard() {
               <h3 className="text-2xl font-black text-primary">{stats.servicosPendentes}</h3>
             </CardContent>
           </Card>
+
+          <Card className="border-none shadow-md">
+            <CardContent className="p-6">
+              <div className="flex items-center justify-between mb-2">
+                <XCircle size={24} className="text-red-600" />
+              </div>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Cancelados</p>
+              <h3 className="text-2xl font-black text-primary">{stats.servicosCancelados}</h3>
+            </CardContent>
+          </Card>
         </div>
 
+        {/* ======================================== */}
         {/* FILTROS */}
+        {/* ======================================== */}
         <div className="flex flex-wrap gap-2 mb-6">
           <Button
             variant={filterStatus === 'todas' ? 'primary' : 'outline'}
@@ -668,11 +853,12 @@ export default function PrestadorDashboard() {
           </Button>
         </div>
 
-        {/* SOLICITAÇÕES */}
+        {/* ======================================== */}
+        {/* LISTA DE SOLICITAÇÕES */}
+        {/* ======================================== */}
         <div className="space-y-4">
           {filteredSolicitacoes.length > 0 ? (
             filteredSolicitacoes.map((sol) => {
-              // Calcular ganho do prestador (60% do valor total)
               const ganhoPrestador = sol.valorTotal ? Math.round(sol.valorTotal * 0.6) : 0;
               
               return (
@@ -682,9 +868,10 @@ export default function PrestadorDashboard() {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ duration: 0.3 }}
                 >
-                  <Card className={`hover:shadow-xl transition-all ${
+                  <Card className={`hover:shadow-xl transition-all cursor-pointer ${
                     sol.status === 'buscando_prestador' ? 'border-accent/30 bg-accent/5' : ''
-                  }`}>
+                  }`}
+                  onClick={() => handleViewDetails(sol)}>
                     <CardContent className="p-6">
                       <div className="flex flex-col lg:flex-row justify-between gap-6">
                         {/* Informações do Serviço */}
@@ -739,16 +926,9 @@ export default function PrestadorDashboard() {
                         {/* Status, Ganhos e Ações */}
                         <div className="flex flex-col justify-between items-end gap-4 min-w-[250px]">
                           <div className="text-right w-full">
-                            <span className={`inline-block text-[10px] font-black uppercase px-3 py-1 rounded-full mb-2 ${
-                              sol.status === 'concluido' ? 'bg-green-100 text-green-700' :
-                              sol.status === 'aguardando_pagamento_final' ? 'bg-purple-100 text-purple-700' :
-                              sol.status === 'buscando_prestador' ? 'bg-yellow-100 text-yellow-700' :
-                              sol.status === 'prestador_atribuido' ? 'bg-blue-100 text-blue-700' :
-                              sol.status === 'em_andamento' ? 'bg-indigo-100 text-indigo-700' :
-                              sol.status === 'cancelado' ? 'bg-red-100 text-red-700' :
-                              'bg-gray-100 text-gray-700'
-                            }`}>
-                              {translateStatus(sol.status)}
+                            <span className={`inline-flex items-center text-[10px] font-black uppercase px-3 py-1 rounded-full mb-2 ${getStatusColor(sol.status)}`}>
+                              {getStatusIcon(sol.status)}
+                              {getStatusTexto(sol.status)}
                             </span>
                             
                             {/* Mostrar ganho do prestador para serviços concluídos */}
@@ -761,12 +941,15 @@ export default function PrestadorDashboard() {
                             )}
                           </div>
 
-                          {/* AÇÕES */}
+                          {/* Ações Rápidas */}
                           <div className="flex flex-wrap items-center justify-end gap-2 mt-4">
                             <Button
                               variant="ghost"
                               size="icon"
-                              onClick={() => handleViewDetails(sol.id)}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleViewDetails(sol);
+                              }}
                               title="Visualizar detalhes"
                               className="text-blue-600 hover:bg-blue-50"
                             >
@@ -777,21 +960,31 @@ export default function PrestadorDashboard() {
                               <>
                                 <Button
                                   variant="outline"
-                                  size="sm"
-                                  onClick={() => handleRejectService(sol.id)}
+                                  size="icon"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleRejectService(sol.id);
+                                  }}
                                   disabled={actionLoading === sol.id}
-                                  className="border-red-200 text-red-600 hover:bg-red-50"
+                                  className="text-red-600 hover:bg-red-50"
                                 >
-                                  Recusar
+                                  {actionLoading === sol.id ? <Loader2 size={16} className="animate-spin" /> : <ThumbsDown size={16} />}
                                 </Button>
                                 <Button
                                   variant="primary"
                                   size="sm"
-                                  onClick={() => handleAcceptService(sol.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleAcceptService(sol.id);
+                                  }}
                                   disabled={actionLoading === sol.id}
-                                  className="bg-accent hover:bg-accent/90"
+                                  className="bg-green-600 hover:bg-green-700 text-white"
                                 >
-                                  {actionLoading === sol.id ? '...' : 'Aceitar'}
+                                  {actionLoading === sol.id ? (
+                                    <Loader2 size={16} className="animate-spin" />
+                                  ) : (
+                                    <ThumbsUp size={16} />
+                                  )}
                                 </Button>
                               </>
                             )}
@@ -801,7 +994,10 @@ export default function PrestadorDashboard() {
                                 <Button
                                   variant="ghost"
                                   size="icon"
-                                  onClick={() => handleEditService(sol.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleEditService(sol.id);
+                                  }}
                                   title="Editar"
                                   className="text-green-600 hover:bg-green-50"
                                 >
@@ -810,7 +1006,10 @@ export default function PrestadorDashboard() {
                                 <Button
                                   variant="outline"
                                   size="sm"
-                                  onClick={() => handleCancelService(sol.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleCancelService(sol.id);
+                                  }}
                                   disabled={actionLoading === sol.id}
                                   className="border-orange-200 text-orange-600 hover:bg-orange-50"
                                 >
@@ -819,7 +1018,10 @@ export default function PrestadorDashboard() {
                                 <Button
                                   variant="primary"
                                   size="sm"
-                                  onClick={() => handleStartService(sol.id)}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStartService(sol.id);
+                                  }}
                                   disabled={actionLoading === sol.id}
                                   className="bg-blue-600 hover:bg-blue-700"
                                 >
@@ -832,11 +1034,18 @@ export default function PrestadorDashboard() {
                               <Button
                                 variant="primary"
                                 size="sm"
-                                onClick={() => handleCompleteService(sol.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleCompleteService(sol.id);
+                                }}
                                 disabled={actionLoading === sol.id}
                                 className="bg-green-600 hover:bg-green-700"
                               >
-                                {actionLoading === sol.id ? '...' : 'Concluir Serviço'}
+                                {actionLoading === sol.id ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  'Concluir'
+                                )}
                               </Button>
                             )}
 
@@ -855,12 +1064,15 @@ export default function PrestadorDashboard() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleRefreshStatus(sol.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleRefreshStatus(sol.id);
+                                }}
                                 disabled={actionLoading === sol.id}
                                 title="Atualizar"
                                 className="text-gray-600 hover:bg-gray-50"
                               >
-                                <RefreshCw size={18} className={actionLoading === sol.id ? 'animate-spin' : ''} />
+                                <RefreshCw size={16} className={actionLoading === sol.id ? 'animate-spin' : ''} />
                               </Button>
                             )}
 
@@ -868,12 +1080,17 @@ export default function PrestadorDashboard() {
                               <Button
                                 variant="ghost"
                                 size="icon"
-                                onClick={() => handleDeleteService(sol.id)}
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  if (window.confirm('Tem certeza que deseja excluir permanentemente este serviço?')) {
+                                    handleDeleteService(sol.id);
+                                  }
+                                }}
                                 disabled={actionLoading === sol.id}
                                 title="Excluir permanentemente"
                                 className="text-red-600 hover:bg-red-50"
                               >
-                                <Trash2 size={18} />
+                                {actionLoading === sol.id ? <Loader2 size={16} className="animate-spin" /> : <Trash2 size={16} />}
                               </Button>
                             )}
                           </div>
@@ -888,13 +1105,13 @@ export default function PrestadorDashboard() {
             <Card className="border-dashed border-2 bg-transparent">
               <CardContent className="py-12 text-center">
                 <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
-                  <AlertCircle size={32} />
+                  <Briefcase size={32} />
                 </div>
                 <h3 className="font-bold text-gray-700 mb-2">Nenhuma solicitação encontrada</h3>
                 <p className="text-sm text-gray-500">
                   {filterStatus === 'todas' 
                     ? 'Você ainda não tem serviços disponíveis.' 
-                    : `Não há serviços com status "${translateStatus(filterStatus)}".`}
+                    : `Não há serviços com status "${getStatusTexto(filterStatus)}".`}
                 </p>
               </CardContent>
             </Card>
@@ -902,7 +1119,103 @@ export default function PrestadorDashboard() {
         </div>
       </div>
 
-      {/* Modal de Saque */}
+      {/* ======================================== */}
+      {/* MODAL DE DETALHES */}
+      {/* ======================================== */}
+      <Modal isOpen={showDetalhesModal} onClose={() => setShowDetalhesModal(false)} title="Detalhes do Serviço" size="lg">
+        {selectedSolicitacao && (
+          <div className="space-y-6 max-h-[80vh] overflow-y-auto p-1">
+            <div className="flex items-center justify-between pb-4 border-b">
+              <div>
+                <h3 className="font-bold text-primary text-xl">{selectedSolicitacao.servico}</h3>
+                <p className="text-sm text-gray-500">ID: #{selectedSolicitacao.id.slice(-8).toUpperCase()}</p>
+              </div>
+              <span className={`inline-flex items-center text-xs font-bold px-3 py-1 rounded-full ${getStatusColor(selectedSolicitacao.status)}`}>
+                {getStatusIcon(selectedSolicitacao.status)}
+                {getStatusTexto(selectedSolicitacao.status)}
+              </span>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-gray-500">Cliente</p>
+                <p className="font-bold text-primary">{selectedSolicitacao.clienteNome}</p>
+                <p className="text-xs text-gray-400">{selectedSolicitacao.telefoneCliente}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Data Agendada</p>
+                <p className="font-bold text-primary">{formatDate(selectedSolicitacao.dataAgendada)}</p>
+              </div>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Local</p>
+              <p className="text-sm text-primary bg-gray-50 p-3 rounded-xl">
+                {selectedSolicitacao.endereco.bairro}
+                {selectedSolicitacao.endereco.quarteirao && `, Q. ${selectedSolicitacao.endereco.quarteirao}`}
+                {selectedSolicitacao.endereco.casa && `, Casa ${selectedSolicitacao.endereco.casa}`}
+                {selectedSolicitacao.endereco.referencia && `\nRef: ${selectedSolicitacao.endereco.referencia}`}
+              </p>
+            </div>
+
+            <div>
+              <p className="text-xs text-gray-500 mb-1">Descrição</p>
+              <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">
+                {selectedSolicitacao.descricao}
+              </p>
+            </div>
+
+            {selectedSolicitacao.tamanho && (
+              <div>
+                <p className="text-xs text-gray-500 mb-1">Tamanho do Serviço</p>
+                <span className={`text-xs font-bold px-3 py-1 rounded-full ${
+                  selectedSolicitacao.tamanho === 'pequeno' ? 'bg-green-100 text-green-700' :
+                  selectedSolicitacao.tamanho === 'medio' ? 'bg-yellow-100 text-yellow-700' :
+                  'bg-red-100 text-red-700'
+                }`}>
+                  {selectedSolicitacao.tamanho === 'pequeno' ? 'Pequeno (1-6h)' : 
+                   selectedSolicitacao.tamanho === 'medio' ? 'Médio (24-48h)' : 'Grande (+48h)'}
+                </span>
+              </div>
+            )}
+
+            {selectedSolicitacao.imagens && selectedSolicitacao.imagens.length > 0 && (
+              <div>
+                <p className="text-xs text-gray-500 mb-2">Imagens do Serviço</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {selectedSolicitacao.imagens.slice(0, 3).map((img, idx) => (
+                    <img key={idx} src={img} alt={`Serviço ${idx + 1}`} className="w-full h-20 object-cover rounded-lg" />
+                  ))}
+                </div>
+              </div>
+            )}
+
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowDetalhesModal(false)}
+                className="flex-1"
+              >
+                Fechar
+              </Button>
+              <Button
+                variant="primary"
+                onClick={() => {
+                  setShowDetalhesModal(false);
+                  navigate(`/prestador/agenda?id=${selectedSolicitacao.id}`);
+                }}
+                className="flex-1 bg-accent hover:bg-accent/90 text-white"
+              >
+                Ver na Agenda
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL DE SAQUE */}
+      {/* ======================================== */}
       <Modal isOpen={showSaqueModal} onClose={() => setShowSaqueModal(false)} title="Solicitar Saque">
         <div className="space-y-6">
           <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
@@ -910,7 +1223,7 @@ export default function PrestadorDashboard() {
               <span className="font-bold">Saldo disponível:</span> {formatCurrency(stats.ganhosDisponiveis)}
             </p>
             <p className="text-xs text-blue-600">
-              O saque será processado pela central em até 48 horas úteis.
+              Mínimo: 500 MT • Máximo: {formatCurrency(stats.ganhosDisponiveis)}
             </p>
           </div>
 
@@ -918,23 +1231,21 @@ export default function PrestadorDashboard() {
             <label className="block text-sm font-bold text-gray-700 mb-2">
               Valor do Saque (MT)
             </label>
-            <input
+            <Input
               type="number"
               value={valorSaque}
               onChange={(e) => setValorSaque(Number(e.target.value))}
               max={stats.ganhosDisponiveis}
-              min={100}
+              min={500}
               step={100}
-              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none"
               placeholder="Digite o valor"
             />
-            <p className="text-xs text-gray-400 mt-1">Mínimo: 100 MT</p>
           </div>
 
           <div className="bg-gray-50 rounded-xl p-4">
             <h4 className="font-bold text-primary mb-2">Dados Bancários</h4>
             <p className="text-sm text-gray-600 mb-3">
-              Os dados bancários cadastrados serão usados para transferência.
+              Os dados abaixo serão usados para transferência:
             </p>
             <div className="space-y-2 text-sm">
               <div className="flex justify-between">
@@ -945,7 +1256,21 @@ export default function PrestadorDashboard() {
                 <span className="text-gray-500">Conta:</span>
                 <span className="font-bold text-primary">123456789</span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-gray-500">Titular:</span>
+                <span className="font-bold text-primary">{user?.nome}</span>
+              </div>
             </div>
+          </div>
+
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <p className="text-xs text-yellow-700 flex items-start gap-2">
+              <Info size={14} className="shrink-0 mt-0.5" />
+              <span>
+                O saque será processado pela central em até 48 horas úteis.
+                Você receberá uma notificação quando for aprovado.
+              </span>
+            </p>
           </div>
 
           <div className="flex gap-3">
@@ -958,10 +1283,154 @@ export default function PrestadorDashboard() {
             </Button>
             <Button
               onClick={handleSolicitarSaque}
-              disabled={processingSaque || valorSaque <= 0 || valorSaque > stats.ganhosDisponiveis}
+              disabled={processingSaque || valorSaque < 500 || valorSaque > stats.ganhosDisponiveis}
               className="flex-1 bg-accent hover:bg-accent/90 text-white"
             >
               {processingSaque ? 'Processando...' : 'Solicitar Saque'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL DE NOTIFICAÇÕES */}
+      {/* ======================================== */}
+      <Modal isOpen={showNotificacoesModal} onClose={() => setShowNotificacoesModal(false)} title="Notificações" size="lg">
+        <div className="space-y-4 max-h-[60vh] overflow-y-auto">
+          {notificacoes.length > 0 ? (
+            <>
+              <div className="flex justify-between items-center mb-4">
+                <p className="text-sm text-gray-500">Total: {notificacoes.length}</p>
+                {notificacoesNaoLidas > 0 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleMarcarTodasLidas}
+                    className="text-accent"
+                  >
+                    Marcar todas como lidas
+                  </Button>
+                )}
+              </div>
+
+              {notificacoes.map((notificacao) => (
+                <Card
+                  key={notificacao.id}
+                  className={`cursor-pointer hover:shadow-md transition-all ${
+                    !notificacao.lida ? 'border-l-4 border-l-accent bg-accent/5' : ''
+                  }`}
+                  onClick={() => handleMarcarNotificacaoLida(notificacao.id)}
+                >
+                  <CardContent className="p-4">
+                    <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center shrink-0 ${
+                          notificacao.tipo === 'sucesso' ? 'bg-green-100 text-green-600' :
+                          notificacao.tipo === 'aviso' ? 'bg-yellow-100 text-yellow-600' :
+                          notificacao.tipo === 'erro' ? 'bg-red-100 text-red-600' :
+                          'bg-blue-100 text-blue-600'
+                        }`}>
+                          {notificacao.tipo === 'sucesso' ? <CheckCircle size={16} /> :
+                           notificacao.tipo === 'aviso' ? <AlertCircle size={16} /> :
+                           notificacao.tipo === 'erro' ? <XCircle size={16} /> :
+                           <Info size={16} />}
+                        </div>
+                        <div>
+                          <p className="font-bold text-primary">{notificacao.titulo}</p>
+                          <p className="text-sm text-gray-600 mt-1">{notificacao.mensagem}</p>
+                          <p className="text-xs text-gray-400 mt-2">{formatDate(notificacao.data)}</p>
+                        </div>
+                      </div>
+                      {!notificacao.lida && (
+                        <div className="w-2 h-2 rounded-full bg-accent" />
+                      )}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </>
+          ) : (
+            <div className="py-12 text-center">
+              <Bell size={40} className="mx-auto mb-4 text-gray-300" />
+              <p className="text-gray-500">Nenhuma notificação</p>
+            </div>
+          )}
+        </div>
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL DE PERFIL */}
+      {/* ======================================== */}
+      <Modal isOpen={showPerfilModal} onClose={() => setShowPerfilModal(false)} title="Meu Perfil" size="lg">
+        <div className="space-y-6">
+          <div className="flex items-center gap-4">
+            <div className="w-20 h-20 rounded-full bg-gradient-to-br from-accent to-orange-600 flex items-center justify-center text-white text-3xl font-black">
+              {user?.nome?.charAt(0).toUpperCase()}
+            </div>
+            <div>
+              <h3 className="font-bold text-primary text-xl">{user?.nome}</h3>
+              <p className="text-sm text-gray-500">{user?.email}</p>
+              <p className="text-sm text-gray-500">{user?.telefone}</p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-gray-50 p-4 rounded-xl">
+              <p className="text-xs text-gray-500 mb-1">Especialidade</p>
+              <p className="font-bold text-primary">{user?.especialidade || 'Profissional'}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-xl">
+              <p className="text-xs text-gray-500 mb-1">Cidade</p>
+              <p className="font-bold text-primary">{user?.cidade || 'Maputo'}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-xl">
+              <p className="text-xs text-gray-500 mb-1">Valor/Hora</p>
+              <p className="font-bold text-primary">{user?.valorHora ? formatCurrency(user.valorHora) : '500 MT'}</p>
+            </div>
+            <div className="bg-gray-50 p-4 rounded-xl">
+              <p className="text-xs text-gray-500 mb-1">Experiência</p>
+              <p className="font-bold text-primary">{user?.experiencia || '3-5 anos'}</p>
+            </div>
+          </div>
+
+          <div className="bg-yellow-50 p-4 rounded-xl">
+            <div className="flex items-center gap-2 mb-2">
+              <Star size={18} className="text-yellow-500 fill-current" />
+              <span className="font-bold text-primary">Avaliação</span>
+            </div>
+            <div className="flex items-center gap-4">
+              <span className="text-3xl font-black text-primary">{stats.avaliacaoMedia.toFixed(1)}</span>
+              <div className="flex items-center gap-1">
+                {[1,2,3,4,5].map((star) => (
+                  <Star key={star} size={20} fill={star <= Math.round(stats.avaliacaoMedia) ? 'currentColor' : 'none'} className="text-yellow-500" />
+                ))}
+              </div>
+              <span className="text-sm text-gray-500">({stats.totalAvaliacoes} avaliações)</span>
+            </div>
+          </div>
+
+          <div className="bg-gray-50 p-4 rounded-xl">
+            <p className="text-xs text-gray-500 mb-1">Sobre</p>
+            <p className="text-sm text-primary">{user?.descricao || 'Profissional dedicado e experiente.'}</p>
+          </div>
+
+          <div className="flex gap-3 pt-4 border-t">
+            <Button
+              variant="outline"
+              onClick={() => setShowPerfilModal(false)}
+              className="flex-1"
+            >
+              Fechar
+            </Button>
+            <Button
+              variant="primary"
+              onClick={() => {
+                setShowPerfilModal(false);
+                showToast('Funcionalidade em desenvolvimento', 'info');
+              }}
+              className="flex-1 bg-accent hover:bg-accent/90 text-white"
+            >
+              Editar Perfil
             </Button>
           </div>
         </div>
