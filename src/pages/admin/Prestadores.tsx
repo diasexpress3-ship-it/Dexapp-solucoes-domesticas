@@ -199,7 +199,9 @@ export default function Prestadores() {
       const inactivos = docs.filter(p => p.status === 'inactivo').length;
       
       const totalGanhos = docs.reduce((acc, p) => acc + (p.totalGanho || 0), 0);
-      const mediaAvaliacao = docs.reduce((acc, p) => acc + (p.avaliacaoMedia || 0), 0) / (docs.length || 1);
+      const mediaAvaliacao = docs.length > 0 
+        ? docs.reduce((acc, p) => acc + (p.avaliacaoMedia || 0), 0) / docs.length 
+        : 0;
 
       setStats({
         total: docs.length,
@@ -812,7 +814,7 @@ export default function Prestadores() {
       {/* ======================================== */}
       <Modal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} title="Detalhes do Prestador" size="lg">
         {selectedPrestador && (
-          <div className="space-y-6">
+          <div className="space-y-6 max-h-[80vh] overflow-y-auto p-1">
             {/* Cabeçalho */}
             <div className="flex items-center justify-between pb-4 border-b">
               <div className="flex items-center gap-4">
@@ -857,6 +859,12 @@ export default function Prestadores() {
                 <p className="text-xs text-gray-500">Data Cadastro</p>
                 <p className="font-bold text-primary">{formatDate(selectedPrestador.dataCadastro)}</p>
               </div>
+              {selectedPrestador.ultimoAcesso && (
+                <div>
+                  <p className="text-xs text-gray-500">Último Acesso</p>
+                  <p className="font-bold text-primary">{formatDate(selectedPrestador.ultimoAcesso)}</p>
+                </div>
+              )}
             </div>
 
             {/* Profissão */}
@@ -888,7 +896,397 @@ export default function Prestadores() {
               </div>
             </div>
 
-            {/* Financeiro */}
-            <div className="grid grid-cols-3 gap-4">
+            {/* Avaliações */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="bg-yellow-50 p-4 rounded-xl">
+                <p className="text-xs text-gray-500 mb-1">Avaliação Média</p>
+                <div className="flex items-center gap-2">
+                  <Star size={20} className="text-yellow-500 fill-current" />
+                  <span className="text-2xl font-black text-primary">{selectedPrestador.avaliacaoMedia.toFixed(1)}</span>
+                </div>
+                <p className="text-xs text-gray-500 mt-1">{selectedPrestador.totalAvaliacoes} avaliações</p>
+              </div>
+
               <div className="bg-green-50 p-4 rounded-xl">
-               
+                <p className="text-xs text-gray-500 mb-1">Total Ganho</p>
+                <p className="text-2xl font-black text-green-600">{formatCurrency(selectedPrestador.totalGanho || 0)}</p>
+                <p className="text-xs text-gray-500 mt-1">{selectedPrestador.servicosConcluidos || 0} serviços concluídos</p>
+              </div>
+            </div>
+
+            {/* Documentos */}
+            <div>
+              <h4 className="font-bold text-primary mb-3">Documentos</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="border-2 border-gray-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <IdCard size={18} className="text-gray-500" />
+                      <span className="font-bold text-primary">Bilhete de Identidade</span>
+                    </div>
+                    {selectedPrestador.documentos?.bi ? (
+                      <span className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 size={14} />
+                        Carregado
+                      </span>
+                    ) : (
+                      <span className="text-xs text-red-600 flex items-center gap-1">
+                        <XCircle size={14} />
+                        Faltando
+                      </span>
+                    )}
+                  </div>
+                  {selectedPrestador.documentos?.bi && (
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-xs text-gray-400">
+                        {selectedPrestador.documentos.bi.nome} • {formatDate(selectedPrestador.documentos.bi.dataUpload)}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => window.open(selectedPrestador.documentos?.bi?.url, '_blank')}
+                        className="text-blue-600 hover:bg-blue-50"
+                      >
+                        <Eye size={16} />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+
+                <div className="border-2 border-gray-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="flex items-center gap-2">
+                      <FileText size={18} className="text-gray-500" />
+                      <span className="font-bold text-primary">Declaração do Bairro</span>
+                    </div>
+                    {selectedPrestador.documentos?.declaracaoBairro ? (
+                      <span className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 size={14} />
+                        Carregado
+                      </span>
+                    ) : (
+                      <span className="text-xs text-red-600 flex items-center gap-1">
+                        <XCircle size={14} />
+                        Faltando
+                      </span>
+                    )}
+                  </div>
+                  {selectedPrestador.documentos?.declaracaoBairro && (
+                    <div className="flex items-center justify-between mt-2">
+                      <p className="text-xs text-gray-400">
+                        {selectedPrestador.documentos.declaracaoBairro.nome} • {formatDate(selectedPrestador.documentos.declaracaoBairro.dataUpload)}
+                      </p>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => window.open(selectedPrestador.documentos?.declaracaoBairro?.url, '_blank')}
+                        className="text-blue-600 hover:bg-blue-50"
+                      >
+                        <Eye size={16} />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Histórico */}
+            {selectedPrestador.dataAprovacao && (
+              <div className="bg-green-50 rounded-xl p-4">
+                <p className="text-xs text-green-600 mb-1">Aprovado em</p>
+                <p className="font-bold text-green-700">{formatDate(selectedPrestador.dataAprovacao)}</p>
+                {selectedPrestador.aprovadoPor && (
+                  <p className="text-xs text-green-600 mt-1">Por: {selectedPrestador.aprovadoPor}</p>
+                )}
+              </div>
+            )}
+
+            {selectedPrestador.dataRejeicao && (
+              <div className="bg-red-50 rounded-xl p-4">
+                <p className="text-xs text-red-600 mb-1">Rejeitado em</p>
+                <p className="font-bold text-red-700">{formatDate(selectedPrestador.dataRejeicao)}</p>
+                {selectedPrestador.rejeitadoPor && (
+                  <p className="text-xs text-red-600 mt-1">Por: {selectedPrestador.rejeitadoPor}</p>
+                )}
+                {selectedPrestador.observacao && (
+                  <p className="text-sm text-red-700 mt-2">{selectedPrestador.observacao}</p>
+                )}
+              </div>
+            )}
+
+            {/* Ações */}
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowDetailsModal(false)}
+                className="flex-1"
+              >
+                Fechar
+              </Button>
+              
+              {(selectedPrestador.status === 'pendente' || selectedPrestador.status === 'pendente_documentos') && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      setShowRejectModal(true);
+                    }}
+                    className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    Rejeitar
+                  </Button>
+                  <Button
+                    onClick={() => handleApprove(selectedPrestador.id)}
+                    disabled={actionLoading === selectedPrestador.id}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {actionLoading === selectedPrestador.id ? 'Processando...' : 'Aprovar'}
+                  </Button>
+                </>
+              )}
+
+              {selectedPrestador.status === 'activo' && (
+                <Button
+                  onClick={() => {
+                    handleToggleStatus(selectedPrestador.id, selectedPrestador.status);
+                    setShowDetailsModal(false);
+                  }}
+                  disabled={actionLoading === selectedPrestador.id}
+                  className="flex-1 bg-orange-600 hover:bg-orange-700 text-white"
+                >
+                  {actionLoading === selectedPrestador.id ? 'Processando...' : 'Desativar'}
+                </Button>
+              )}
+
+              {selectedPrestador.status === 'inactivo' && (
+                <Button
+                  onClick={() => {
+                    handleToggleStatus(selectedPrestador.id, selectedPrestador.status);
+                    setShowDetailsModal(false);
+                  }}
+                  disabled={actionLoading === selectedPrestador.id}
+                  className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                >
+                  {actionLoading === selectedPrestador.id ? 'Processando...' : 'Ativar'}
+                </Button>
+              )}
+
+              {selectedPrestador.status === 'rejeitado' && (
+                <Button
+                  onClick={() => {
+                    setShowDetailsModal(false);
+                    setShowDeleteModal(true);
+                  }}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  Excluir Permanentemente
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL DE DOCUMENTOS */}
+      {/* ======================================== */}
+      <Modal isOpen={showDocumentModal} onClose={() => setShowDocumentModal(false)} title="Documentos do Prestador" size="lg">
+        {selectedPrestador && (
+          <div className="space-y-6">
+            <div className="flex items-center gap-4 pb-4 border-b">
+              <div className="w-12 h-12 rounded-full bg-primary text-white flex items-center justify-center text-xl font-black">
+                {selectedPrestador.nome.charAt(0)}
+              </div>
+              <div>
+                <h3 className="font-bold text-primary">{selectedPrestador.nome}</h3>
+                <p className="text-sm text-gray-500">{getEspecialidadeNome(selectedPrestador.especialidade)}</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              {/* BI */}
+              <div className="border-2 border-gray-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <IdCard size={24} className="text-gray-600" />
+                    <div>
+                      <h4 className="font-bold text-primary">Bilhete de Identidade</h4>
+                      {selectedPrestador.documentos?.bi ? (
+                        <p className="text-xs text-green-600">
+                          Carregado em {formatDate(selectedPrestador.documentos.bi.dataUpload)}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-red-600">Não carregado</p>
+                      )}
+                    </div>
+                  </div>
+                  {selectedPrestador.documentos?.bi && (
+                    <CheckCircle2 size={20} className="text-green-500" />
+                  )}
+                </div>
+                {selectedPrestador.documentos?.bi && (
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(selectedPrestador.documentos?.bi?.url, '_blank')}
+                      className="flex-1"
+                      leftIcon={<Eye size={14} />}
+                    >
+                      Visualizar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyToClipboard(selectedPrestador.documentos?.bi?.url || '', 'URL do BI')}
+                      className="flex-1"
+                      leftIcon={<Copy size={14} />}
+                    >
+                      Copiar Link
+                    </Button>
+                  </div>
+                )}
+              </div>
+
+              {/* Declaração do Bairro */}
+              <div className="border-2 border-gray-200 rounded-xl p-4">
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center gap-3">
+                    <FileText size={24} className="text-gray-600" />
+                    <div>
+                      <h4 className="font-bold text-primary">Declaração do Bairro</h4>
+                      {selectedPrestador.documentos?.declaracaoBairro ? (
+                        <p className="text-xs text-green-600">
+                          Carregado em {formatDate(selectedPrestador.documentos.declaracaoBairro.dataUpload)}
+                        </p>
+                      ) : (
+                        <p className="text-xs text-red-600">Não carregado</p>
+                      )}
+                    </div>
+                  </div>
+                  {selectedPrestador.documentos?.declaracaoBairro && (
+                    <CheckCircle2 size={20} className="text-green-500" />
+                  )}
+                </div>
+                {selectedPrestador.documentos?.declaracaoBairro && (
+                  <div className="mt-3 flex gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => window.open(selectedPrestador.documentos?.declaracaoBairro?.url, '_blank')}
+                      className="flex-1"
+                      leftIcon={<Eye size={14} />}
+                    >
+                      Visualizar
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => handleCopyToClipboard(selectedPrestador.documentos?.declaracaoBairro?.url || '', 'URL da Declaração')}
+                      className="flex-1"
+                      leftIcon={<Copy size={14} />}
+                    >
+                      Copiar Link
+                    </Button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowDocumentModal(false)}
+                className="flex-1"
+              >
+                Fechar
+              </Button>
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL DE REJEIÇÃO */}
+      {/* ======================================== */}
+      <Modal isOpen={showRejectModal} onClose={() => setShowRejectModal(false)} title="Rejeitar Prestador">
+        <div className="space-y-6">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-sm text-red-700">
+              Tem certeza que deseja rejeitar o prestador <span className="font-bold">{selectedPrestador?.nome}</span>?
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Motivo da rejeição (opcional)
+            </label>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Ex: Documentos inválidos, informações inconsistentes..."
+              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none min-h-[100px]"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowRejectModal(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleReject}
+              disabled={actionLoading === selectedPrestador?.id}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            >
+              {actionLoading === selectedPrestador?.id ? 'Processando...' : 'Rejeitar Prestador'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL DE EXCLUSÃO */}
+      {/* ======================================== */}
+      <Modal isOpen={showDeleteModal} onClose={() => setShowDeleteModal(false)} title="Excluir Prestador">
+        <div className="space-y-6">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-sm text-red-700">
+              Tem certeza que deseja excluir permanentemente o prestador{' '}
+              <span className="font-bold">{selectedPrestador?.nome}</span>?
+            </p>
+            <p className="text-xs text-red-600 mt-2">
+              Esta ação não pode ser desfeita. Todos os dados associados serão removidos.
+            </p>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowDeleteModal(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                if (selectedPrestador) {
+                  handleDelete(selectedPrestador.id);
+                  setShowDeleteModal(false);
+                }
+              }}
+              disabled={actionLoading === selectedPrestador?.id}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            >
+              {actionLoading === selectedPrestador?.id ? 'Excluindo...' : 'Excluir Permanentemente'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
+    </AppLayout>
+  );
+}
