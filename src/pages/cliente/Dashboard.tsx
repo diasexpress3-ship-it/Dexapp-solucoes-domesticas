@@ -24,14 +24,16 @@ import {
   XCircle,
   RefreshCw,
   User,
-  Star
+  Star,
+  Home,
+  LogOut
 } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { useToast } from '../../contexts/ToastContext';
 
 export default function ClienteDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const { showToast } = useToast();
   const [recentSolicitacoes, setRecentSolicitacoes] = useState<Solicitacao[]>([]);
@@ -49,7 +51,6 @@ export default function ClienteDashboard() {
   useEffect(() => {
     if (!user) return;
 
-    // Buscar solicitações recentes (5)
     const recentQuery = query(
       collection(db, 'solicitacoes'),
       where('clienteId', '==', user.id),
@@ -57,7 +58,6 @@ export default function ClienteDashboard() {
       limit(5)
     );
 
-    // Buscar todas as solicitações
     const allQuery = query(
       collection(db, 'solicitacoes'),
       where('clienteId', '==', user.id),
@@ -73,7 +73,6 @@ export default function ClienteDashboard() {
       const docs = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Solicitacao));
       setAllSolicitacoes(docs);
       
-      // Calcular estatísticas
       const total = docs.reduce((acc, curr) => acc + (curr.status === 'concluido' ? curr.valorTotal : 0), 0);
       const active = docs.filter(s => ['buscando_prestador', 'prestador_atribuido', 'em_andamento'].includes(s.status)).length;
       const completed = docs.filter(s => s.status === 'concluido').length;
@@ -94,12 +93,17 @@ export default function ClienteDashboard() {
     };
   }, [user]);
 
-  // ============================================
-  // FUNÇÕES CRUD
-  // ============================================
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+      showToast('Logout efetuado com sucesso!', 'success');
+    } catch (error) {
+      showToast('Erro ao fazer logout', 'error');
+    }
+  };
 
   const handleCancelSolicitacao = async (id: string, status: string) => {
-    // Verificar se pode cancelar
     if (!['buscando_prestador', 'prestador_atribuido'].includes(status)) {
       showToast('Não é possível cancelar este serviço neste estado', 'error');
       return;
@@ -140,7 +144,6 @@ export default function ClienteDashboard() {
 
   const handleRefreshStatus = async (id: string) => {
     setActionLoading(id);
-    // Simular refresh - na verdade os dados já são atualizados em tempo real
     setTimeout(() => {
       showToast('Status atualizado!', 'success');
       setActionLoading(null);
@@ -171,7 +174,7 @@ export default function ClienteDashboard() {
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
         {/* ======================================== */}
-        {/* HEADER PERSONALIZADO */}
+        {/* HEADER PERSONALIZADO COM BOTÃO INÍCIO CORRIGIDO */}
         {/* ======================================== */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
@@ -189,14 +192,36 @@ export default function ClienteDashboard() {
               </p>
             </div>
           </div>
-          <Link to="/cliente/nova-solicitacao">
-            <Button 
-              className="bg-accent hover:bg-accent/90 text-white shadow-lg hover:shadow-xl transition-all"
-              leftIcon={<Plus size={20} />}
+          <div className="flex items-center gap-3">
+            {/* BOTÃO INÍCIO - AGORA LEVA PARA LANDING */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/')}
+              leftIcon={<Home size={16} />}
+              className="border-gray-300 text-gray-600 hover:bg-gray-50"
             >
-              Nova Solicitação
+              Início
             </Button>
-          </Link>
+            {/* BOTÃO LOGOUT */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              leftIcon={<LogOut size={16} />}
+              className="border-rose-200 text-rose-600 hover:bg-rose-50"
+            >
+              Sair
+            </Button>
+            <Link to="/cliente/nova-solicitacao">
+              <Button 
+                className="bg-accent hover:bg-accent/90 text-white shadow-lg hover:shadow-xl transition-all"
+                leftIcon={<Plus size={20} />}
+              >
+                Nova Solicitação
+              </Button>
+            </Link>
+          </div>
         </div>
 
         {/* ======================================== */}
@@ -253,7 +278,7 @@ export default function ClienteDashboard() {
         </div>
 
         {/* ======================================== */}
-        {/* SOLICITAÇÕES */}
+        {/* SOLICITAÇÕES RECENTES */}
         {/* ======================================== */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           <div className="lg:col-span-2 space-y-6">
@@ -474,31 +499,6 @@ export default function ClienteDashboard() {
                 </CardContent>
               </Card>
             </div>
-
-            {/* Avaliações Pendentes */}
-            {allSolicitacoes.filter(s => s.status === 'concluido' && !s.avaliado).length > 0 && (
-              <div className="mt-6">
-                <h3 className="font-black text-primary flex items-center gap-2 mb-3">
-                  <Star size={18} className="text-accent" />
-                  Avaliações Pendentes
-                </h3>
-                <Card className="bg-yellow-50 border-yellow-200">
-                  <CardContent className="p-4">
-                    <p className="text-sm text-gray-600 mb-3">
-                      Você tem {allSolicitacoes.filter(s => s.status === 'concluido' && !s.avaliado).length} serviços para avaliar.
-                    </p>
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="w-full border-yellow-300 text-yellow-700 hover:bg-yellow-100"
-                      onClick={() => setShowAll(true)}
-                    >
-                      Avaliar Agora
-                    </Button>
-                  </CardContent>
-                </Card>
-              </div>
-            )}
           </div>
         </div>
       </div>
