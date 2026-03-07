@@ -36,7 +36,12 @@ import {
   Wrench,
   Shield,
   UserCheck,
-  UserX
+  UserX,
+  Home,
+  LogOut,
+  ChevronDown,
+  ChevronUp,
+  Info
 } from 'lucide-react';
 import { formatCurrency, formatDate, translateStatus, exportToCSV } from '../../utils/utils';
 import { useToast } from '../../contexts/ToastContext';
@@ -49,7 +54,10 @@ interface CentralStats {
   emAndamento: number;
   concluidas: number;
   canceladas: number;
+  aguardandoOrcamento: number;
   totalPrestadores: number;
+  prestadoresPendentes: number;
+  prestadoresAtivos: number;
   totalClientes: number;
   valorTotalMovimentado: number;
 }
@@ -62,10 +70,14 @@ interface PrestadorPendente {
   especialidade: string;
   dataCadastro: Date;
   status: string;
+  documentos: {
+    bi?: { nome: string, tipo: string };
+    declaracaoBairro?: { nome: string, tipo: string };
+  };
 }
 
 export default function CentralDashboard() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [solicitacoes, setSolicitacoes] = useState<Solicitacao[]>([]);
   const [filteredSolicitacoes, setFilteredSolicitacoes] = useState<Solicitacao[]>([]);
@@ -81,10 +93,23 @@ export default function CentralDashboard() {
     emAndamento: 0,
     concluidas: 0,
     canceladas: 0,
+    aguardandoOrcamento: 0,
     totalPrestadores: 0,
+    prestadoresPendentes: 0,
+    prestadoresAtivos: 0,
     totalClientes: 0,
     valorTotalMovimentado: 0
   });
+
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+      showToast('Logout efetuado com sucesso!', 'success');
+    } catch (error) {
+      showToast('Erro ao fazer logout', 'error');
+    }
+  };
 
   useEffect(() => {
     // Buscar solicitações
@@ -98,6 +123,7 @@ export default function CentralDashboard() {
       const emAndamento = docs.filter(s => ['prestador_atribuido', 'em_andamento'].includes(s.status)).length;
       const concluidas = docs.filter(s => s.status === 'concluido').length;
       const canceladas = docs.filter(s => s.status === 'cancelado').length;
+      const aguardandoOrcamento = docs.filter(s => s.tamanho === 'grande' && s.status === 'aguardando_orcamento').length;
       const valorTotal = docs.filter(s => s.status === 'concluido').reduce((acc, curr) => acc + curr.valorTotal, 0);
 
       setStats(prev => ({
@@ -107,6 +133,7 @@ export default function CentralDashboard() {
         emAndamento,
         concluidas,
         canceladas,
+        aguardandoOrcamento,
         valorTotalMovimentado: valorTotal
       }));
 
@@ -129,7 +156,21 @@ export default function CentralDashboard() {
       
       setStats(prev => ({
         ...prev,
-        totalPrestadores: docs.length
+        prestadoresPendentes: docs.length
+      }));
+    });
+
+    // Buscar total de prestadores ativos
+    const prestadoresAtivosQuery = query(
+      collection(db, 'users'),
+      where('profile', '==', 'prestador'),
+      where('status', '==', 'activo')
+    );
+    const unsubscribePrestadoresAtivos = onSnapshot(prestadoresAtivosQuery, (snapshot) => {
+      setStats(prev => ({
+        ...prev,
+        prestadoresAtivos: snapshot.docs.length,
+        totalPrestadores: snapshot.docs.length + prestadoresPendentes.length
       }));
     });
 
@@ -148,6 +189,7 @@ export default function CentralDashboard() {
     return () => {
       unsubscribeSolicitacoes();
       unsubscribePrestadores();
+      unsubscribePrestadoresAtivos();
       unsubscribeClientes();
     };
   }, []);
@@ -223,6 +265,22 @@ export default function CentralDashboard() {
     showToast('Funcionalidade em desenvolvimento', 'info');
   };
 
+  const handleGerarOrcamento = async (id: string) => {
+    setActionLoading(id);
+    try {
+      await updateDoc(doc(db, 'solicitacoes', id), {
+        status: 'aguardando_aprovacao_cliente',
+        dataOrcamento: new Date()
+      });
+      showToast('Orçamento enviado para o cliente!', 'success');
+    } catch (error) {
+      console.error('Erro ao gerar orçamento:', error);
+      showToast('Erro ao gerar orçamento', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
+
   // ============================================
   // FUNÇÕES CRUD - PRESTADORES
   // ============================================
@@ -290,7 +348,8 @@ export default function CentralDashboard() {
       Prestador: s.prestadorNome || 'N/A',
       Status: translateStatus(s.status),
       Data: formatDate(s.dataSolicitacao),
-      Valor: formatCurrency(s.valorTotal)
+      Valor: formatCurrency(s.valorTotal),
+      Tamanho: s.tamanho || 'N/A'
     }));
     exportToCSV(data, `solicitacoes_${new Date().toISOString().split('T')[0]}`);
     showToast('Relatório exportado com sucesso!', 'success');
@@ -323,6 +382,24 @@ export default function CentralDashboard() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/')}
+              leftIcon={<Home size={16} />}
+              className="border-gray-300 text-gray-600 hover:bg-gray-50"
+            >
+              Início
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              leftIcon={<LogOut size={16} />}
+              className="border-rose-200 text-rose-600 hover:bg-rose-50"
+            >
+              Sair
+            </Button>
             <Button
               variant="outline"
               size="sm"
@@ -370,10 +447,10 @@ export default function CentralDashboard() {
           <Card className="border-none shadow-md hover:shadow-lg transition-all">
             <CardContent className="p-6">
               <div className="flex items-center justify-between mb-2">
-                <AlertCircle size={24} className="text-blue-600" />
+                <Info size={24} className="text-blue-600" />
               </div>
-              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Em Andamento</p>
-              <h3 className="text-2xl font-black text-primary">{stats.emAndamento}</h3>
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Aguardando Orçamento</p>
+              <h3 className="text-2xl font-black text-primary">{stats.aguardandoOrcamento}</h3>
             </CardContent>
           </Card>
 
@@ -430,6 +507,18 @@ export default function CentralDashboard() {
                           <Phone size={12} />
                           <span>{prestador.telefone}</span>
                         </div>
+                        {prestador.documentos?.bi && (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle2 size={12} />
+                            <span>BI carregado</span>
+                          </div>
+                        )}
+                        {prestador.documentos?.declaracaoBairro && (
+                          <div className="flex items-center gap-2 text-green-600">
+                            <CheckCircle2 size={12} />
+                            <span>Declaração do Bairro carregada</span>
+                          </div>
+                        )}
                       </div>
 
                       <div className="flex gap-2">
@@ -492,6 +581,14 @@ export default function CentralDashboard() {
                   Pendentes
                 </Button>
                 <Button
+                  variant={filterStatus === 'aguardando_orcamento' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('aguardando_orcamento')}
+                  className="border-blue-200 text-blue-700 hover:bg-blue-50"
+                >
+                  Orçamento
+                </Button>
+                <Button
                   variant={filterStatus === 'em_andamento' ? 'primary' : 'outline'}
                   size="sm"
                   onClick={() => handleStatusChange('em_andamento')}
@@ -534,8 +631,9 @@ export default function CentralDashboard() {
                       {/* Barra de status lateral */}
                       <div className={`w-2 md:w-4 ${
                         s.status === 'buscando_prestador' ? 'bg-yellow-400' :
-                        s.status === 'prestador_atribuido' ? 'bg-blue-400' :
-                        s.status === 'em_andamento' ? 'bg-indigo-400' :
+                        s.status === 'aguardando_orcamento' ? 'bg-blue-400' :
+                        s.status === 'prestador_atribuido' ? 'bg-indigo-400' :
+                        s.status === 'em_andamento' ? 'bg-purple-400' :
                         s.status === 'concluido' ? 'bg-green-400' :
                         s.status === 'cancelado' ? 'bg-red-400' :
                         'bg-gray-400'
@@ -549,11 +647,22 @@ export default function CentralDashboard() {
                               <p className="text-[10px] font-bold text-gray-400 uppercase mb-1">Serviço</p>
                               <h4 className="font-black text-primary">{s.servico}</h4>
                               <p className="text-xs text-gray-500">{formatDate(s.dataAgendada)}</p>
-                              <span className={`inline-block mt-2 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
+                              {s.tamanho && (
+                                <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  s.tamanho === 'pequeno' ? 'bg-green-100 text-green-700' :
+                                  s.tamanho === 'medio' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {s.tamanho === 'pequeno' ? 'Pequeno' : 
+                                   s.tamanho === 'medio' ? 'Médio' : 'Grande'}
+                                </span>
+                              )}
+                              <span className={`inline-block mt-2 ml-2 text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${
                                 s.status === 'concluido' ? 'bg-green-100 text-green-700' :
                                 s.status === 'buscando_prestador' ? 'bg-yellow-100 text-yellow-700' :
-                                s.status === 'prestador_atribuido' ? 'bg-blue-100 text-blue-700' :
-                                s.status === 'em_andamento' ? 'bg-indigo-100 text-indigo-700' :
+                                s.status === 'aguardando_orcamento' ? 'bg-blue-100 text-blue-700' :
+                                s.status === 'prestador_atribuido' ? 'bg-indigo-100 text-indigo-700' :
+                                s.status === 'em_andamento' ? 'bg-purple-100 text-purple-700' :
                                 s.status === 'cancelado' ? 'bg-red-100 text-red-700' :
                                 'bg-gray-100 text-gray-700'
                               }`}>
@@ -605,16 +714,30 @@ export default function CentralDashboard() {
                               <Eye size={18} />
                             </Button>
 
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              onClick={() => handleAssignPrestador(s.id)}
-                              title="Atribuir Prestador"
-                              className="text-green-600 hover:bg-green-50"
-                              disabled={s.status !== 'buscando_prestador'}
-                            >
-                              <UserCheck size={18} />
-                            </Button>
+                            {s.status === 'buscando_prestador' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleAssignPrestador(s.id)}
+                                title="Atribuir Prestador"
+                                className="text-green-600 hover:bg-green-50"
+                              >
+                                <UserCheck size={18} />
+                              </Button>
+                            )}
+
+                            {s.status === 'aguardando_orcamento' && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                onClick={() => handleGerarOrcamento(s.id)}
+                                disabled={actionLoading === s.id}
+                                title="Gerar Orçamento"
+                                className="text-blue-600 hover:bg-blue-50"
+                              >
+                                <DollarSign size={18} />
+                              </Button>
+                            )}
 
                             {s.status === 'buscando_prestador' && (
                               <Button
@@ -665,6 +788,7 @@ export default function CentralDashboard() {
                                 {s.endereco.quarteirao && `, Q. ${s.endereco.quarteirao}`}
                                 {s.endereco.casa && `, Casa ${s.endereco.casa}`}
                                 {s.endereco.complemento && ` - ${s.endereco.complemento}`}
+                                {s.endereco.referencia && ` (${s.endereco.referencia})`}
                               </span>
                             </div>
                           </div>
