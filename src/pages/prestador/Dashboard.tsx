@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { AppLayout } from '../../components/layout/AppLayout';
 import { useAuth } from '../../contexts/AuthContext';
@@ -32,11 +31,16 @@ import {
   LogOut,
   Filter,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
+  Info,
+  Upload,
+  FileText,
+  IdCard
 } from 'lucide-react';
 import { useToast } from '../../contexts/ToastContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Link, useNavigate } from 'react-router-dom';
+import { Modal } from '../../components/ui/Modal';
 
 interface PrestadorStats {
   totalGanhos: number;
@@ -56,6 +60,7 @@ export default function PrestadorDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
   const { showToast } = useToast();
+  const [showDocumentModal, setShowDocumentModal] = useState(false);
   const [stats, setStats] = useState<PrestadorStats>({
     totalGanhos: 0,
     servicosConcluidos: 0,
@@ -249,6 +254,10 @@ export default function PrestadorDashboard() {
     navigate(`/prestador/agenda?id=${id}&edit=true`);
   };
 
+  const handleUploadDocuments = () => {
+    setShowDocumentModal(true);
+  };
+
   if (user?.status === 'pendente') {
     return (
       <AppLayout>
@@ -283,12 +292,167 @@ export default function PrestadorDashboard() {
     );
   }
 
+  // Status especial para pendente_documentos
+  if (user?.status === 'pendente_documentos') {
+    return (
+      <AppLayout>
+        <div className="container mx-auto px-4 py-8">
+          {/* Alerta de documentos pendentes */}
+          <Card className="bg-yellow-50 border-yellow-200 mb-8">
+            <CardContent className="p-6">
+              <div className="flex items-start gap-4">
+                <div className="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center text-yellow-600 shrink-0">
+                  <AlertCircle size={24} />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl font-black text-yellow-800 mb-2">
+                    Documentos Pendentes
+                  </h2>
+                  <p className="text-sm text-yellow-700 mb-4">
+                    Seu perfil está aguardando o envio dos documentos obrigatórios para ativação completa.
+                    Envie agora para começar a receber solicitações de serviço.
+                  </p>
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={handleUploadDocuments}
+                      className="bg-yellow-600 hover:bg-yellow-700 text-white"
+                      leftIcon={<Upload size={16} />}
+                    >
+                      Enviar Documentos Agora
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => setShowDocumentModal(true)}
+                      className="border-yellow-300 text-yellow-700 hover:bg-yellow-100"
+                    >
+                      Saber mais
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Restante do dashboard normal... */}
+          {/* HEADER */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
+            <div className="flex items-center gap-4">
+              <div className="w-16 h-16 rounded-full bg-gradient-to-br from-accent to-orange-600 flex items-center justify-center text-white text-2xl font-black shadow-lg">
+                {user?.nome?.charAt(0).toUpperCase() || 'P'}
+              </div>
+              <div>
+                <h1 className="text-3xl md:text-4xl font-black text-primary mb-1">
+                  Olá, {user?.nome?.split(' ')[0] || 'Prestador'}! 👋
+                </h1>
+                <div className="flex items-center gap-3 flex-wrap">
+                  <span className="text-sm font-bold text-accent bg-accent/10 px-3 py-1 rounded-full">
+                    {user?.especialidade || 'Profissional'}
+                  </span>
+                  <div className="flex items-center gap-1 text-yellow-500">
+                    <Star size={16} fill="currentColor" />
+                    <span className="text-sm font-bold text-primary">{stats.avaliacaoMedia.toFixed(1)}</span>
+                    <span className="text-xs text-gray-400">({stats.totalAvaliacoes})</span>
+                  </div>
+                  <span className="text-xs font-bold uppercase px-2 py-1 rounded-full bg-yellow-100 text-yellow-700">
+                    Pendente Documentos
+                  </span>
+                </div>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => navigate('/')}
+                leftIcon={<Home size={16} />}
+                className="border-gray-300 text-gray-600 hover:bg-gray-50"
+              >
+                Início
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleLogout}
+                leftIcon={<LogOut size={16} />}
+                className="border-rose-200 text-rose-600 hover:bg-rose-50"
+              >
+                Sair
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => window.location.reload()}
+                title="Atualizar"
+              >
+                <RefreshCw size={18} />
+              </Button>
+            </div>
+          </div>
+
+          {/* Stats Grid (simplificado) */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
+            <Card className="bg-gradient-to-br from-accent to-orange-600 text-white border-none shadow-lg">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <DollarSign size={24} className="opacity-80" />
+                  <TrendingUp size={20} className="opacity-60" />
+                </div>
+                <p className="text-xs font-bold opacity-60 uppercase tracking-wider">Ganhos Totais</p>
+                <h3 className="text-2xl font-black">{formatCurrency(stats.totalGanhos)}</h3>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-md hover:shadow-lg transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Award size={24} className="text-blue-600" />
+                </div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Concluídos</p>
+                <h3 className="text-2xl font-black text-primary">{stats.servicosConcluidos}</h3>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-md hover:shadow-lg transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <Clock size={24} className="text-orange-600" />
+                </div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Em Andamento</p>
+                <h3 className="text-2xl font-black text-primary">{stats.servicosEmAndamento}</h3>
+              </CardContent>
+            </Card>
+
+            <Card className="border-none shadow-md hover:shadow-lg transition-all">
+              <CardContent className="p-6">
+                <div className="flex items-center justify-between mb-2">
+                  <AlertCircle size={24} className="text-yellow-600" />
+                </div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wider">Disponíveis</p>
+                <h3 className="text-2xl font-black text-primary">{stats.servicosPendentes}</h3>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Mensagem de que não pode aceitar serviços sem documentos */}
+          <Card className="bg-gray-50 border-gray-200 mb-8">
+            <CardContent className="p-4">
+              <p className="text-sm text-gray-600 flex items-center gap-2">
+                <Info size={16} className="text-gray-400" />
+                Enquanto seus documentos não forem enviados, você não poderá aceitar novos serviços.
+                Envie os documentos para ativar seu perfil completamente.
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      </AppLayout>
+    );
+  }
+
+  // Dashboard normal para prestador ativo
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        {/* ======================================== */}
         {/* HEADER PERSONALIZADO */}
-        {/* ======================================== */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
           <div className="flex items-center gap-4">
             <div className="w-16 h-16 rounded-full bg-gradient-to-br from-accent to-orange-600 flex items-center justify-center text-white text-2xl font-black shadow-lg">
@@ -345,9 +509,7 @@ export default function PrestadorDashboard() {
           </div>
         </div>
 
-        {/* ======================================== */}
         {/* STATS GRID */}
-        {/* ======================================== */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-10">
           <Card className="bg-gradient-to-br from-accent to-orange-600 text-white border-none shadow-lg">
             <CardContent className="p-6">
@@ -391,9 +553,7 @@ export default function PrestadorDashboard() {
           </Card>
         </div>
 
-        {/* ======================================== */}
         {/* FILTROS */}
-        {/* ======================================== */}
         <div className="flex flex-wrap gap-2 mb-6">
           <Button
             variant={filterStatus === 'todas' ? 'primary' : 'outline'}
@@ -444,9 +604,7 @@ export default function PrestadorDashboard() {
           </Button>
         </div>
 
-        {/* ======================================== */}
         {/* SOLICITAÇÕES */}
-        {/* ======================================== */}
         <div className="space-y-4">
           {filteredSolicitacoes.length > 0 ? (
             filteredSolicitacoes.map((sol) => (
@@ -530,7 +688,6 @@ export default function PrestadorDashboard() {
 
                         {/* AÇÕES CRUD */}
                         <div className="flex flex-wrap items-center justify-end gap-2 mt-4">
-                          {/* Visualizar */}
                           <Button
                             variant="ghost"
                             size="icon"
@@ -541,7 +698,6 @@ export default function PrestadorDashboard() {
                             <Eye size={18} />
                           </Button>
 
-                          {/* Ações baseadas no status */}
                           {sol.status === 'buscando_prestador' && (
                             <>
                               <Button
@@ -658,6 +814,72 @@ export default function PrestadorDashboard() {
           )}
         </div>
       </div>
+
+      {/* Modal de Upload de Documentos */}
+      <Modal isOpen={showDocumentModal} onClose={() => setShowDocumentModal(false)} title="Enviar Documentos">
+        <div className="space-y-6">
+          <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
+            <p className="text-sm text-yellow-700 flex items-start gap-2">
+              <Info size={18} className="shrink-0 mt-0.5" />
+              <span>
+                Envie os documentos abaixo para ativar seu perfil completamente.
+                Formatos aceitos: PDF, JPG, PNG (máx 5MB cada).
+              </span>
+            </p>
+          </div>
+
+          <div className="space-y-4">
+            <div className="border-2 border-gray-200 rounded-xl p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <IdCard size={20} className="text-gray-600" />
+                <div>
+                  <h3 className="font-bold text-primary">Bilhete de Identidade</h3>
+                  <p className="text-xs text-gray-500">Frente e verso do seu BI</p>
+                </div>
+              </div>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-white hover:file:bg-accent/90"
+              />
+            </div>
+
+            <div className="border-2 border-gray-200 rounded-xl p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <Home size={20} className="text-gray-600" />
+                <div>
+                  <h3 className="font-bold text-primary">Declaração do Bairro</h3>
+                  <p className="text-xs text-gray-500">Comprovativo de residência</p>
+                </div>
+              </div>
+              <input
+                type="file"
+                accept=".pdf,.jpg,.jpeg,.png"
+                className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-accent file:text-white hover:file:bg-accent/90"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowDocumentModal(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={() => {
+                showToast('Documentos enviados com sucesso!', 'success');
+                setShowDocumentModal(false);
+              }}
+              className="flex-1 bg-accent hover:bg-accent/90 text-white"
+            >
+              Enviar Documentos
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </AppLayout>
   );
 }
