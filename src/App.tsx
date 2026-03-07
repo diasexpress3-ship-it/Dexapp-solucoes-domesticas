@@ -41,6 +41,9 @@ import Configuracoes from './pages/admin/Configuracoes';
 import { NovoAdmin } from './pages/admin/NovoAdmin';
 import NovoUsuario from './pages/admin/NovoUsuario';
 
+// ============================================
+// COMPONENTE DE ROTA PROTEGIDA
+// ============================================
 const ProtectedRoute = ({ children, allowedProfiles }: { children: React.ReactNode, allowedProfiles?: string[] }) => {
   const { user, loading, firebaseUser } = useAuth();
 
@@ -64,47 +67,61 @@ const ProtectedRoute = ({ children, allowedProfiles }: { children: React.ReactNo
   return <>{children}</>;
 };
 
-// Componente de redirecionamento da raiz
+// ============================================
+// COMPONENTE DE REDIRECIONAMENTO DA RAIZ
+// ============================================
 const HomeRedirect = () => {
   const { user, loading, firebaseUser } = useAuth();
 
   if (loading) return <LoadingSpinner fullScreen />;
 
+  // Se não estiver logado, vai para Landing
   if (!firebaseUser || !user) {
+    console.log('🏠 HomeRedirect - não logado → Landing');
     return <Landing />;
   }
 
-  // Admin vai para Landing (para poder fazer upload)
-  if (user.profile === 'admin') {
-    return <Landing />;
-  }
-
-  // Para outros perfis
+  // Redireciona baseado no perfil
+  console.log('🏠 HomeRedirect - logado como:', user.profile);
+  
   switch (user.profile) {
+    case 'admin':
+      console.log('🏠 HomeRedirect - admin → Landing (para upload)');
+      return <Landing />;
     case 'cliente':
+      console.log('🏠 HomeRedirect - cliente → /cliente/dashboard');
       return <Navigate to="/cliente/dashboard" replace />;
     case 'prestador':
+      console.log('🏠 HomeRedirect - prestador → /prestador/dashboard');
       return <Navigate to="/prestador/dashboard" replace />;
     case 'central':
+      console.log('🏠 HomeRedirect - central → /central/dashboard');
       return <Navigate to="/central/dashboard" replace />;
     default:
+      console.log('🏠 HomeRedirect - perfil desconhecido → Landing');
       return <Landing />;
   }
 };
 
-// Componente para rotas públicas (só não-logados)
+// ============================================
+// COMPONENTE PARA ROTAS PÚBLICAS (SÓ NÃO-LOGADOS)
+// ============================================
 const PublicOnlyRoute = ({ children }: { children: React.ReactNode }) => {
   const { firebaseUser, loading } = useAuth();
 
   if (loading) return <LoadingSpinner fullScreen />;
 
   if (firebaseUser) {
+    console.log('🔓 PublicOnlyRoute - usuário logado, redirecionando para home');
     return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
 };
 
+// ============================================
+// COMPONENTE PRINCIPAL
+// ============================================
 export default function App() {
   return (
     <ErrorBoundary>
@@ -112,7 +129,7 @@ export default function App() {
         <ToastProvider>
           <BrowserRouter>
             <Routes>
-              {/* Rota raiz */}
+              {/* Rota raiz - HomeRedirect decide */}
               <Route path="/" element={<HomeRedirect />} />
 
               {/* Public Routes */}
@@ -121,7 +138,7 @@ export default function App() {
               <Route path="/contacto" element={<ContactoPage />} />
               <Route path="/update-admin" element={<UpdateAdmin />} />
               
-              {/* Auth Routes */}
+              {/* Auth Routes - APENAS NÃO LOGADOS */}
               <Route path="/login" element={
                 <PublicOnlyRoute>
                   <Login />
@@ -138,7 +155,53 @@ export default function App() {
                 </PublicOnlyRoute>
               } />
 
-              {/* Admin Routes - VERIFICAR SE ESTÁ CORRETO */}
+              {/* Cliente Routes */}
+              <Route path="/cliente/dashboard" element={
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
+                  <ClienteDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/cliente/nova-solicitacao" element={
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
+                  <NovaSolicitacao />
+                </ProtectedRoute>
+              } />
+              <Route path="/cliente/acompanhamento/:id" element={
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
+                  <AcompanhamentoPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/cliente/carteira" element={
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
+                  <CarteiraPage />
+                </ProtectedRoute>
+              } />
+              <Route path="/cliente/agenda" element={
+                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
+                  <AgendaPageCliente />
+                </ProtectedRoute>
+              } />
+
+              {/* Prestador Routes */}
+              <Route path="/prestador/dashboard" element={
+                <ProtectedRoute allowedProfiles={['prestador', 'admin']}>
+                  <PrestadorDashboard />
+                </ProtectedRoute>
+              } />
+              <Route path="/prestador/agenda" element={
+                <ProtectedRoute allowedProfiles={['prestador', 'admin']}>
+                  <AgendaPagePrestador />
+                </ProtectedRoute>
+              } />
+
+              {/* Central Routes */}
+              <Route path="/central/dashboard" element={
+                <ProtectedRoute allowedProfiles={['central', 'admin']}>
+                  <CentralDashboard />
+                </ProtectedRoute>
+              } />
+
+              {/* Admin Routes */}
               <Route path="/admin/dashboard" element={
                 <ProtectedRoute allowedProfiles={['admin']}>
                   <AdminDashboard />
@@ -180,15 +243,7 @@ export default function App() {
                 </ProtectedRoute>
               } />
 
-              {/* Outras rotas protegidas (cliente, prestador, central) */}
-              <Route path="/cliente/dashboard" element={
-                <ProtectedRoute allowedProfiles={['cliente', 'admin']}>
-                  <ClienteDashboard />
-                </ProtectedRoute>
-              } />
-              {/* ... outras rotas ... */}
-
-              {/* Fallback */}
+              {/* Fallback - 404 */}
               <Route path="*" element={<Navigate to="/" replace />} />
             </Routes>
           </BrowserRouter>
