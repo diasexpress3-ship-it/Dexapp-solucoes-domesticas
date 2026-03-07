@@ -1,263 +1,934 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { AppLayout } from '../../components/layout/AppLayout';
-import { 
-  Briefcase, 
-  Search, 
-  Filter, 
-  Star, 
-  MapPin, 
-  CheckCircle2, 
-  Clock, 
-  XCircle,
-  FileText,
-  ExternalLink,
-  Home,
-  ArrowLeft
-} from 'lucide-react';
-import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader } from '../../components/ui/Card';
 import { Button } from '../../components/ui/Button';
 import { Input } from '../../components/ui/Input';
-import { collection, onSnapshot, query, where, doc, updateDoc } from 'firebase/firestore';
-import { db } from '../../services/firebase';
-import { User } from '../../types';
-import { formatDate, exportToCSV, exportToPDF } from '../../utils/utils';
-import { ExportButtons } from '../../components/ui/ExportButtons';
+import { Modal } from '../../components/ui/Modal';
+import { 
+  ArrowLeft,
+  Home,
+  LogOut,
+  RefreshCw,
+  Download,
+  Filter,
+  Search,
+  Users,
+  UserCheck,
+  UserX,
+  Clock,
+  AlertCircle,
+  CheckCircle2,
+  XCircle,
+  Eye,
+  Edit,
+  Trash2,
+  Mail,
+  Phone,
+  Star,
+  Award,
+  Wrench,
+  FileText,
+  IdCard,
+  Building,
+  Calendar,
+  TrendingUp,
+  Shield,
+  ThumbsUp,
+  ThumbsDown,
+  Loader2,
+  Copy,
+  Check
+} from 'lucide-react';
+import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
+import { collection, query, onSnapshot, orderBy, doc, updateDoc, deleteDoc, where } from 'firebase/firestore';
+import { db } from '../../services/firebase';
+import { formatCurrency, formatDate, exportToCSV } from '../../utils/utils';
+import { motion } from 'framer-motion';
+import { SERVICE_CATEGORIES, getEspecialidadeNome } from '../../constants/categories';
 
+// ============================================
+// INTERFACES
+// ============================================
+interface Prestador {
+  id: string;
+  nome: string;
+  email: string;
+  telefone: string;
+  profile: 'prestador';
+  status: 'activo' | 'inactivo' | 'pendente' | 'pendente_documentos' | 'rejeitado';
+  dataCadastro: Date;
+  ultimoAcesso?: Date;
+  especialidade: string;
+  categoria: string;
+  descricao: string;
+  experiencia: string;
+  endereco: string;
+  cidade: string;
+  valorHora: number;
+  avaliacaoMedia: number;
+  totalAvaliacoes: number;
+  documentos: {
+    bi?: { nome: string; tipo: string; dataUpload: Date };
+    declaracaoBairro?: { nome: string; tipo: string; dataUpload: Date };
+  };
+  dataAprovacao?: Date;
+  aprovadoPor?: string;
+  dataRejeicao?: Date;
+  rejeitadoPor?: string;
+  observacao?: string;
+}
+
+interface PrestadorStats {
+  total: number;
+  activos: number;
+  pendentes: number;
+  documentosPendentes: number;
+  rejeitados: number;
+  inactivos: number;
+}
+
+// ============================================
+// COMPONENTE PRINCIPAL
+// ============================================
 export default function Prestadores() {
   const navigate = useNavigate();
-  const [prestadores, setPrestadores] = useState<User[]>([]);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [statusFilter, setStatusFilter] = useState('todos');
-  const [isLoading, setIsLoading] = useState(true);
+  const { user, logout } = useAuth();
   const { showToast } = useToast();
+  
+  const [prestadores, setPrestadores] = useState<Prestador[]>([]);
+  const [filteredPrestadores, setFilteredPrestadores] = useState<Prestador[]>([]);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('todos');
+  const [isLoading, setIsLoading] = useState(true);
+  const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [selectedPrestador, setSelectedPrestador] = useState<Prestador | null>(null);
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [showRejectModal, setShowRejectModal] = useState(false);
+  const [rejectReason, setRejectReason] = useState('');
+  const [copiado, setCopiado] = useState<string | null>(null);
+  
+  const [stats, setStats] = useState<PrestadorStats>({
+    total: 0,
+    activos: 0,
+    pendentes: 0,
+    documentosPendentes: 0,
+    rejeitados: 0,
+    inactivos: 0
+  });
 
+  const handleLogout = async () => {
+    try {
+      await logout();
+      navigate('/');
+      showToast('Logout efetuado com sucesso!', 'success');
+    } catch (error) {
+      showToast('Erro ao fazer logout', 'error');
+    }
+  };
+
+  // ============================================
+  // BUSCAR PRESTADORES
+  // ============================================
   useEffect(() => {
-    const q = query(collection(db, 'users'), where('role', '==', 'prestador'));
-    const unsubscribe = onSnapshot(q, (snap) => {
-      let data = snap.docs.map(d => ({ id: d.id, ...d.data() } as User));
-      if (statusFilter !== 'todos') {
-        data = data.filter(p => p.status === statusFilter);
-      }
-      setPrestadores(data);
+    const q = query(
+      collection(db, 'users'),
+      where('profile', '==', 'prestador'),
+      orderBy('dataCadastro', 'desc')
+    );
+
+    const unsubscribe = onSnapshot(q, (snapshot) => {
+      const docs = snapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        dataCadastro: doc.data().dataCadastro?.toDate?.() || new Date(doc.data().dataCadastro),
+        ultimoAcesso: doc.data().ultimoAcesso?.toDate?.() || null,
+        dataAprovacao: doc.data().dataAprovacao?.toDate?.() || null,
+        dataRejeicao: doc.data().dataRejeicao?.toDate?.() || null,
+        documentos: {
+          bi: doc.data().documentos?.bi ? {
+            ...doc.data().documentos.bi,
+            dataUpload: doc.data().documentos.bi.dataUpload?.toDate?.() || new Date(doc.data().documentos.bi.dataUpload)
+          } : null,
+          declaracaoBairro: doc.data().documentos?.declaracaoBairro ? {
+            ...doc.data().documentos.declaracaoBairro,
+            dataUpload: doc.data().documentos.declaracaoBairro.dataUpload?.toDate?.() || new Date(doc.data().documentos.declaracaoBairro.dataUpload)
+          } : null
+        }
+      } as Prestador));
+      
+      setPrestadores(docs);
+      
+      // Calcular estatísticas
+      const activos = docs.filter(p => p.status === 'activo').length;
+      const pendentes = docs.filter(p => p.status === 'pendente').length;
+      const documentosPendentes = docs.filter(p => p.status === 'pendente_documentos').length;
+      const rejeitados = docs.filter(p => p.status === 'rejeitado').length;
+      const inactivos = docs.filter(p => p.status === 'inactivo').length;
+
+      setStats({
+        total: docs.length,
+        activos,
+        pendentes,
+        documentosPendentes,
+        rejeitados,
+        inactivos
+      });
+
+      filterPrestadores(filterStatus, docs);
       setIsLoading(false);
     });
 
     return () => unsubscribe();
-  }, [statusFilter]);
+  }, []);
 
-  const filteredPrestadores = prestadores.filter(p => 
-    p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    p.prestadorData?.categoria?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // ============================================
+  // FILTRAR PRESTADORES
+  // ============================================
+  useEffect(() => {
+    filterPrestadores(filterStatus, prestadores);
+  }, [searchTerm, prestadores]);
 
-  const handleStatusChange = async (userId: string, newStatus: User['status']) => {
+  const filterPrestadores = (status: string, docs = prestadores) => {
+    let filtered = docs;
+
+    // Filtro por status
+    if (status !== 'todos') {
+      filtered = filtered.filter(p => p.status === status);
+    }
+
+    // Filtro por busca
+    if (searchTerm) {
+      filtered = filtered.filter(p => 
+        p.nome.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.telefone.includes(searchTerm) ||
+        p.especialidade.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        p.cidade.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredPrestadores(filtered);
+  };
+
+  const handleStatusChange = (status: string) => {
+    setFilterStatus(status);
+    filterPrestadores(status);
+  };
+
+  // ============================================
+  // FUNÇÕES CRUD
+  // ============================================
+  const handleViewDetails = (prestador: Prestador) => {
+    setSelectedPrestador(prestador);
+    setShowDetailsModal(true);
+  };
+
+  const handleApprove = async (id: string) => {
+    if (!window.confirm('Confirmar aprovação deste prestador?')) return;
+    
+    setActionLoading(id);
     try {
-      await updateDoc(doc(db, 'users', userId), { status: newStatus });
-      showToast('Status do prestador atualizado.', 'success');
+      await updateDoc(doc(db, 'users', id), {
+        status: 'activo',
+        dataAprovacao: new Date(),
+        aprovadoPor: user?.id
+      });
+      showToast('Prestador aprovado com sucesso!', 'success');
     } catch (error) {
-      showToast('Erro ao atualizar status.', 'error');
+      console.error('Erro ao aprovar prestador:', error);
+      showToast('Erro ao aprovar prestador', 'error');
+    } finally {
+      setActionLoading(null);
     }
   };
 
-  const exportHeaders = ['Nome', 'Categoria', 'Telefone', 'Status', 'Trabalhos', 'Rating'];
-  const exportData = filteredPrestadores.map(p => ({
-    Nome: p.nome,
-    Categoria: p.prestadorData?.categoria || 'N/A',
-    Telefone: p.telefone,
-    Status: p.status,
-    Trabalhos: p.prestadorData?.trabalhos || 0,
-    Rating: p.prestadorData?.rating || 0
-  }));
+  const handleReject = async () => {
+    if (!selectedPrestador) return;
+    
+    setActionLoading(selectedPrestador.id);
+    try {
+      await updateDoc(doc(db, 'users', selectedPrestador.id), {
+        status: 'rejeitado',
+        dataRejeicao: new Date(),
+        rejeitadoPor: user?.id,
+        observacao: rejectReason || 'Rejeitado pela central'
+      });
+      showToast('Prestador rejeitado', 'info');
+      setShowRejectModal(false);
+      setShowDetailsModal(false);
+      setRejectReason('');
+    } catch (error) {
+      console.error('Erro ao rejeitar prestador:', error);
+      showToast('Erro ao rejeitar prestador', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
-  const pdfData = filteredPrestadores.map(p => [
-    p.nome,
-    p.prestadorData?.categoria || 'N/A',
-    p.telefone,
-    p.status,
-    p.prestadorData?.trabalhos || 0,
-    p.prestadorData?.rating || 0
-  ]);
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja excluir permanentemente este prestador?')) return;
+    
+    setActionLoading(id);
+    try {
+      await deleteDoc(doc(db, 'users', id));
+      showToast('Prestador excluído', 'success');
+    } catch (error) {
+      console.error('Erro ao excluir prestador:', error);
+      showToast('Erro ao excluir prestador', 'error');
+    } finally {
+      setActionLoading(null);
+    }
+  };
 
+  const handleCopyToClipboard = (texto: string, tipo: string) => {
+    navigator.clipboard.writeText(texto);
+    setCopiado(tipo);
+    setTimeout(() => setCopiado(null), 2000);
+    showToast(`${tipo} copiado!`, 'success');
+  };
+
+  const handleExportCSV = () => {
+    const data = filteredPrestadores.map(p => ({
+      Nome: p.nome,
+      Email: p.email,
+      Telefone: p.telefone,
+      Especialidade: getEspecialidadeNome(p.especialidade),
+      Categoria: p.categoria,
+      Cidade: p.cidade,
+      Status: p.status,
+      Avaliacao: p.avaliacaoMedia.toFixed(1),
+      'Total Avaliações': p.totalAvaliacoes,
+      'Valor Hora': formatCurrency(p.valorHora),
+      'Data Cadastro': formatDate(p.dataCadastro),
+      'Documentos': p.documentos?.bi && p.documentos?.declaracaoBairro ? 'Completos' : 'Incompletos'
+    }));
+    exportToCSV(data, `prestadores_${new Date().toISOString().split('T')[0]}`);
+    showToast('Lista exportada com sucesso!', 'success');
+  };
+
+  // ============================================
+  // HELPERS
+  // ============================================
+  const getStatusColor = (status: string) => {
+    switch (status) {
+      case 'activo': return 'bg-green-100 text-green-700';
+      case 'pendente': return 'bg-yellow-100 text-yellow-700';
+      case 'pendente_documentos': return 'bg-orange-100 text-orange-700';
+      case 'rejeitado': return 'bg-red-100 text-red-700';
+      case 'inactivo': return 'bg-gray-100 text-gray-700';
+      default: return 'bg-gray-100 text-gray-700';
+    }
+  };
+
+  const getStatusIcon = (status: string) => {
+    switch (status) {
+      case 'activo': return <CheckCircle2 size={14} className="mr-1" />;
+      case 'pendente': return <Clock size={14} className="mr-1" />;
+      case 'pendente_documentos': return <FileText size={14} className="mr-1" />;
+      case 'rejeitado': return <XCircle size={14} className="mr-1" />;
+      case 'inactivo': return <AlertCircle size={14} className="mr-1" />;
+      default: return null;
+    }
+  };
+
+  // ============================================
+  // RENDER
+  // ============================================
   return (
     <AppLayout>
       <div className="container mx-auto px-4 py-8">
-        {/* Breadcrumb Navigation */}
-        <div className="flex items-center gap-2 text-sm text-gray-500 mb-4">
-          <button 
-            onClick={() => navigate('/')} 
-            className="flex items-center gap-1 hover:text-accent transition-colors"
-          >
-            <Home className="w-4 h-4" /> Início
-          </button>
-          <span>/</span>
-          <button 
-            onClick={() => navigate('/admin/dashboard')} 
-            className="hover:text-accent transition-colors"
-          >
-            Admin
-          </button>
-          <span>/</span>
-          <span className="text-primary font-bold">Prestadores</span>
-        </div>
-
-        {/* Header */}
-        <div className="flex items-center gap-4 mb-8">
-          <button 
-            onClick={() => navigate(-1)}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-            title="Voltar"
-          >
-            <ArrowLeft className="w-5 h-5 text-gray-600" />
-          </button>
-          <div>
-            <h1 className="text-3xl font-black text-primary flex items-center gap-3">
-              <Briefcase size={32} className="text-accent" />
-              Gestão de Prestadores
-            </h1>
-            <p className="text-gray-500">Acompanhe e valide os profissionais da plataforma.</p>
-          </div>
-        </div>
-
+        {/* ======================================== */}
+        {/* HEADER */}
+        {/* ======================================== */}
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-          <div className="flex flex-wrap gap-2">
-            <ExportButtons 
-              data={exportData}
-              filename="prestadores_dexapp"
-              title="Relatório de Prestadores - DEXAPP"
-              headers={exportHeaders}
-              pdfData={pdfData}
-            />
+          <div className="flex items-center gap-4">
+            <button 
+              onClick={() => navigate(-1)}
+              className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              title="Voltar"
+            >
+              <ArrowLeft className="w-5 h-5 text-gray-600" />
+            </button>
+            <div>
+              <h1 className="text-3xl font-black text-primary flex items-center gap-3">
+                <Users size={32} className="text-accent" />
+                Gestão de Prestadores
+              </h1>
+              <p className="text-gray-500">Gerencie os prestadores da plataforma.</p>
+            </div>
+          </div>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/')}
+              leftIcon={<Home size={16} />}
+              className="border-gray-300 text-gray-600 hover:bg-gray-50"
+            >
+              Início
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleLogout}
+              leftIcon={<LogOut size={16} />}
+              className="border-rose-200 text-rose-600 hover:bg-rose-50"
+            >
+              Sair
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleExportCSV}
+              leftIcon={<Download size={16} />}
+            >
+              Exportar
+            </Button>
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() => window.location.reload()}
+              title="Atualizar"
+            >
+              <RefreshCw size={18} />
+            </Button>
           </div>
         </div>
 
+        {/* ======================================== */}
+        {/* STATS CARDS */}
+        {/* ======================================== */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-8">
+          <Card className="bg-primary text-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold opacity-60 uppercase">Total</p>
+              <h3 className="text-2xl font-black">{stats.total}</h3>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-green-600 text-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold opacity-60 uppercase">Ativos</p>
+              <h3 className="text-2xl font-black">{stats.activos}</h3>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-yellow-600 text-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold opacity-60 uppercase">Pendentes</p>
+              <h3 className="text-2xl font-black">{stats.pendentes}</h3>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-orange-600 text-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold opacity-60 uppercase">Docs Pendentes</p>
+              <h3 className="text-2xl font-black">{stats.documentosPendentes}</h3>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-red-600 text-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold opacity-60 uppercase">Rejeitados</p>
+              <h3 className="text-2xl font-black">{stats.rejeitados}</h3>
+            </CardContent>
+          </Card>
+
+          <Card className="bg-gray-600 text-white">
+            <CardContent className="p-4">
+              <p className="text-xs font-bold opacity-60 uppercase">Inativos</p>
+              <h3 className="text-2xl font-black">{stats.inactivos}</h3>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* ======================================== */}
+        {/* FILTROS */}
+        {/* ======================================== */}
         <Card className="mb-8">
           <CardContent className="p-4">
             <div className="flex flex-col md:flex-row gap-4">
               <div className="flex-1">
                 <Input
-                  placeholder="Pesquisar por nome ou categoria..."
+                  placeholder="Pesquisar por nome, email, telefone, especialidade..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  leftIcon={<Search size={20} className="text-gray-400" />}
-                  className="rounded-xl border-gray-100"
+                  leftIcon={<Search size={18} />}
                 />
               </div>
-              <div className="flex gap-2">
-                <select 
-                  value={statusFilter}
-                  onChange={(e) => setStatusFilter(e.target.value)}
-                  className="bg-gray-50 border-none rounded-xl px-4 py-2 font-bold text-sm text-primary outline-none focus:ring-2 focus:ring-accent/20"
+              <div className="flex flex-wrap gap-2">
+                <Button
+                  variant={filterStatus === 'todos' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('todos')}
                 >
-                  <option value="todos">Todos os Status</option>
-                  <option value="ativo">Ativos</option>
-                  <option value="pendente">Pendentes (Validação)</option>
-                  <option value="bloqueado">Bloqueados</option>
-                </select>
-                <Button variant="outline" size="icon" className="rounded-xl">
-                  <Filter size={20} />
+                  Todos
+                </Button>
+                <Button
+                  variant={filterStatus === 'activo' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('activo')}
+                  className="border-green-200 text-green-700 hover:bg-green-50"
+                >
+                  Ativos
+                </Button>
+                <Button
+                  variant={filterStatus === 'pendente' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('pendente')}
+                  className="border-yellow-200 text-yellow-700 hover:bg-yellow-50"
+                >
+                  Pendentes
+                </Button>
+                <Button
+                  variant={filterStatus === 'pendente_documentos' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('pendente_documentos')}
+                  className="border-orange-200 text-orange-700 hover:bg-orange-50"
+                >
+                  Docs Pendentes
+                </Button>
+                <Button
+                  variant={filterStatus === 'rejeitado' ? 'primary' : 'outline'}
+                  size="sm"
+                  onClick={() => handleStatusChange('rejeitado')}
+                  className="border-red-200 text-red-700 hover:bg-red-50"
+                >
+                  Rejeitados
                 </Button>
               </div>
             </div>
           </CardContent>
         </Card>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {filteredPrestadores.map((p) => (
-            <motion.div key={p.id} whileHover={{ y: -5 }}>
-              <Card className="h-full overflow-hidden border-gray-100 hover:shadow-xl hover:shadow-gray-200/50 transition-all">
-                <CardContent className="p-6">
-                  <div className="flex items-start justify-between mb-6">
-                    <div className="flex items-center gap-4">
-                      <div className="w-16 h-16 rounded-2xl bg-primary/5 flex items-center justify-center text-primary font-black text-xl overflow-hidden shadow-inner">
-                        {p.photoURL ? (
-                          <img src={p.photoURL} alt="" className="w-full h-full object-cover" referrerPolicy="no-referrer" />
-                        ) : (
-                          p.nome.charAt(0)
-                        )}
+        {/* ======================================== */}
+        {/* LISTA DE PRESTADORES */}
+        {/* ======================================== */}
+        <div className="space-y-4">
+          {filteredPrestadores.length > 0 ? (
+            filteredPrestadores.map((prestador) => (
+              <motion.div
+                key={prestador.id}
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+              >
+                <Card className="hover:shadow-lg transition-all cursor-pointer"
+                      onClick={() => handleViewDetails(prestador)}>
+                  <CardContent className="p-4">
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      <div className="flex items-center gap-4">
+                        <div className={`w-12 h-12 rounded-full flex items-center justify-center ${
+                          prestador.status === 'activo' ? 'bg-green-100 text-green-600' :
+                          prestador.status === 'pendente' ? 'bg-yellow-100 text-yellow-600' :
+                          prestador.status === 'pendente_documentos' ? 'bg-orange-100 text-orange-600' :
+                          prestador.status === 'rejeitado' ? 'bg-red-100 text-red-600' :
+                          'bg-gray-100 text-gray-600'
+                        }`}>
+                          <Award size={24} />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <h4 className="font-bold text-primary">{prestador.nome}</h4>
+                            <span className={`text-[10px] font-bold uppercase px-2 py-0.5 rounded-full flex items-center ${getStatusColor(prestador.status)}`}>
+                              {getStatusIcon(prestador.status)}
+                              {prestador.status === 'activo' ? 'Ativo' :
+                               prestador.status === 'pendente' ? 'Pendente' :
+                               prestador.status === 'pendente_documentos' ? 'Docs Pendentes' :
+                               prestador.status === 'rejeitado' ? 'Rejeitado' : 'Inativo'}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-gray-500">
+                            <span className="flex items-center gap-1">
+                              <Mail size={12} />
+                              {prestador.email}
+                            </span>
+                            <span className="w-1 h-1 bg-gray-300 rounded-full"></span>
+                            <span className="flex items-center gap-1">
+                              <Phone size={12} />
+                              {prestador.telefone}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 mt-2">
+                            <span className="text-xs font-bold bg-gray-100 px-2 py-0.5 rounded-full">
+                              {getEspecialidadeNome(prestador.especialidade)}
+                            </span>
+                            <div className="flex items-center gap-1 text-yellow-500">
+                              <Star size={12} fill="currentColor" />
+                              <span className="text-xs font-bold text-primary">{prestador.avaliacaoMedia.toFixed(1)}</span>
+                              <span className="text-xs text-gray-400">({prestador.totalAvaliacoes})</span>
+                            </div>
+                          </div>
+                        </div>
                       </div>
-                      <div>
-                        <h3 className="text-lg font-black text-primary leading-tight">{p.nome}</h3>
-                        <p className="text-xs font-bold text-accent uppercase tracking-widest">{p.prestadorData?.categoria || 'Sem Categoria'}</p>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end gap-2">
-                      <span className={`text-[10px] font-black uppercase px-2 py-1 rounded-full ${
-                        p.status === 'ativo' ? 'bg-green-100 text-green-700' :
-                        p.status === 'pendente' ? 'bg-yellow-100 text-yellow-700' :
-                        'bg-red-100 text-red-700'
-                      }`}>
-                        {p.status}
-                      </span>
-                      <div className="flex items-center text-yellow-500 gap-1">
-                        <Star size={14} fill="currentColor" />
-                        <span className="text-sm font-black">{p.prestadorData?.rating || '0.0'}</span>
-                      </div>
-                    </div>
-                  </div>
 
-                  <div className="space-y-4 mb-6">
-                    <div className="flex items-center gap-3 text-sm text-gray-500 font-medium">
-                      <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400">
-                        <MapPin size={16} />
-                      </div>
-                      Maputo, Moçambique
-                    </div>
-                    <div className="flex items-center gap-3 text-sm text-gray-500 font-medium">
-                      <div className="w-8 h-8 rounded-lg bg-gray-50 flex items-center justify-center text-gray-400">
-                        <CheckCircle2 size={16} />
-                      </div>
-                      {p.prestadorData?.trabalhos || 0} Trabalhos Concluídos
-                    </div>
-                  </div>
+                      <div className="flex items-center gap-4">
+                        <div className="text-right">
+                          <p className="text-sm font-bold text-primary">{formatCurrency(prestador.valorHora)}/hora</p>
+                          <p className="text-xs text-gray-500">{prestador.cidade}</p>
+                        </div>
+                        
+                        <div className="flex items-center gap-2">
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleViewDetails(prestador);
+                            }}
+                            className="text-blue-600 hover:bg-blue-50"
+                          >
+                            <Eye size={18} />
+                          </Button>
+                          
+                          {(prestador.status === 'pendente' || prestador.status === 'pendente_documentos') && (
+                            <>
+                              <Button
+                                variant="outline"
+                                size="icon"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  setSelectedPrestador(prestador);
+                                  setShowRejectModal(true);
+                                }}
+                                className="text-red-600 hover:bg-red-50"
+                              >
+                                <ThumbsDown size={18} />
+                              </Button>
+                              <Button
+                                variant="primary"
+                                size="sm"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleApprove(prestador.id);
+                                }}
+                                disabled={actionLoading === prestador.id}
+                                className="bg-green-600 hover:bg-green-700 text-white"
+                              >
+                                {actionLoading === prestador.id ? (
+                                  <Loader2 size={16} className="animate-spin" />
+                                ) : (
+                                  <ThumbsUp size={16} />
+                                )}
+                              </Button>
+                            </>
+                          )}
 
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {p.prestadorData?.especialidades?.map((esp, i) => (
-                      <span key={i} className="text-[10px] font-bold bg-gray-100 text-gray-600 px-2 py-1 rounded-lg">
-                        {esp}
-                      </span>
-                    ))}
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3">
-                    <Button 
-                      variant="outline" 
-                      size="sm" 
-                      className="rounded-xl font-bold"
-                      leftIcon={<FileText size={16} />}
-                      onClick={() => window.open(p.prestadorData?.biUrl, '_blank')}
-                      disabled={!p.prestadorData?.biUrl}
-                    >
-                      Ver BI
-                    </Button>
-                    {p.status === 'pendente' ? (
-                      <Button 
-                        variant="primary" 
-                        size="sm" 
-                        className="rounded-xl font-bold bg-green-600 hover:bg-green-700"
-                        onClick={() => handleStatusChange(p.id, 'ativo')}
-                      >
-                        Aprovar
-                      </Button>
-                    ) : (
-                      <Button 
-                        variant="outline" 
-                        size="sm" 
-                        className="rounded-xl font-bold text-red-500 border-red-100 hover:bg-red-50"
-                        onClick={() => handleStatusChange(p.id, 'bloqueado')}
-                      >
-                        Bloquear
-                      </Button>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
+                          {prestador.status === 'rejeitado' && (
+                            <Button
+                              variant="ghost"
+                              size="icon"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (window.confirm('Tem certeza que deseja excluir permanentemente este prestador?')) {
+                                  handleDelete(prestador.id);
+                                }
+                              }}
+                              disabled={actionLoading === prestador.id}
+                              className="text-red-600 hover:bg-red-50"
+                            >
+                              {actionLoading === prestador.id ? (
+                                <Loader2 size={18} className="animate-spin" />
+                              ) : (
+                                <Trash2 size={18} />
+                              )}
+                            </Button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              </motion.div>
+            ))
+          ) : (
+            <Card className="border-dashed border-2 bg-transparent">
+              <CardContent className="py-12 text-center">
+                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4 text-gray-400">
+                  <Users size={32} />
+                </div>
+                <h3 className="font-bold text-gray-700 mb-2">Nenhum prestador encontrado</h3>
+                <p className="text-sm text-gray-500">
+                  {searchTerm 
+                    ? 'Tente ajustar seus filtros ou termos de busca.'
+                    : 'Nenhum prestador cadastrado até o momento.'}
+                </p>
+              </CardContent>
+            </Card>
+          )}
         </div>
       </div>
+
+      {/* ======================================== */}
+      {/* MODAL DE DETALHES */}
+      {/* ======================================== */}
+      <Modal isOpen={showDetailsModal} onClose={() => setShowDetailsModal(false)} title="Detalhes do Prestador" size="lg">
+        {selectedPrestador && (
+          <div className="space-y-6">
+            {/* Cabeçalho */}
+            <div className="flex items-center justify-between pb-4 border-b">
+              <div className="flex items-center gap-4">
+                <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                  selectedPrestador.status === 'activo' ? 'bg-green-100 text-green-600' :
+                  selectedPrestador.status === 'pendente' ? 'bg-yellow-100 text-yellow-600' :
+                  selectedPrestador.status === 'pendente_documentos' ? 'bg-orange-100 text-orange-600' :
+                  selectedPrestador.status === 'rejeitado' ? 'bg-red-100 text-red-600' :
+                  'bg-gray-100 text-gray-600'
+                }`}>
+                  <Award size={32} />
+                </div>
+                <div>
+                  <h3 className="font-bold text-primary text-xl">{selectedPrestador.nome}</h3>
+                  <p className="text-sm text-gray-500">{selectedPrestador.email}</p>
+                </div>
+              </div>
+              <span className={`text-xs font-bold px-3 py-1 rounded-full flex items-center ${getStatusColor(selectedPrestador.status)}`}>
+                {getStatusIcon(selectedPrestador.status)}
+                {selectedPrestador.status === 'activo' ? 'Ativo' :
+                 selectedPrestador.status === 'pendente' ? 'Pendente' :
+                 selectedPrestador.status === 'pendente_documentos' ? 'Documentos Pendentes' :
+                 selectedPrestador.status === 'rejeitado' ? 'Rejeitado' : 'Inativo'}
+              </span>
+            </div>
+
+            {/* Grid de informações */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className="text-xs text-gray-500">Telefone</p>
+                <p className="font-bold text-primary">{selectedPrestador.telefone}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Cidade</p>
+                <p className="font-bold text-primary">{selectedPrestador.cidade}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Endereço</p>
+                <p className="font-bold text-primary">{selectedPrestador.endereco}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-500">Data Cadastro</p>
+                <p className="font-bold text-primary">{formatDate(selectedPrestador.dataCadastro)}</p>
+              </div>
+            </div>
+
+            {/* Profissão */}
+            <div>
+              <h4 className="font-bold text-primary mb-3">Dados Profissionais</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-xs text-gray-500">Categoria</p>
+                  <p className="font-bold text-primary">{selectedPrestador.categoria}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Especialidade</p>
+                  <p className="font-bold text-primary">{getEspecialidadeNome(selectedPrestador.especialidade)}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Experiência</p>
+                  <p className="font-bold text-primary">{selectedPrestador.experiencia}</p>
+                </div>
+                <div>
+                  <p className="text-xs text-gray-500">Valor Hora</p>
+                  <p className="font-bold text-primary">{formatCurrency(selectedPrestador.valorHora)}</p>
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className="text-xs text-gray-500 mb-1">Descrição</p>
+                <p className="text-sm text-gray-600 bg-gray-50 p-3 rounded-xl">
+                  {selectedPrestador.descricao}
+                </p>
+              </div>
+            </div>
+
+            {/* Avaliação */}
+            <div className="bg-gray-50 rounded-xl p-4">
+              <div className="flex items-center justify-between">
+                <span className="text-sm text-gray-600">Avaliação Média</span>
+                <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-1 text-yellow-500">
+                    {[1,2,3,4,5].map((star) => (
+                      <Star key={star} size={16} fill={star <= Math.round(selectedPrestador.avaliacaoMedia) ? 'currentColor' : 'none'} />
+                    ))}
+                  </div>
+                  <span className="font-bold text-primary">{selectedPrestador.avaliacaoMedia.toFixed(1)}</span>
+                  <span className="text-xs text-gray-400">({selectedPrestador.totalAvaliacoes} avaliações)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Documentos */}
+            <div>
+              <h4 className="font-bold text-primary mb-3">Documentos</h4>
+              <div className="grid grid-cols-2 gap-4">
+                <div className="border-2 border-gray-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <IdCard size={18} className="text-gray-500" />
+                      <span className="font-bold text-primary">BI</span>
+                    </div>
+                    {selectedPrestador.documentos?.bi ? (
+                      <span className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 size={14} />
+                        Carregado
+                      </span>
+                    ) : (
+                      <span className="text-xs text-red-600 flex items-center gap-1">
+                        <XCircle size={14} />
+                        Faltando
+                      </span>
+                    )}
+                  </div>
+                  {selectedPrestador.documentos?.bi && (
+                    <p className="text-xs text-gray-400 mt-2">
+                      {selectedPrestador.documentos.bi.nome} • {formatDate(selectedPrestador.documentos.bi.dataUpload)}
+                    </p>
+                  )}
+                </div>
+
+                <div className="border-2 border-gray-200 rounded-xl p-4">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText size={18} className="text-gray-500" />
+                      <span className="font-bold text-primary">Declaração do Bairro</span>
+                    </div>
+                    {selectedPrestador.documentos?.declaracaoBairro ? (
+                      <span className="text-xs text-green-600 flex items-center gap-1">
+                        <CheckCircle2 size={14} />
+                        Carregado
+                      </span>
+                    ) : (
+                      <span className="text-xs text-red-600 flex items-center gap-1">
+                        <XCircle size={14} />
+                        Faltando
+                      </span>
+                    )}
+                  </div>
+                  {selectedPrestador.documentos?.declaracaoBairro && (
+                    <p className="text-xs text-gray-400 mt-2">
+                      {selectedPrestador.documentos.declaracaoBairro.nome} • {formatDate(selectedPrestador.documentos.declaracaoBairro.dataUpload)}
+                    </p>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Histórico */}
+            {selectedPrestador.dataAprovacao && (
+              <div className="bg-green-50 rounded-xl p-4">
+                <p className="text-xs text-green-600 mb-1">Aprovado em</p>
+                <p className="font-bold text-green-700">{formatDate(selectedPrestador.dataAprovacao)}</p>
+                {selectedPrestador.aprovadoPor && (
+                  <p className="text-xs text-green-600 mt-1">Por: {selectedPrestador.aprovadoPor}</p>
+                )}
+              </div>
+            )}
+
+            {selectedPrestador.dataRejeicao && (
+              <div className="bg-red-50 rounded-xl p-4">
+                <p className="text-xs text-red-600 mb-1">Rejeitado em</p>
+                <p className="font-bold text-red-700">{formatDate(selectedPrestador.dataRejeicao)}</p>
+                {selectedPrestador.rejeitadoPor && (
+                  <p className="text-xs text-red-600 mt-1">Por: {selectedPrestador.rejeitadoPor}</p>
+                )}
+                {selectedPrestador.observacao && (
+                  <p className="text-sm text-red-700 mt-2">{selectedPrestador.observacao}</p>
+                )}
+              </div>
+            )}
+
+            {/* Ações */}
+            <div className="flex gap-3 pt-4 border-t">
+              <Button
+                variant="outline"
+                onClick={() => setShowDetailsModal(false)}
+                className="flex-1"
+              >
+                Fechar
+              </Button>
+              
+              {(selectedPrestador.status === 'pendente' || selectedPrestador.status === 'pendente_documentos') && (
+                <>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowDetailsModal(false);
+                      setShowRejectModal(true);
+                    }}
+                    className="flex-1 border-red-200 text-red-600 hover:bg-red-50"
+                  >
+                    Rejeitar
+                  </Button>
+                  <Button
+                    onClick={() => handleApprove(selectedPrestador.id)}
+                    disabled={actionLoading === selectedPrestador.id}
+                    className="flex-1 bg-green-600 hover:bg-green-700 text-white"
+                  >
+                    {actionLoading === selectedPrestador.id ? 'Processando...' : 'Aprovar'}
+                  </Button>
+                </>
+              )}
+
+              {selectedPrestador.status === 'rejeitado' && (
+                <Button
+                  onClick={() => {
+                    if (window.confirm('Tem certeza que deseja excluir permanentemente este prestador?')) {
+                      handleDelete(selectedPrestador.id);
+                      setShowDetailsModal(false);
+                    }
+                  }}
+                  disabled={actionLoading === selectedPrestador.id}
+                  className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+                >
+                  {actionLoading === selectedPrestador.id ? 'Processando...' : 'Excluir Permanentemente'}
+                </Button>
+              )}
+            </div>
+          </div>
+        )}
+      </Modal>
+
+      {/* ======================================== */}
+      {/* MODAL DE REJEIÇÃO */}
+      {/* ======================================== */}
+      <Modal isOpen={showRejectModal} onClose={() => setShowRejectModal(false)} title="Rejeitar Prestador">
+        <div className="space-y-6">
+          <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+            <p className="text-sm text-red-700">
+              Tem certeza que deseja rejeitar o prestador <span className="font-bold">{selectedPrestador?.nome}</span>?
+            </p>
+          </div>
+
+          <div>
+            <label className="block text-sm font-bold text-gray-700 mb-2">
+              Motivo da rejeição (opcional)
+            </label>
+            <textarea
+              value={rejectReason}
+              onChange={(e) => setRejectReason(e.target.value)}
+              placeholder="Ex: Documentos inválidos, informações inconsistentes..."
+              className="w-full p-3 border-2 border-gray-200 rounded-xl focus:border-accent focus:outline-none min-h-[100px]"
+            />
+          </div>
+
+          <div className="flex gap-3">
+            <Button
+              variant="outline"
+              onClick={() => setShowRejectModal(false)}
+              className="flex-1"
+            >
+              Cancelar
+            </Button>
+            <Button
+              onClick={handleReject}
+              disabled={actionLoading === selectedPrestador?.id}
+              className="flex-1 bg-red-600 hover:bg-red-700 text-white"
+            >
+              {actionLoading === selectedPrestador?.id ? 'Processando...' : 'Rejeitar Prestador'}
+            </Button>
+          </div>
+        </div>
+      </Modal>
     </AppLayout>
   );
 }
