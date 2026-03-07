@@ -30,6 +30,9 @@ export interface User {
   // Campos específicos para cliente
   endereco?: string;
   cidade?: string;
+  // Campos específicos para central
+  nivel?: string;
+  departamento?: string;
 }
 
 interface AuthContextData {
@@ -71,12 +74,15 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // ============================================
-  // BUSCAR DADOS DO USUÁRIO NO FIRESTORE
+  // BUSCAR OU CRIAR DADOS DO USUÁRIO NO FIRESTORE
   // ============================================
-  const fetchUserData = async (uid: string): Promise<User | null> => {
+  const fetchOrCreateUserData = async (uid: string, email: string, telefone?: string): Promise<User | null> => {
     try {
-      const userDoc = await getDoc(doc(db, 'users', uid));
+      const userRef = doc(db, 'users', uid);
+      const userDoc = await getDoc(userRef);
+      
       if (userDoc.exists()) {
+        // Documento existe - retornar dados
         const userData = userDoc.data() as User;
         console.log('📦 Dados do usuário carregados:', userData);
         return {
@@ -84,9 +90,62 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           id: uid,
           dataCadastro: userData.dataCadastro || new Date()
         };
+      } else {
+        // Documento NÃO existe - criar um novo com base no contato
+        console.log('🆕 Criando novo documento para usuário:', uid);
+        
+        // Determinar perfil baseado no email/telefone (para desenvolvimento)
+        // Em produção, isso viria do registro
+        let profile: 'cliente' | 'prestador' | 'central' | 'admin' = 'cliente';
+        let status: 'activo' | 'inactivo' | 'pendente' = 'activo';
+        let especialidade = '';
+        let nivel = '';
+        
+        // Regras para determinar perfil (ajuste conforme necessário)
+        const contacto = email || telefone || '';
+        if (contacto.includes('prestador')) {
+          profile = 'prestador';
+          status = 'pendente'; // Prestadores começam como pendentes
+          especialidade = 'Profissional Geral';
+        } else if (contacto.includes('central')) {
+          profile = 'central';
+          nivel = 'Operador';
+        } else if (contacto.includes('admin')) {
+          profile = 'admin';
+        }
+        
+        const novoUsuario: User = {
+          id: uid,
+          nome: email ? email.split('@')[0] : (telefone ? `Usuário ${telefone.slice(-4)}` : 'Usuário'),
+          email: email || '',
+          telefone: telefone || '',
+          profile: profile,
+          status: status,
+          dataCadastro: new Date(),
+          ultimoAcesso: new Date(),
+          ...(profile === 'prestador' && {
+            especialidade: especialidade,
+            categoria: 'geral',
+            descricao: 'Profissional aguardando aprovação',
+            avaliacaoMedia: 0,
+            totalAvaliacoes: 0
+          }),
+          ...(profile === 'cliente' && {
+            endereco: '',
+            cidade: 'Maputo'
+          }),
+          ...(profile === 'central' && {
+            nivel: nivel,
+            departamento: 'Atendimento'
+          })
+        };
+        
+        await setDoc(userRef, novoUsuario);
+        console.log('✅ Documento criado com sucesso! Perfil:', profile);
+        return novoUsuario;
       }
     } catch (error) {
-      console.error('Erro ao buscar dados do usuário:', error);
+      console.error('Erro ao buscar/criar dados do usuário:', error);
     }
     return null;
   };
@@ -96,7 +155,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   // ============================================
   const updateLastAccess = async (uid: string) => {
     try {
-      await updateDoc(doc(db, 'users', uid), {
+      const userRef = doc(db, 'users', uid);
+      await updateDoc(userRef, {
         ultimoAcesso: new Date()
       });
     } catch (error) {
@@ -116,12 +176,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       setFirebaseUser(firebaseUser);
       
       if (firebaseUser) {
-        // Buscar dados do Firestore
-        const userData = await fetchUserData(firebaseUser.uid);
+        // Buscar ou criar dados do Firestore
+        const userData = await fetchOrCreateUserData(
+          firebaseUser.uid, 
+          firebaseUser.email || '',
+          firebaseUser.phoneNumber || ''
+        );
         setUser(userData);
         
         // Atualizar último acesso
-        await updateLastAccess(firebaseUser.uid);
+        if (userData) {
+          await updateLastAccess(firebaseUser.uid);
+        }
       } else {
         setUser(null);
       }
@@ -142,8 +208,12 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userCredential = await signInWithEmailAndPassword(auth, email, password);
       const firebaseUser = userCredential.user;
       
-      // Buscar dados do Firestore
-      const userData = await fetchUserData(firebaseUser.uid);
+      // Buscar ou criar dados do Firestore
+      const userData = await fetchOrCreateUserData(
+        firebaseUser.uid, 
+        firebaseUser.email || '',
+        firebaseUser.phoneNumber || ''
+      );
       
       console.log('✅ Login bem-sucedido para:', userData?.profile);
       
@@ -158,6 +228,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         errorMessage = 'Senha incorreta';
       } else if (error.code === 'auth/invalid-email') {
         errorMessage = 'Email inválido';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMessage = 'Muitas tentativas. Tente novamente mais tarde';
       }
       
       return { success: false, error: errorMessage };
@@ -165,16 +237,36 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   };
 
   // ============================================
-  // REGISTRO
+  // REGISTRO - ACEITA EMAIL OU TELEFONE COMO CONTATO
   // ============================================
   const register = async (userData: any) => {
     try {
-      console.log('📝 Tentativa de registro:', userData.email);
+      // Determinar o contato principal (email ou telefone)
+      const contacto = userData.email || userData.telefone;
+      if (!contacto) {
+        return { success: false, error: 'É necessário fornecer email ou telefone' };
+      }
+
+      console.log('📝 Tentativa de registro com contato:', contacto);
+      
+      // Para registro com telefone, precisamos gerar um email temporário
+      // pois o Firebase Auth requer email
+      let email = userData.email;
+      let password = userData.password;
+      
+      // Se não tem email mas tem telefone, criar email temporário
+      if (!email && userData.telefone) {
+        email = `${userData.telefone.replace(/\D/g, '')}@temp.dexapp.co.mz`;
+        // Se não foi fornecida senha, gerar uma padrão
+        if (!password) {
+          password = 'temp123456';
+        }
+      }
       
       const userCredential = await createUserWithEmailAndPassword(
         auth,
-        userData.email,
-        userData.password
+        email,
+        password
       );
       
       const firebaseUser = userCredential.user;
@@ -183,10 +275,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       const userToSave = {
         id: firebaseUser.uid,
         nome: userData.nome,
-        email: userData.email,
+        email: userData.email || '',  // Pode ser vazio se usou telefone
         telefone: userData.telefone || '',
         profile: userData.profile || 'cliente',
-        status: 'activo',
+        status: userData.profile === 'prestador' ? 'pendente' : 'activo',
         dataCadastro: new Date(),
         ultimoAcesso: new Date(),
         ...(userData.profile === 'prestador' && {
@@ -198,7 +290,11 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         }),
         ...(userData.profile === 'cliente' && {
           endereco: userData.endereco || '',
-          cidade: userData.cidade || ''
+          cidade: userData.cidade || 'Maputo'
+        }),
+        ...(userData.profile === 'central' && {
+          nivel: userData.nivel || 'Operador',
+          departamento: userData.departamento || 'Atendimento'
         })
       };
       
@@ -215,7 +311,9 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
       if (error.code === 'auth/email-already-in-use') {
         errorMessage = 'Email já está em uso';
       } else if (error.code === 'auth/weak-password') {
-        errorMessage = 'Senha muito fraca';
+        errorMessage = 'Senha muito fraca. Use pelo menos 6 caracteres';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Email inválido';
       }
       
       return { success: false, error: errorMessage };
