@@ -27,7 +27,9 @@ import {
   Briefcase,
   Star,
   Clock,
-  MessageCircle
+  MessageCircle,
+  IdCard,
+  Home
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
@@ -51,10 +53,8 @@ interface PrestadorForm {
   cidade: string;
   valorHora: number;
   documentos: {
-    bi: File | null;
-    declaracaoRendimento: File | null;
-    declaracaoBairro: File | null;
-    certificado?: File | null;
+    bi: File | null;           // Bilhete de Identidade (obrigatório)
+    declaracaoBairro: File | null; // Declaração do Bairro (obrigatório)
   };
 }
 
@@ -82,18 +82,10 @@ const DOCUMENTOS_REQUERIDOS: DocumentoRequerido[] = [
   {
     id: 'bi',
     label: 'Bilhete de Identidade',
-    descricao: 'Frente e verso do seu BI',
+    descricao: 'Frente e verso do seu BI (PDF ou imagem)',
     aceitos: 'PDF, JPG, PNG (max 5MB)',
     obrigatorio: true,
-    icon: FileText
-  },
-  {
-    id: 'declaracaoRendimento',
-    label: 'Declaração de Rendimento',
-    descricao: 'Comprovativo de rendimento ou atividade',
-    aceitos: 'PDF, JPG, PNG (max 5MB)',
-    obrigatorio: true,
-    icon: FileText
+    icon: IdCard
   },
   {
     id: 'declaracaoBairro',
@@ -101,15 +93,7 @@ const DOCUMENTOS_REQUERIDOS: DocumentoRequerido[] = [
     descricao: 'Comprovativo de residência emitido pelo bairro',
     aceitos: 'PDF, JPG, PNG (max 5MB)',
     obrigatorio: true,
-    icon: FileText
-  },
-  {
-    id: 'certificado',
-    label: 'Certificado/Diploma (opcional)',
-    descricao: 'Comprovativo de formação na área',
-    aceitos: 'PDF, JPG, PNG (max 5MB)',
-    obrigatorio: false,
-    icon: FileText
+    icon: Home
   }
 ];
 
@@ -144,9 +128,7 @@ export default function RegisterPrestador() {
     valorHora: 500,
     documentos: {
       bi: null,
-      declaracaoRendimento: null,
-      declaracaoBairro: null,
-      certificado: null
+      declaracaoBairro: null
     }
   });
 
@@ -177,7 +159,7 @@ export default function RegisterPrestador() {
     if (!file) return;
 
     // Validar tipo
-    const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png'];
+    const tiposPermitidos = ['application/pdf', 'image/jpeg', 'image/png', 'image/jpg'];
     if (!tiposPermitidos.includes(file.type)) {
       showToast('Formato não permitido. Use PDF, JPG ou PNG', 'error');
       return;
@@ -305,7 +287,7 @@ export default function RegisterPrestador() {
     const faltando = documentosObrigatorios.filter(d => !uploadedFiles[d.id]);
 
     if (faltando.length > 0) {
-      showToast(`Carregue todos os documentos obrigatórios`, 'error');
+      showToast('Carregue todos os documentos obrigatórios', 'error');
       return false;
     }
     return true;
@@ -593,6 +575,19 @@ export default function RegisterPrestador() {
                             >
                               <h3 className="font-bold text-primary">{esp.nome}</h3>
                               <p className="text-xs text-gray-500">{esp.descricao}</p>
+                              <div className="flex items-center gap-2 mt-2">
+                                <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full ${
+                                  esp.tamanho === 'pequeno' ? 'bg-green-100 text-green-700' :
+                                  esp.tamanho === 'medio' ? 'bg-yellow-100 text-yellow-700' :
+                                  'bg-red-100 text-red-700'
+                                }`}>
+                                  {esp.tamanho === 'pequeno' ? 'Pequeno' : 
+                                   esp.tamanho === 'medio' ? 'Médio' : 'Grande'}
+                                </span>
+                                <span className="text-xs font-bold text-primary">
+                                  {esp.precoBase.toLocaleString()} MT base
+                                </span>
+                              </div>
                             </button>
                           ))}
                         </div>
@@ -713,7 +708,7 @@ export default function RegisterPrestador() {
               )}
 
               {/* ======================================== */}
-              {/* PASSO 3: DOCUMENTOS */}
+              {/* PASSO 3: DOCUMENTOS (APENAS BI E DECLARAÇÃO DO BAIRRO) */}
               {/* ======================================== */}
               {step === 3 && (
                 <motion.div
@@ -800,11 +795,11 @@ export default function RegisterPrestador() {
                         <AlertCircle size={20} className="text-blue-600 shrink-0 mt-0.5" />
                         <div>
                           <p className="text-sm font-bold text-blue-700 mb-1">
-                            Por que precisamos destes documentos?
+                            Apenas estes documentos são necessários
                           </p>
                           <p className="text-xs text-blue-600">
-                            A verificação de documentos garante mais segurança para você e para os clientes.
-                            Seus dados estão protegidos e só serão usados para validação.
+                            Bilhete de Identidade e Declaração do Bairro são suficientes para 
+                            validar seu cadastro. Seus dados estão protegidos.
                           </p>
                         </div>
                       </div>
