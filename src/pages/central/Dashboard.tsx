@@ -470,7 +470,7 @@ export default function CentralDashboard() {
       unsubscribeAvaliacoes();
       unsubscribeNotificacoes();
     };
-  }, []);
+  }, [user?.id]);
 
   // ============================================
   // FILTRAR SOLICITAÇÕES
@@ -1941,7 +1941,6 @@ export default function CentralDashboard() {
                 variant="primary"
                 onClick={() => {
                   setShowDetalhesSolicitacaoModal(false);
-                  // Navegar para detalhes específicos se necessário
                 }}
                 className="flex-1 bg-accent hover:bg-accent/90 text-white"
               >
