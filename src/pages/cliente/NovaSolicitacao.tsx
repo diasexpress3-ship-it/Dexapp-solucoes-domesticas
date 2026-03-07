@@ -34,13 +34,14 @@ import {
   Copy,
   Check,
   Ruler,
-  Info
+  Info,
+  Percent
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { useToast } from '../../contexts/ToastContext';
 import { collection, addDoc, serverTimestamp, query, where, getDocs, doc, updateDoc } from 'firebase/firestore';
 import { db } from '../../services/firebase';
-import { SERVICE_CATEGORIES, getEspecialidadesByCategoria, Especialidade, calcularPrecoEstimado, getTamanhoDescricao } from '../../constants/categories';
+import { SERVICE_CATEGORIES, getEspecialidadesByCategoria, Especialidade, calcularPrecoTotalMultiplas, getTamanhoDescricao } from '../../constants/categories';
 import { motion, AnimatePresence } from 'framer-motion';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -50,7 +51,7 @@ import jsPDF from 'jspdf';
 // ============================================
 interface SolicitacaoForm {
   categoria: string;
-  especialidades: string[]; // AGORA É ARRAY PARA MÚLTIPLAS ESPECIALIDADES
+  especialidades: string[];
   descricao: string;
   tamanho: 'pequeno' | 'medio' | 'grande';
   dataAgendada: string;
@@ -60,12 +61,14 @@ interface SolicitacaoForm {
     quarteirao?: string;
     casa?: string;
     complemento?: string;
-    referencia?: string; // NOVO: referência da residência
+    referencia?: string;
   };
   imagens: string[];
   prestadorId?: string;
   prestadorNome?: string;
-  valorEstimado: number;
+  valorTotal: number;
+  valorInicial70: number;
+  valorFinal30: number;
   metodoPagamento?: string;
   referenciaPagamento?: string;
 }
@@ -107,10 +110,12 @@ interface Recibo {
   especialidades: string[];
   prestador: string;
   prestadorId: string;
-  valor: number;
+  valorTotal: number;
+  valorPago: number; // 70%
+  valorRestante: number; // 30%
   metodo: string;
   referencia: string;
-  status: 'pago' | 'pendente' | 'cancelado';
+  status: 'pago_parcial' | 'pago_total' | 'pendente' | 'cancelado';
   clienteNome: string;
   clienteEmail?: string;
   clienteTelefone?: string;
@@ -226,6 +231,7 @@ export default function NovaSolicitacao() {
   const [pagamentoConfirmado, setPagamentoConfirmado] = useState(false);
   const [copiado, setCopiado] = useState<string | null>(null);
   const [tamanhoSelecionado, setTamanhoSelecionado] = useState<'pequeno' | 'medio' | 'grande'>('pequeno');
+  const [precos, setPrecos] = useState({ total: 0, inicial70: 0, final30: 0 });
   
   const [form, setForm] = useState<SolicitacaoForm>({
     categoria: '',
@@ -242,22 +248,26 @@ export default function NovaSolicitacao() {
       referencia: ''
     },
     imagens: [],
-    valorEstimado: 0
+    valorTotal: 0,
+    valorInicial70: 0,
+    valorFinal30: 0
   });
 
   const [files, setFiles] = useState<FileWithPreview[]>([]);
 
   // ============================================
-  // ATUALIZAR VALOR ESTIMADO
+  // ATUALIZAR VALORES ESTIMADOS
   // ============================================
   useEffect(() => {
     if (form.especialidades.length > 0) {
-      // Calcular valor total somando todas as especialidades selecionadas
-      let total = 0;
-      form.especialidades.forEach(espId => {
-        total += calcularPrecoEstimado(espId, form.tamanho);
-      });
-      setForm(prev => ({ ...prev, valorEstimado: total }));
+      const precosCalculados = calcularPrecoTotalMultiplas(form.especialidades, form.tamanho);
+      setPrecos(precosCalculados);
+      setForm(prev => ({ 
+        ...prev, 
+        valorTotal: precosCalculados.total,
+        valorInicial70: precosCalculados.inicial70,
+        valorFinal30: precosCalculados.final30
+      }));
     }
   }, [form.especialidades, form.tamanho]);
 
@@ -314,7 +324,7 @@ export default function NovaSolicitacao() {
           collection(db, 'users'),
           where('profile', '==', 'prestador'),
           where('status', '==', 'activo'),
-          where('especialidade', 'in', form.especialidades.slice(0, 10)) // Firestore limit
+          where('especialidade', 'in', form.especialidades.slice(0, 10))
         );
 
         const snapshot = await getDocs(prestadoresQuery);
@@ -326,7 +336,7 @@ export default function NovaSolicitacao() {
           totalAvaliacoes: doc.data().totalAvaliacoes || 0,
           valorHora: doc.data().valorHora || 500,
           disponivel: true,
-          distancia: '2.5 km', // Simulado
+          distancia: '2.5 km',
           telefone: doc.data().telefone,
           descricao: doc.data().descricao
         }));
@@ -392,8 +402,7 @@ export default function NovaSolicitacao() {
     setForm(prev => ({
       ...prev,
       prestadorId: prestador.id,
-      prestadorNome: prestador.nome,
-      valorEstimado: prev.valorEstimado // Mantém o valor calculado
+      prestadorNome: prestador.nome
     }));
   };
 
@@ -471,12 +480,14 @@ export default function NovaSolicitacao() {
         especialidades: form.especialidades,
         prestador: form.prestadorNome || 'Aguardando prestador',
         prestadorId: form.prestadorId || '',
-        valor: form.valorEstimado,
+        valorTotal: form.valorTotal,
+        valorPago: form.valorInicial70,
+        valorRestante: form.valorFinal30,
         metodo: metodo.nome,
         referencia: metodo.id === 'transferencia' 
           ? `TRF-${camposPagamento.comprovativo?.slice(-6) || Date.now().toString().slice(-6)}` 
           : `MP-${Math.random().toString(36).substring(2, 10).toUpperCase()}`,
-        status: 'pago',
+        status: 'pago_parcial',
         clienteNome: user?.nome || 'Cliente',
         clienteEmail: user?.email,
         clienteTelefone: user?.telefone,
@@ -486,7 +497,7 @@ export default function NovaSolicitacao() {
       };
 
       setRecibo(novoRecibo);
-      showToast('✅ Pagamento confirmado!', 'success');
+      showToast('✅ Pagamento inicial de 70% confirmado!', 'success');
       
       setTimeout(() => setStep(6), 1500);
     }, 2000);
@@ -517,8 +528,13 @@ export default function NovaSolicitacao() {
         imagens: imagensUrls,
         prestadorId: form.prestadorId,
         prestadorNome: form.prestadorNome,
-        status: form.tamanho === 'grande' ? 'aguardando_orcamento' : 'pagamento_confirmado',
-        valorTotal: form.valorEstimado,
+        status: form.tamanho === 'grande' ? 'aguardando_orcamento' : 'pagamento_parcial',
+        valorTotal: form.valorTotal,
+        valorInicial70: form.valorInicial70,
+        valorFinal30: form.valorFinal30,
+        valorPago: form.valorInicial70,
+        valorRestante: form.valorFinal30,
+        percentualPago: 70,
         metodoPagamento: metodoSelecionado,
         referenciaPagamento: recibo?.referencia,
         pagamentoConfirmado: true,
@@ -591,8 +607,8 @@ export default function NovaSolicitacao() {
               {step === 3 && form.tamanho === 'grande' && 'Aguardando orçamento da central'}
               {step === 3 && form.tamanho !== 'grande' && 'Escolha o prestador para o serviço'}
               {step === 4 && 'Selecione o método de pagamento'}
-              {step === 5 && 'Confirme os dados e realize o pagamento'}
-              {step === 6 && 'Pagamento confirmado! Guarde seu recibo'}
+              {step === 5 && 'Confirme os dados e realize o pagamento inicial (70%)'}
+              {step === 6 && 'Pagamento inicial confirmado! Guarde seu recibo'}
             </p>
           </div>
         </div>
@@ -745,7 +761,7 @@ export default function NovaSolicitacao() {
                                    esp.tamanho === 'medio' ? 'Médio' : 'Grande'}
                                 </span>
                                 <span className="text-xs font-bold text-primary">
-                                  {esp.precoBase.toLocaleString()} MT
+                                  {esp.precoBase.toLocaleString()} MT base
                                 </span>
                               </div>
                             </div>
@@ -755,13 +771,29 @@ export default function NovaSolicitacao() {
                     </div>
                     
                     {especialidadesSelecionadas.length > 0 && (
-                      <div className="mt-4 p-3 bg-accent/5 rounded-xl flex items-center justify-between">
-                        <span className="text-sm font-bold text-gray-600">
-                          {especialidadesSelecionadas.length} especialidade(s) selecionada(s)
-                        </span>
-                        <span className="text-lg font-black text-primary">
-                          {form.valorEstimado.toLocaleString()} MT
-                        </span>
+                      <div className="mt-4 p-4 bg-accent/5 rounded-xl">
+                        <div className="flex items-center justify-between mb-2">
+                          <span className="text-sm font-bold text-gray-600">
+                            {especialidadesSelecionadas.length} especialidade(s) selecionada(s)
+                          </span>
+                          <span className="text-lg font-black text-primary">
+                            {precos.total.toLocaleString()} MT
+                          </span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 flex items-center gap-1">
+                            <Percent size={14} className="text-accent" />
+                            70% inicial:
+                          </span>
+                          <span className="font-bold text-accent">{precos.inicial70.toLocaleString()} MT</span>
+                        </div>
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-gray-500 flex items-center gap-1">
+                            <Percent size={14} className="text-orange-500" />
+                            30% final:
+                          </span>
+                          <span className="font-bold text-orange-500">{precos.final30.toLocaleString()} MT</span>
+                        </div>
                       </div>
                     )}
                   </div>
@@ -1033,29 +1065,50 @@ export default function NovaSolicitacao() {
                 </div>
 
                 {/* Simulação de Preço */}
-                <Card className="bg-gradient-to-r from-accent/10 to-accent/5 border-accent/20 mb-6">
-                  <CardContent className="p-4">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <DollarSign size={24} className="text-accent" />
+                {form.especialidades.length > 0 && (
+                  <Card className="bg-gradient-to-r from-accent/10 to-accent/5 border-accent/20 mb-6">
+                    <CardContent className="p-4">
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-3">
+                          <DollarSign size={24} className="text-accent" />
+                          <div>
+                            <p className="text-sm font-bold text-gray-600">Valor Total Estimado</p>
+                            <p className="text-2xl font-black text-primary">
+                              {precos.total.toLocaleString()} MT
+                            </p>
+                            <p className="text-xs text-gray-500">
+                              {getTamanhoDescricao(form.tamanho)}
+                            </p>
+                          </div>
+                        </div>
+                        {form.tamanho === 'grande' && (
+                          <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
+                            Orçamento via Central
+                          </span>
+                        )}
+                      </div>
+                      
+                      <div className="grid grid-cols-2 gap-4 mt-3 pt-3 border-t border-gray-200">
                         <div>
-                          <p className="text-sm font-bold text-gray-600">Valor Estimado</p>
-                          <p className="text-2xl font-black text-primary">
-                            {form.valorEstimado.toLocaleString()} MT
+                          <p className="text-xs text-gray-500 flex items-center gap-1">
+                            <Percent size={12} className="text-accent" />
+                            70% Inicial
                           </p>
-                          <p className="text-xs text-gray-500">
-                            {getTamanhoDescricao(form.tamanho)}
+                          <p className="text-lg font-bold text-accent">{precos.inicial70.toLocaleString()} MT</p>
+                          <p className="text-[10px] text-gray-400">Pagar agora</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-500 flex items-center gap-1">
+                            <Percent size={12} className="text-orange-500" />
+                            30% Final
                           </p>
+                          <p className="text-lg font-bold text-orange-500">{precos.final30.toLocaleString()} MT</p>
+                          <p className="text-[10px] text-gray-400">Pagar após conclusão</p>
                         </div>
                       </div>
-                      {form.tamanho === 'grande' && (
-                        <span className="text-xs font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full">
-                          Orçamento via Central
-                        </span>
-                      )}
-                    </div>
-                  </CardContent>
-                </Card>
+                    </CardContent>
+                  </Card>
+                )}
 
                 <div className="flex justify-between mt-8">
                   <Button
@@ -1213,14 +1266,23 @@ export default function NovaSolicitacao() {
                 exit={{ opacity: 0, x: -20 }}
               >
                 <h2 className="text-2xl font-black text-primary mb-6">
-                  <span className="text-accent">Pagamento</span>
+                  <span className="text-accent">Pagamento</span> Inicial (70%)
                 </h2>
 
                 <Card className="bg-gradient-to-r from-primary to-blue-900 text-white mb-6">
                   <CardContent className="p-6">
-                    <p className="text-sm opacity-80 mb-1">Total a Pagar</p>
-                    <p className="text-4xl font-black mb-2">{form.valorEstimado.toLocaleString()} MT</p>
-                    <p className="text-xs opacity-60">Inclui taxas de serviço</p>
+                    <p className="text-sm opacity-80 mb-1">Total do Serviço</p>
+                    <p className="text-4xl font-black mb-2">{precos.total.toLocaleString()} MT</p>
+                    <div className="grid grid-cols-2 gap-4 mt-4 pt-4 border-t border-white/20">
+                      <div>
+                        <p className="text-xs opacity-60">70% Inicial</p>
+                        <p className="text-2xl font-bold text-accent">{precos.inicial70.toLocaleString()} MT</p>
+                      </div>
+                      <div>
+                        <p className="text-xs opacity-60">30% Final</p>
+                        <p className="text-2xl font-bold text-orange-300">{precos.final30.toLocaleString()} MT</p>
+                      </div>
+                    </div>
                   </CardContent>
                 </Card>
 
@@ -1267,7 +1329,7 @@ export default function NovaSolicitacao() {
             )}
 
             {/* ======================================== */}
-            {/* PASSO 5: CONFIRMAÇÃO E PAGAMENTO */}
+            {/* PASSO 5: CONFIRMAÇÃO E PAGAMENTO (70%) */}
             {/* ======================================== */}
             {step === 5 && metodoSelecionado && (
               <motion.div
@@ -1276,8 +1338,16 @@ export default function NovaSolicitacao() {
                 exit={{ opacity: 0, x: -20 }}
               >
                 <h2 className="text-2xl font-black text-primary mb-6">
-                  <span className="text-accent">Confirmar</span> Pagamento
+                  <span className="text-accent">Confirmar</span> Pagamento Inicial
                 </h2>
+
+                <Card className="bg-gradient-to-r from-accent to-orange-600 text-white mb-6">
+                  <CardContent className="p-6">
+                    <p className="text-sm opacity-80 mb-1">Valor a pagar agora (70%)</p>
+                    <p className="text-4xl font-black mb-2">{precos.inicial70.toLocaleString()} MT</p>
+                    <p className="text-xs opacity-60">Restante: {precos.final30.toLocaleString()} MT (após conclusão)</p>
+                  </CardContent>
+                </Card>
 
                 <Card className="bg-blue-50 border-blue-200 mb-6">
                   <CardContent className="p-4">
@@ -1337,7 +1407,7 @@ export default function NovaSolicitacao() {
                       Processando pagamento...
                     </>
                   ) : (
-                    'Confirmar Pagamento'
+                    `Pagar ${precos.inicial70.toLocaleString()} MT (70%)`
                   )}
                 </Button>
 
@@ -1353,7 +1423,7 @@ export default function NovaSolicitacao() {
             )}
 
             {/* ======================================== */}
-            {/* PASSO 6: RECIBO */}
+            {/* PASSO 6: RECIBO (70% PAGO) */}
             {/* ======================================== */}
             {step === 6 && recibo && (
               <motion.div
@@ -1382,7 +1452,7 @@ export default function NovaSolicitacao() {
                           </div>
                           <div className="text-right">
                             <p className="opacity-80">Status</p>
-                            <p className="font-bold text-green-400">PAGO</p>
+                            <p className="font-bold text-yellow-400">PAGO PARCIAL (70%)</p>
                           </div>
                         </div>
                       </div>
@@ -1411,27 +1481,29 @@ export default function NovaSolicitacao() {
                         </div>
 
                         <div className="bg-gray-50 p-4 rounded-xl">
-                          <div className="flex items-center justify-between mb-2">
-                            <p className="text-xs text-gray-500">Método de Pagamento</p>
-                            <p className="font-bold text-accent">{recibo.metodo}</p>
-                          </div>
-                          <div className="flex items-center justify-between">
-                            <p className="text-xs text-gray-500">Referência</p>
-                            <div className="flex items-center gap-2">
-                              <p className="font-mono text-sm">{recibo.referencia}</p>
-                              <button
-                                onClick={() => handleCopyToClipboard(recibo.referencia, 'Referência')}
-                                className="text-gray-400 hover:text-accent"
-                              >
-                                {copiado === 'Referência' ? <Check size={16} /> : <Copy size={16} />}
-                              </button>
+                          <div className="grid grid-cols-2 gap-4 mb-3">
+                            <div>
+                              <p className="text-xs text-gray-500">Valor Total</p>
+                              <p className="font-bold text-primary">{recibo.valorTotal.toLocaleString()} MT</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Método</p>
+                              <p className="font-bold text-accent">{recibo.metodo}</p>
                             </div>
                           </div>
-                        </div>
-
-                        <div className="flex items-center justify-between pt-4">
-                          <p className="text-lg font-black text-primary">Total Pago</p>
-                          <p className="text-3xl font-black text-accent">{recibo.valor.toLocaleString()} MT</p>
+                          <div className="grid grid-cols-2 gap-4 pt-3 border-t border-gray-200">
+                            <div>
+                              <p className="text-xs text-gray-500">Pago (70%)</p>
+                              <p className="font-bold text-green-600">{recibo.valorPago.toLocaleString()} MT</p>
+                            </div>
+                            <div>
+                              <p className="text-xs text-gray-500">Restante (30%)</p>
+                              <p className="font-bold text-orange-500">{recibo.valorRestante.toLocaleString()} MT</p>
+                            </div>
+                          </div>
+                          <div className="mt-3 text-xs text-gray-400">
+                            Referência: {recibo.referencia}
+                          </div>
                         </div>
                       </div>
                     </CardContent>
@@ -1480,11 +1552,10 @@ export default function NovaSolicitacao() {
                   <CardContent className="p-4 flex items-start gap-3">
                     <CheckCircle2 size={20} className="text-green-600 shrink-0 mt-0.5" />
                     <div>
-                      <p className="font-bold text-green-700 mb-1">Pagamento Confirmado!</p>
+                      <p className="font-bold text-green-700 mb-1">Pagamento Inicial Confirmado!</p>
                       <p className="text-sm text-green-600">
-                        Um recibo foi enviado para {user?.email || 'seu email'} e 
-                        {user?.telefone ? ` ${user.telefone}` : ' SMS'}.
-                        Você pode acompanhar o status do serviço no dashboard.
+                        Você pagou 70% do valor total ({recibo.valorPago.toLocaleString()} MT). 
+                        Os 30% restantes ({recibo.valorRestante.toLocaleString()} MT) deverão ser pagos após a conclusão do serviço.
                       </p>
                     </div>
                   </CardContent>
