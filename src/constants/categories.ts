@@ -6,7 +6,7 @@ export interface Especialidade {
   id: string;
   nome: string;
   descricao: string;
-  tamanho: 'pequeno' | 'medio' | 'grande'; // TAMANHO do serviço (não tempo)
+  tamanho: 'pequeno' | 'medio' | 'grande';
   precoBase: number;
 }
 
@@ -179,15 +179,15 @@ export const ESPECIALIDADES_POR_CATEGORIA = SERVICE_CATEGORIES.reduce((acc, cat)
 }, {} as Record<string, Especialidade[]>);
 
 // ============================================
-// FUNÇÕES PARA CÁLCULO DE PREÇO BASEADO NO TAMANHO
+// FUNÇÕES PARA CÁLCULO DE PREÇO
 // ============================================
 
 export const calcularPrecoEstimado = (
   especialidadeId: string,
   tamanho: 'pequeno' | 'medio' | 'grande'
-): number => {
+): { total: number; inicial70: number; final30: number } => {
   const especialidade = getAllEspecialidades().find(e => e.id === especialidadeId);
-  if (!especialidade) return 0;
+  if (!especialidade) return { total: 0, inicial70: 0, final30: 0 };
 
   const multiplicador = {
     pequeno: 1,
@@ -195,7 +195,28 @@ export const calcularPrecoEstimado = (
     grande: 2.5
   };
 
-  return especialidade.precoBase * multiplicador[tamanho];
+  const total = especialidade.precoBase * multiplicador[tamanho];
+  const inicial70 = Math.round(total * 0.7);
+  const final30 = Math.round(total * 0.3);
+
+  return { total, inicial70, final30 };
+};
+
+export const calcularPrecoTotalMultiplas = (
+  especialidadesIds: string[],
+  tamanho: 'pequeno' | 'medio' | 'grande'
+): { total: number; inicial70: number; final30: number } => {
+  let total = 0;
+  especialidadesIds.forEach(espId => {
+    const { total: preco } = calcularPrecoEstimado(espId, tamanho);
+    total += preco;
+  });
+
+  return {
+    total,
+    inicial70: Math.round(total * 0.7),
+    final30: Math.round(total * 0.3)
+  };
 };
 
 export const getTamanhoDescricao = (tamanho: 'pequeno' | 'medio' | 'grande'): string => {
