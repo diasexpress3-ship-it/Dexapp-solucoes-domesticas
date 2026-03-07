@@ -141,24 +141,43 @@ export const SERVICE_CATEGORIES: Categoria[] = [
   }
 ];
 
-// Helper para obter especialidades por categoria
+// ============================================
+// HELPERS (EXPORTADOS CORRETAMENTE)
+// ============================================
+
+/**
+ * Obtém especialidades por categoria
+ * @param categoriaId - ID da categoria
+ * @returns Array de especialidades
+ */
 export const getEspecialidadesByCategoria = (categoriaId: string): Especialidade[] => {
   const categoria = SERVICE_CATEGORIES.find(c => c.id === categoriaId);
   return categoria?.especialidades || [];
 };
 
-// Helper para obter todas as especialidades
+/**
+ * Obtém todas as especialidades
+ * @returns Array com todas as especialidades
+ */
 export const getAllEspecialidades = (): Especialidade[] => {
   return SERVICE_CATEGORIES.flatMap(c => c.especialidades);
 };
 
-// Helper para obter nome da categoria pelo ID
+/**
+ * Obtém nome da categoria pelo ID
+ * @param categoriaId - ID da categoria
+ * @returns Nome da categoria
+ */
 export const getCategoriaNome = (categoriaId: string): string => {
   const categoria = SERVICE_CATEGORIES.find(c => c.id === categoriaId);
   return categoria?.nome || categoriaId;
 };
 
-// Helper para obter especialidade pelo ID
+/**
+ * Obtém nome da especialidade pelo ID
+ * @param especialidadeId - ID da especialidade
+ * @returns Nome da especialidade
+ */
 export const getEspecialidadeNome = (especialidadeId: string): string => {
   for (const cat of SERVICE_CATEGORIES) {
     const esp = cat.especialidades.find(e => e.id === especialidadeId);
@@ -166,3 +185,20 @@ export const getEspecialidadeNome = (especialidadeId: string): string => {
   }
   return especialidadeId;
 };
+
+/**
+ * Obtém especialidades por categoria (alias em inglês para compatibilidade)
+ * @param categoryId - ID da categoria
+ * @returns Array de especialidades
+ */
+export const getSpecialtiesByCategory = (categoryId: string): Especialidade[] => {
+  return getEspecialidadesByCategoria(categoryId);
+};
+
+/**
+ * Mapeamento de especialidades por categoria (para compatibilidade)
+ */
+export const ESPECIALIDADES_POR_CATEGORIA = SERVICE_CATEGORIES.reduce((acc, cat) => {
+  acc[cat.id] = cat.especialidades;
+  return acc;
+}, {} as Record<string, Especialidade[]>);
